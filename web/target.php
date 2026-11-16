@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/includes/layout.php';
 require __DIR__ . '/includes/plots.php';
+require __DIR__ . '/includes/releases.php';
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 $t = $id ? ava_target($id) : null;
@@ -300,6 +301,8 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         F<sub>max</sub>/F<sub>min</sub>: highest / lowest nightly flux (not corrected for errors).
       </p>
       <?php endif; ?>
+
+      <?php ava_release_panel($t); ?>
 
       <h2 class="ava-h">Data citation</h2>
       <?php if ($cites): ?>

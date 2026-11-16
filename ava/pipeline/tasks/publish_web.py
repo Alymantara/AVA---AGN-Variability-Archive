@@ -22,4 +22,10 @@ def publish_web(targets: list[str] | None = None) -> dict:
     s = publish_from_config(cfg, targets=targets)
     log.info("website data → %s: %d AGN, %d plot(s) updated for %d target(s), %d pruned, %d usage plot(s)",
              s.dest, s.agn, s.plots_copied, s.targets_with_plots, s.plots_pruned, s.usage_copied)
-    return s.as_dict()
+    from ava.web.releases import publish_releases_from_config     # data releases (ava.database.releases)
+
+    r = publish_releases_from_config(cfg)
+    log.info("data releases: %d public file(s), %d copied, %d removed", r["release_files"], r["copied"], r["pruned"])
+    for p in r["problems"]:
+        log.warning("data release: %s", p)
+    return {**s.as_dict(), "releases": r}

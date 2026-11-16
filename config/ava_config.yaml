@@ -567,3 +567,12 @@ web:
   port: 5000
   debug: false
   secret_key: ""   # use env var AVA_SECRET_KEY
+
+# ============================================================
+#  DATA RELEASES  (ava.database.releases; tools/register_release.py; ava.web.releases)
+# ============================================================
+# Release files are made by a release script; tools/register_release.py <DR> records them in the database
+# (data_releases, agn_releases = the per-AGN flag, release_files) and -w publishes the public ones to
+# <web.data_dir>/releases/. Layout: <dir>/<DR>/release.yaml + <dir>/<DR>/<data_id>/[<kind>/]<files>.
+releases:
+  dir: "releases"          # absolute, or relative to paths.archive_root

@@ -291,3 +291,11 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **Redshift disagreements, SIMBAD vs NED:** 3C 382 0.0579 vs 0.0556; RX J1755 0.0785 vs 0.0806; PHL 1811 0.192 vs 0.194.
 - **ADS bibcodes:** add them in `*_url` for the new literature values (only the citation names were supplied).
 - **Vmag** is not maintained by the pipeline: only the original import set it. After the merge (PyTICS / intercalibration), the photometry package should update `agn.Vmag` (or a g-band equivalent) from the merged light curve.
+
+## Data releases (16 Nov 2026: groundwork, no release content yet)
+
+- **Database:** `data_releases` (one row per release), `agn_releases` (the per-AGN flag: `available` 1/0) and `release_files` (path, kind, size, SHA-256), all in `ava.db`, written by `tools/register_release.py <DR> --write` (dry run by default; backup first). `--withhold <data_id>` registers an AGN with the flag at 0, and a withhold sticks on re-registration.
+- **Files:** made by a release script, still to be written. Layout: `<releases.dir>/<DR>/release.yaml` (title, description, date range, `release_date`, DOI, URL) plus `<releases.dir>/<DR>/<data_id>/[<kind>/]<files>`; the first sub-folder is the file's kind.
+- **Website:** `-w` copies exactly the public files (flag 1, `release_date` passed, SHA-256 unchanged since registration) into `<web.data_dir>/releases/` and removes anything else. The target page shows a "Data releases" section with links only then (`web/includes/releases.php`).
+- **To do:** the DR1 release script (contents, file formats, README per AGN); a per-AGN zip; a release list on the Data & Access page; a DOI.
+- **Test archive demo:** `data/test_archive/releases/DR1` (Mrk 817 merged light curve, Mrk 817 and NGC 4151 Hβ light curves) is registered in the test-archive database only.
