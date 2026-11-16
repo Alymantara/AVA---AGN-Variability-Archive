@@ -57,7 +57,8 @@ def process_catalog(cat_path: Path, ref: pd.DataFrame, meta: dict, data_id: str,
     parts = frame.split("-")
     cam = parts[1]
     row = dict(frame=frame, data_id=data_id, camera=cam, tel=parts[0][-5:], site=meta.get("site") or parts[0][:3],
-               **{k: meta.get(k) for k in ("mjd_mid", "day_obs", "filter", "exptime", "airmass", "seeing_hdr")},
+               **{k: meta.get(k) for k in ("mjd_mid", "day_obs", "filter", "exptime", "airmass", "seeing_hdr",
+                                           "saturate", "naxis1", "naxis2")},
                pipeline_version=PIPELINE_VERSION,
                processed_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     cat = read_catalog(cat_path)

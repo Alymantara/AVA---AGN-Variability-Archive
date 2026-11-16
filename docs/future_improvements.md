@@ -299,3 +299,22 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **Website:** `-w` copies exactly the public files (flag 1, `release_date` passed, SHA-256 unchanged since registration) into `<web.data_dir>/releases/` and removes anything else. The target page shows a "Data releases" section with links only then (`web/includes/releases.php`).
 - **To do:** the DR1 release script (contents, file formats, README per AGN); a per-AGN zip; a release list on the Data & Access page; a DOI.
 - **Test archive demo:** `data/test_archive/releases/DR1` (Mrk 817 merged light curve, Mrk 817 and NGC 4151 Hβ light curves) is registered in the test-archive database only.
+
+## Production storage: photometry images are not kept (decided 16 Nov 2026)
+
+- **Decision (user):** photometry images (BANZAI e91 `.fits.fz`, ~38 MB per Sinistro frame) are deleted
+  after they are catalogued and calibrated, after a short retention period. Catalogues, FLOYDS raw frames,
+  reduced spectra and all products are kept. Storage ≈ 0.24 TB now, +30 GB/yr (keeping images would be
+  ~19 TB + 2.7 TB/yr). Details: `docs/deployment_guide.md` §3.1, §7.4.
+- **Built (16 Nov 2026):** `scripts/cleanup.py` / `ava/archive/cleanup.py` (dry run by default; `cleanup:` config):
+  photometry image deleted once catalogued + `frame_qc` at the current version + older than `retention_days`;
+  FLOYDS night once every spectrum has its -1d, `spec_qc` row and `hbeta_fits` row; standards night once no target
+  night on disk needs it.  `frame_qc` now also stores SATURATE and the image size (all a recalibration needs from the
+  image; old rows completed from the image before deletion) and calibration falls back to it; downloads skip frames that have a catalogue; deletions marked in `local_files`.
+  **Still to do:** switch `cleanup.mode: live` in production; MuSCAT re-extraction before its images go.
+- **lcodb headers (16 Nov 2026):** only the FLOYDS slit width (APERWID) is used from the fetched headers
+  (arc/flat + standard matching).  `headers.spectra.since: 2021-09-01` — the 14k-frame 2014–2021 backlog is not
+  fetched (matched by block, then time).  Unused header columns (weather, moon, L1 stats, ...) are only exposed
+  through `ava.lcodb.query`.
+- New targets of 16 Nov 2026 (ids 72–81) are linked in both lcodb databases (sync of 16 Nov), but nothing
+  is downloaded, catalogued or calibrated yet, and they are not in `data/test_archive/ava.db`.

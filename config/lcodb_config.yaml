@@ -56,7 +56,11 @@ sync_rate_per_s: 2          # archive listing requests (sync, standards and cali
 # Spectra: every frame (a few 10^4). Photometry: the BANZAI frames (all raw keywords plus
 # L1FWHM / L1ZP / L1SIGMA ...). Only headers are fetched through the API; no image is downloaded.
 headers:
-  spectra: {levels: [0, 91]}
+  # Spectra: only the slit width (APERWID, not in the archive listing) is used — arc/flat and standard matching
+  # prefer the same slit; airmass has a computed fallback and target linking works from the footprint + name.
+  # New frames only (`since`, YYYY-MM-DD): the 14k frames of 2014 – Aug 2021 without a header are not fetched
+  # (decided 16 Nov 2026); their matching falls back to same block, then nearest in time.
+  spectra: {levels: [0, 91], since: "2021-09-01"}
   photometry: {levels: [90, 91], best_only: true, enabled: false}   # one header per exposure (the best level)
   # photometry headers are OFF (Nov 2026): ~5e5 headers vs the archive rate limit, and the quality numbers come from
   # our own reductions. Set enabled: true (or run `lcodb headers --db photometry`) to backfill later.

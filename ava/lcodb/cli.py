@@ -83,7 +83,8 @@ def cmd_headers(cfg, a):
         if k == 'photometry':
             db.mark_best(con)
         ok, bad = headers.fetch(c, con, cfg['headers'][k]['levels'], cfg['header_workers'],
-                                cfg['headers']['store_full'], a.limit, best_only=cfg['headers'][k].get('best_only', False))
+                                cfg['headers']['store_full'], a.limit, best_only=cfg['headers'][k].get('best_only', False),
+                                since=cfg['headers'][k].get('since'))
         inh = db.propagate_headers(con)
         log.info('%s: %d headers fetched, %d failed, %d frames inherited from their twin', k, ok, bad, inh)
         tot += ok

@@ -576,3 +576,19 @@ web:
 # <web.data_dir>/releases/. Layout: <dir>/<DR>/release.yaml + <dir>/<DR>/<data_id>/[<kind>/]<files>.
 releases:
   dir: "releases"          # absolute, or relative to paths.archive_root
+
+
+# ============================================================
+#  CLEAN-UP  (scripts/cleanup.py, daily cron; ava.archive.cleanup)
+# ============================================================
+# Raw frames are deleted once AVA has finished with them (decided 16 Nov 2026; catalogues, reduced spectra and
+# products are kept):
+#   photometry image  — catalogue made, frame_qc row at the current version (holds the header values);
+#   FLOYDS night      — every spectrum reduced (-1d + spec_qc) and in the final products (hbeta_fits);
+#   standards night   — no target night still on disk may need it.
+# and older than retention_days (must exceed the downloads' overlap_days).
+cleanup:
+  mode: "dry_run"          # dry_run | live (scripts/cleanup.py --live overrides)
+  retention_days: 7
+  photometry: true
+  spectra: true

@@ -122,12 +122,14 @@ def download(target: str, mode: str | None = None, kinds: list[str] | None = Non
                     start.date(), q.end.date(), q.names, q.proposals, mode)
         res = dl.run(archive_client(), q, raw_dir(target, kind), live=(mode == "live"),
                      max_frames=int(dc.max_frames_per_run), data_id=target,
-                     verify_existing=bool(dc.verify_existing), registry_db=lcodb_path(kind), log=logger.warning)
-        out[kind] = dict(found=res.found, on_disk=res.on_disk, missing=res.missing,
+                     verify_existing=bool(dc.verify_existing), registry_db=lcodb_path(kind), log=logger.warning,
+                     done=dl.catalogued(cfg.sextractor_dir(target)) if kind == "phot" else None)
+        out[kind] = dict(found=res.found, on_disk=res.on_disk, processed=res.processed, missing=res.missing,
                          downloaded=len(res.downloaded), failed=len(res.failed), capped=res.capped,
                          bytes=res.bytes, requests=res.requests, by_type=res.by_type)
-        logger.info("%s %s: %d found (%s), %d on disk, %d missing; %d downloaded (%.1f MB), %d failed; "
-                    "%d archive request(s)%s", target, kind, res.found, res.by_type, res.on_disk, res.missing,
+        logger.info("%s %s: %d found (%s), %d on disk, %d already processed, %d missing; %d downloaded (%.1f MB), "
+                    "%d failed; %d archive request(s)%s", target, kind, res.found, res.by_type, res.on_disk,
+                    res.processed, res.missing,
                     len(res.downloaded), res.bytes / 1e6, len(res.failed), res.requests,
                     " — capped" if res.capped else "")
         for name, why in list(res.failed.items())[:10]:

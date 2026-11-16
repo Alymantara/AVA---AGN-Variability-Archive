@@ -9,17 +9,18 @@ from .api import Throttled
 log = logging.getLogger(__name__)
 
 
-def pending(con, levels, limit=None, best_only=False):
+def pending(con, levels, limit=None, best_only=False, since=None):
+    """Frames still without a header; ``since`` (YYYY-MM-DD): only frames observed on or after that night."""
     q = (f"SELECT id, md5 FROM frames WHERE header_status=0 AND rlevel IN ({','.join('?' * len(levels))}) "
-         + ("AND is_best=1 " if best_only else "") + "ORDER BY date_obs DESC")
+         + ("AND is_best=1 " if best_only else "") + ("AND day_obs >= ? " if since else "") + "ORDER BY date_obs DESC")
     if limit:
         q += f' LIMIT {int(limit)}'
-    return con.execute(q, list(levels)).fetchall()
+    return con.execute(q, list(levels) + ([str(since)] if since else [])).fetchall()
 
 
 def fetch(client, con, levels, workers=8, store_full=True, limit=None, commit_every=500, best_only=False,
-          batch=2000):
-    todo = pending(con, levels, limit, best_only)
+          batch=2000, since=None):
+    todo = pending(con, levels, limit, best_only, since)
     log.info('headers to fetch: %d', len(todo))
     if not todo:
         return 0, 0

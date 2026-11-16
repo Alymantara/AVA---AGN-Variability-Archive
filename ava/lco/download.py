@@ -10,7 +10,8 @@ B. J. Fulton), keeping its reasoning:
   page's frames before requesting the next page — download URLs are signed
   and expire (48 h), so they are always used fresh;
 * save to ``<raw dir>/YYYYMMDD/<filename>``, skip files already on disk and
-  ``_cat.fits`` products.
+  ``_cat.fits`` products — and frames already processed whose image has been
+  deleted (``done``: photometry frames with a catalogue).
 
 Two entry points share it: backfill (``scripts/download.py``: a target,
 proposals, dates, kind) and daily (pipeline ``-d``: from the target's last
@@ -189,6 +190,7 @@ class RunResult:
     bytes: int = 0
     requests: int = 0
     other_objects: int = 0             # frames of other objects returned by the archive (filter ignored?)
+    processed: int = 0                 # not on disk, but already processed (image deleted after processing)
     by_type: dict = field(default_factory=dict)
 
 
@@ -210,10 +212,12 @@ def fetch(url: str, dest: Path, limiter=None, timeout: float = 600.0) -> int:
 
 def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_id: str,
         verify_existing: bool = False, registry_db: Path | None = None, log=print,
-        fetcher=None) -> RunResult:
+        fetcher=None, done: Callable[[str], bool] | None = None) -> RunResult:
     """Search the archive for ``q`` and, if ``live``, download missing frames
     (each page before the next is requested), at most ``max_frames``.
-    Not live: list only — no file is fetched (listing requests are still sent)."""
+    Not live: list only — no file is fetched (listing requests are still sent).
+    ``done(filename)``: True for a frame already processed whose image was deleted
+    (``ava.archive.cleanup``) — it is not downloaded again."""
     fetcher = fetcher or fetch   # looked up at call time (replaceable in tests)
     res, stats, seen, reg = RunResult(), {}, set(), []
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -236,6 +240,9 @@ def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_i
                     if dest.exists() and dest.stat().st_size > 0 and not (
                             verify_existing and md5 and md5sum(dest) != md5):
                         res.on_disk += 1
+                        continue
+                    if done is not None and done(f["filename"]):
+                        res.processed += 1
                         continue
                     res.missing += 1
                     if not live:
@@ -294,3 +301,11 @@ def unlinked_names_near(db_path: Path, ra: float, dec: float, radius_arcmin: flo
     t["sep_arcmin"] = SkyCoord(t["obj_ra"].values, t["obj_dec"].values, unit="deg").separation(
         SkyCoord(ra, dec, unit="deg")).arcmin
     return t[t["sep_arcmin"] <= radius_arcmin].sort_values("n_phot", ascending=False).reset_index(drop=True)
+
+
+def catalogued(catdir: Path) -> Callable[[str], bool]:
+    """``done`` for photometry: the frame already has a SExtractor catalogue in ``catdir``."""
+    def done(filename: str) -> bool:
+        base = str(filename).split(".fits")[0]
+        return (Path(catdir) / f"{base}_cat.fits").exists()
+    return done

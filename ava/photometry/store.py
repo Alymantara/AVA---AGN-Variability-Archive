@@ -33,6 +33,8 @@ FRAME_QC_COLUMNS = {
     "exptime": "REAL",
     "airmass": "REAL",                 # true airmass (the legacy files stored airmass - 1)
     "seeing_hdr": "REAL",              # header L1FWHM (arcsec)
+    "saturate": "REAL",                # header SATURATE (ADU) — with the size below, all a recalibration
+    "naxis1": "INTEGER", "naxis2": "INTEGER",   # needs from the image, so it can run after the image is deleted
     "fwhm_arcsec": "REAL",             # median FWHM of clean matched stars
     "background": "REAL",              # median SExtractor BACKGROUND of clean stars (ADU)
     "ellipticity": "REAL",             # median 1 - 1/ELONGATION of clean stars
@@ -57,17 +59,63 @@ def _plain(v):
     return v.item() if hasattr(v, "item") else v
 
 
+#: Frame metadata calibration takes from the image header (``process.header_meta``), all kept in ``frame_qc``.
+META_COLUMNS = ("filter", "exptime", "mjd_mid", "day_obs", "airmass", "seeing_hdr", "saturate", "naxis1", "naxis2",
+                "site")
+
+
+def _ensure_table(con) -> None:
+    """Create ``frame_qc`` if needed and add columns introduced since the table was made."""
+    con.executescript(_DDL)
+    have = {r[1] for r in con.execute("PRAGMA table_info(frame_qc)")}
+    for c, t in FRAME_QC_COLUMNS.items():
+        if c not in have:
+            con.execute(f'ALTER TABLE frame_qc ADD COLUMN "{c}" {t}')
+
+
 def write_frame_qc(db: Path, rows: list[dict]) -> None:
     """Upsert frame rows into ``frame_qc`` (creates the table if needed)."""
     if not rows:
         return
     cols = list(FRAME_QC_COLUMNS)
     with closing(sqlite3.connect(db, timeout=60)) as con:
-        con.executescript(_DDL)
+        _ensure_table(con)
         con.executemany(
             f"INSERT OR REPLACE INTO frame_qc ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
             [tuple(_plain(r.get(c)) for c in cols) for r in rows])
         con.commit()
+
+
+def frame_meta(db: Path, data_id: str) -> dict[str, dict]:
+    """frame -> the image-header metadata stored in ``frame_qc`` (what ``process.header_meta`` returns), for
+    recalibrating frames whose image has been deleted."""
+    fq = read_frame_qc(db, data_id)
+    if fq.empty:
+        return {}
+    for c in META_COLUMNS:
+        if c not in fq:
+            fq[c] = np.nan
+    return {r["frame"]: {c: r[c] for c in META_COLUMNS} for r in fq.to_dict("records")}
+
+
+def meta_complete(m: dict | None) -> bool:
+    """Everything a recalibration needs from the image is stored (time, filter, saturation, image size)."""
+    return bool(m) and all(m.get(c) is not None and not (isinstance(m.get(c), float) and not np.isfinite(m[c]))
+                           for c in ("filter", "exptime", "mjd_mid", "saturate", "naxis1", "naxis2"))
+
+
+def fill_frame_meta(db: Path, metas: dict[str, dict]) -> int:
+    """Complete existing ``frame_qc`` rows with image-header values (frame -> ``process.header_meta`` dict);
+    only empty fields are filled."""
+    if not metas:
+        return 0
+    with closing(sqlite3.connect(db, timeout=60)) as con:
+        _ensure_table(con)
+        for frame, m in metas.items():
+            con.execute("UPDATE frame_qc SET " + ", ".join(f'"{c}" = COALESCE("{c}", ?)' for c in META_COLUMNS)
+                        + " WHERE frame = ?", tuple(_plain(m.get(c)) for c in META_COLUMNS) + (frame,))
+        con.commit()
+    return len(metas)
 
 
 def read_frame_qc(db: Path, data_id: str) -> pd.DataFrame:
