@@ -24,6 +24,7 @@ ava-pipeline [daily | on-demand]          <- top-level, one per invocation
               ensemble     [photometry | calibration | pytics]   (PyTICS; full or incremental)
               webplot      [photometry | plotting]
               merge        [photometry | intercalibration]
+  └── publish-web [website | publish]     <- once, after all targets (-w)
 
 Flow-run names (visible in the UI run list)
 -------------------------------------------
@@ -50,8 +51,13 @@ from ava.pipeline.tasks import (
     ensemble,
     initialise,
     merge,
+    publish_web,
     reference_catalog,
     sextract,
+    spec_download,
+    spec_initialise,
+    spec_products,
+    spec_reduce,
     webplot,
 )
 
@@ -68,6 +74,11 @@ STAGE_TAGS: dict[str, list[str]] = {
     "ensemble":    ["photometry",   "calibration", "pytics"],
     "webplot":     ["photometry",   "plotting"],
     "merge":       ["photometry",   "intercalibration"],
+    "spec_init":     ["spectroscopy", "initialisation"],
+    "spec_download": ["spectroscopy", "download"],
+    "spec_reduce":   ["spectroscopy", "reduction"],
+    "spec_products": ["spectroscopy", "plotting"],
+    "publish":       ["website",      "publish"],
 }
 
 
@@ -132,6 +143,13 @@ def ava_target_flow(
     plot: bool = False,
     merge_data: bool = False,
     save: bool = False,
+    spec_init: bool = False,
+    spec_download_data: bool = False,
+    spec_nights: list[str] | None = None,
+    spec_mode: str | None = None,
+    spec_reduce_data: bool = False,
+    spec_products_data: bool = False,
+    publish: bool = False,
     run_type: str = "on-demand",
 ) -> dict:
     """Run the selected pipeline steps for one target, strictly in sequence.
@@ -146,6 +164,9 @@ def ava_target_flow(
         ``"auto"`` (update the stored solution with new frames; refit if needed)
         or ``"full"`` (recalibrate the whole data set).
         Which stages to execute.
+    publish : bool
+        Finally refresh the website data folder for this target (``publish-web``).
+        ``ava_pipeline`` passes False and publishes once after all targets.
     run_type : str
         ``"daily"``, ``"on-demand"``, or ``"test"`` — added as a tag so the
         dashboard can filter by trigger type.
@@ -165,7 +186,8 @@ def ava_target_flow(
         s for s, flag in [
             ("init", init), ("download", download_data), ("sextract", extract),
             ("calibrate", calibrate_data), ("ensemble", pytics), ("webplot", plot),
-            ("merge", merge_data or save),
+            ("merge", merge_data or save), ("spec_init", spec_init), ("spec_download", spec_download_data), ("spec_reduce", spec_reduce_data), ("spec_products", spec_products_data),
+            ("publish", publish),
         ] if flag
     ]
     logger.info(
@@ -213,6 +235,31 @@ def ava_target_flow(
             tags=_target_tags(target, STAGE_TAGS["merge"]),
         )(target, intercalibrate=merge_data, save=save)
 
+    if spec_init:
+        results["spec_init"] = spec_initialise.with_options(
+            tags=_target_tags(target, STAGE_TAGS["spec_init"]),
+        )(target)
+
+    if spec_download_data:
+        results["spec_download"] = spec_download.with_options(
+            tags=_target_tags(target, STAGE_TAGS["spec_download"]),
+        )(target, nights=spec_nights, mode=spec_mode)
+
+    if spec_reduce_data:
+        results["spec_reduce"] = spec_reduce.with_options(
+            tags=_target_tags(target, STAGE_TAGS["spec_reduce"]),
+        )(target, nights=spec_nights)
+
+    if spec_products_data:
+        results["spec_products"] = spec_products.with_options(
+            tags=_target_tags(target, STAGE_TAGS["spec_products"]),
+        )(target)
+
+    if publish:
+        results["publish"] = publish_web.with_options(
+            tags=_target_tags(target, STAGE_TAGS["publish"]),
+        )(targets=[target])
+
     logger.info(
         "✓  %s  finished  —  %s",
         display, ", ".join(results) or "no stages run",
@@ -255,6 +302,13 @@ def ava_pipeline(
     plot: bool = False,
     merge_data: bool = False,
     save: bool = False,
+    spec_init: bool = False,
+    spec_download_data: bool = False,
+    spec_nights: list[str] | None = None,
+    spec_mode: str | None = None,
+    spec_reduce_data: bool = False,
+    spec_products_data: bool = False,
+    publish: bool = False,
     run_type: str = "on-demand",
 ) -> dict:
     """Run ``ava_target_flow`` for every target in parallel.
@@ -269,6 +323,10 @@ def ava_pipeline(
         ``"auto"`` (update the stored solution with new frames; refit if needed)
         or ``"full"`` (recalibrate the whole data set).
         Which stages to run on each target.
+    publish : bool
+        After all targets, refresh the website data folder once (database
+        snapshot + every target's plots). Runs even if some targets failed,
+        so the site shows the targets that did update.
     run_type : str
         ``"daily"`` (scheduled), ``"on-demand"`` (manual), or ``"test"``.
 
@@ -292,16 +350,22 @@ def ava_pipeline(
         plot=plot,
         merge_data=merge_data,
         save=save,
+        spec_init=spec_init,
+        spec_download_data=spec_download_data,
+        spec_nights=spec_nights,
+        spec_mode=spec_mode,
+        spec_reduce_data=spec_reduce_data,
+        spec_products_data=spec_products_data,
     )
-    active_stages = [k for k, v in stages.items() if v]
+    active_stages = [k for k, v in stages.items() if v and k not in ("pytics_mode", "spec_nights", "spec_mode")]
     stage_tags = []
     for s in active_stages:
-        stage_tags += STAGE_TAGS.get(s, [])
+        stage_tags += STAGE_TAGS.get(s, STAGE_TAGS.get(s.removesuffix("_data"), []))
     stage_tags = sorted(set(stage_tags))
 
     logger.info(
         "AVA pipeline  |  %d targets  |  stages: %s  |  run type: %s",
-        len(targets), ", ".join(active_stages) or "none", run_type,
+        len(targets), ", ".join(active_stages + (["publish"] if publish else [])) or "none", run_type,
     )
 
     # Submit all targets concurrently
@@ -325,8 +389,19 @@ def ava_pipeline(
         "Pipeline complete — %d succeeded, %d failed",
         len(succeeded), len(failed),
     )
+
+    published = None
+    if publish:
+        try:
+            published = publish_web.with_options(
+                tags=["ava", run_type] + STAGE_TAGS["publish"],
+            )(targets=targets)
+        except Exception as exc:  # noqa: BLE001
+            failed["publish-web"] = f"{type(exc).__name__}: {exc}"
+            logger.error("✗  website publish failed:  %s", failed["publish-web"])
+
     if failed:
         raise RuntimeError(
             f"{len(failed)} target(s) failed: {', '.join(failed)}"
         )
-    return {"succeeded": succeeded, "failed": failed}
+    return {"succeeded": succeeded, "failed": failed, "published": published}

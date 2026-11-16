@@ -193,3 +193,59 @@ The z drift within 2021 (about −2 % per 100 d) remains. Figure: `pytics_24_mus
 - The append-only aperture series and `extended_aperture_cameras: ["ep"]` already allow this.
 
 Open question: what changed in MuSCAT between the seasons (focus or pointing of the AGN on the detector, flat fields, an instrument intervention)?
+
+## Spectroscopy: sky flats belong in the reduction package (user, 16 Nov 2026)
+- The sky flats are essential: they set the order trace at each site. They must ship with the improved banzai-floyds fork, not be fetched or registered by hand.
+- What the fork has today:
+  - `banzai_floyds/data/orders/skyflats.dat` lists the frames (site, frame id, slit, validity window);
+  - `banzai_floyds_offline skyflats` processes them from a local folder;
+  - the FITS files themselves are **not** in the package.
+- To decide at the install step: ship the processed order solutions (small tables) as package data, or ship the raw sky flats.
+  - Either way, `banzai_floyds_offline setup-db` should register them with no download.
+
+## Spectroscopy reduction stage: first run (16 Nov 2026)
+
+The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 Mrk 817 OGG nights in about 2 minutes: 21 frames, no failures, 9 rows written to `spec_qc`.
+
+**Comparison with the archive** (`tools/spec_validation/compare_archive.py` → `<spec>/Mrk_817/plots/compare_archive.png`):
+
+| Measure | Ours (EXTRACTED) | Archive (1.0.1) |
+|---|---|---|
+| Red fringing, 7700–8500 Å | 3.0–4.3 % | 8.5–15.8 % |
+| [O III] 5007 offset from redshift | −1.9 to −3.2 Å | −8 to −11 Å |
+| Flux level | reference | 1.9–2.3× higher (archive exposure-time bug) |
+
+**Fork bug.** `extract.CombinedExtractor` rebuilds the merged `SPECTRUM` table from the 2-d binned data. With `FRINGE_METHOD='harmonic'` that data is never fringe-corrected; only the `EXTRACTED` 1-d table is. So the merged spectrum keeps 7–14 % fringes.
+- Fix in the fork: build `SPECTRUM` from the corrected `EXTRACTED` orders.
+- Until then, AVA should read `EXTRACTED`.
+
+**Other open points:**
+- Spikes are left beyond 9000 Å: the known open problem of the red-end telluric correction.
+- The flux grey factor among the 3 standards is 2.9 (`L1FLXGRY`): only 2″ standards exist, so this needs checking on more nights.
+- The banzai work folder is 459 MB for 3 nights. The fork's lean policy (`lean_2d.py`) should become an option.
+
+## Spectroscopy website products (16 Nov 2026; `-P`, `ava/spectroscopy/{lines,products}.py`)
+
+**Products:**
+- `lco_latest_<t>_spec`: the latest spectrum, blue and red arm panels.
+- `lco_latest_<t>_hbeta`: broad Hβ and the 5100 Å continuum, with the g band when photometry exists.
+- `<t>_FLOYDS_Hbeta_lightcurve.csv`: nightly values.
+- Database records: `spec_lines` (spectra DB) and `line_variability` (AVA DB).
+
+**Fit choices:**
+- **One broad Gaussian.** Same-night exposure pairs were used to compare methods. A free 2-Gaussian broad component trades flux with the continuum: 12–19 % pair scatter for Mrk 817, 9 % rms for NGC 4151. One Gaussian gives 0.5 / 1.5 / 4 % for Mrk 817 / NGC 4151 / Fairall 9.
+- **Cross-check.** The flux integrated above the continuum is stored as `flux_integrated`.
+- **[O III] calibration.** Each spectrum is scaled to the median [O III] 5007 of the QC-OK spectra. It removes the grey factors: the raw Hβ of Fairall 9 has F_var 18 % and R_max 4.4; calibrated, 2.2 % and 1.26.
+- **Nights** are grouped by LCO DAY-OBS. At COJ, MJD − 0.5 splits the night.
+
+**Results:**
+
+| Target | Nights | Hβ F_var | Continuum F_var |
+|---|---|---|---|
+| NGC 4151 | 28 | 7.8 ± 0.5 % | 8.2 % |
+| Fairall 9 | 47 | 2.2 ± 0.9 % | 4.3 % |
+| Mrk 817 | 3 | 3.8 ± 1.8 % | |
+
+**Still to do:**
+- Fe II is not modelled (fine for these three; Fe II-strong AGN will need a template).
+- The g band comes from the merged photometry CSV only (Mrk 817 in the test archive).

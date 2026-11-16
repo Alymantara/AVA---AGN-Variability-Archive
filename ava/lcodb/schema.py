@@ -173,6 +173,8 @@ CREATE VIEW spectrum_standards AS   -- the standard to use for each science spec
                                     --   2. the nearest standard taken with the 2" slit, else
                                     --   3. the nearest standard with any slit
                                     -- (same observing block wins over time in each case). std_choice says which.
+                                    -- Standards within 30 d (standards.preferred_dt_days) always win over the wider
+                                    -- search window (max_dt_days); std_window says 'within_30d' or 'wide_window'.
 WITH r AS (
   SELECT m.*,
          ROW_NUMBER() OVER (PARTITION BY sci_id ORDER BY same_block DESC, ABS(dt_hours)) AS r_any,
@@ -185,7 +187,9 @@ best AS (
          CASE WHEN same_slit = 1 THEN 'same_slit'
               WHEN ABS(COALESCE(std_aperwid, 0) - 2.0) < 0.05 THEN 'nearest_2arcsec'
               ELSE 'nearest_any' END AS std_choice,
+         CASE WHEN same_block = 1 OR ABS(dt_hours) <= 720 THEN 'within_30d' ELSE 'wide_window' END AS std_window,
          ROW_NUMBER() OVER (PARTITION BY sci_id ORDER BY
+              CASE WHEN same_block = 1 OR ABS(dt_hours) <= 720 THEN 0 ELSE 1 END,
               CASE WHEN same_slit = 1 AND r_slit = 1 THEN 1
                    WHEN ABS(COALESCE(std_aperwid, 0) - 2.0) < 0.05 AND r_two = 1 THEN 2
                    WHEN r_any = 1 THEN 3 ELSE 9 END) AS pick
@@ -193,7 +197,7 @@ best AS (
 SELECT s.id AS sci_id, s.basename, s.object, s.ava_id, s.instrument_id, s.date_utc, s.mjd_obs, s.aperwid,
        COALESCE(s.airmass, s.airmass_calc) AS airmass,
        b.std_id, f.basename AS std_basename, b.std_object, b.std_proposal, b.std_aperwid, b.std_airmass,
-       b.dt_hours, b.same_block, b.std_choice
+       b.dt_hours, b.same_block, b.std_choice, b.std_window
 FROM frames s
 LEFT JOIN best b ON b.sci_id = s.id AND b.pick = 1
 LEFT JOIN frames f ON f.id = b.std_id

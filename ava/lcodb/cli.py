@@ -2,6 +2,7 @@
 
   lcodb sync        [--full] [--proposal ID ...] [--since DATE] [--until DATE] [--no-standards]
   lcodb headers     [--db spectra|photometry|both] [--limit N] [--retry-failed]
+  lcodb calib-sync  [--full]   raw FLOYDS frames of COJ_calib / OGG_calib (standards flagged by position)
   lcodb airmass
   lcodb match       science->standards and spectrum->arcs/lamp flats (alias: standards)
   lcodb link        LCO target names -> AVA ids (frames.ava_id, table target_link)
@@ -51,7 +52,17 @@ def cmd_sync(cfg, a):
         n2, u2 = ingest.sync_standards(c, cfg, cons, state, full=a.full,
                                        since=_date(a.since), until=_date(a.until))
         log.info('standards by name: %d new, %d refreshed frames', n2, u2)
-        n, u = n + n2, u + u2
+        n3, u3 = ingest.sync_calib_proposals(c, cfg, cons, state, full=a.full,
+                                             since=_date(a.since), until=_date(a.until))
+        log.info('calibration programmes: %d new, %d refreshed frames', n3, u3)
+        n, u = n + n2 + n3, u + u2 + u3
+    return n, u
+
+
+def cmd_calib_sync(cfg, a):
+    cons, state = _open(cfg)
+    n, u = ingest.sync_calib_proposals(_client(cfg), cfg, cons, state, full=a.full)
+    log.info('calibration programmes: %d new, %d refreshed frames', n, u)
     return n, u
 
 
@@ -88,6 +99,8 @@ def cmd_airmass(cfg, a):
 def cmd_match(cfg, a):
     cons, _ = _open(cfg)
     s, c = cfg['standards'], cfg['calibs']
+    nf = standards.flag_by_position(cons['spectra'], s.get('position_radius_arcsec', 60.0))
+    log.info('standards: %d more frames flagged by position', nf)
     nsci, nrow = standards.rebuild(cons['spectra'], s['n_nearest'], s['max_dt_days'])
     log.info('standards: %d science spectra, %d matches', nsci, nrow)
     nspec, ncal = calibs.rebuild(cons['spectra'], c['n_nearest'], c['max_dt_days'])
@@ -179,6 +192,8 @@ def main(argv=None):
     s.add_argument('--db', choices=['spectra', 'photometry', 'both'], default='both')
     s.add_argument('--limit', type=int)
     s.add_argument('--retry-failed', action='store_true')
+    s = sub.add_parser('calib-sync', help='only the observatory calibration programmes (standards.calib_proposals)')
+    s.add_argument('--full', action='store_true')
     for name in ('airmass', 'match', 'standards', 'link', 'reextract', 'status'):
         sub.add_parser(name)
     a = p.parse_args(argv)
@@ -188,7 +203,7 @@ def main(argv=None):
                         format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
                         handlers=[logging.StreamHandler(),
                                   logging.FileHandler(cfg.db_dir / 'lcodb.log')])
-    fn = globals()[f'cmd_{a.cmd}']
+    fn = globals()[f"cmd_{a.cmd.replace('-', '_')}"]
     if a.cmd == 'status':
         fn(cfg, a)
         return 0

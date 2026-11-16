@@ -185,6 +185,43 @@ def name_variants(name):
     return out
 
 
+def sync_calib_proposals(client, cfg, cons, state, full=False, since=None, until=None):
+    """Raw FLOYDS spectra, arcs and lamp flats of the observatory calibration programmes
+    (standards.calib_proposals, e.g. COJ_calib / OGG_calib). Their standards are often logged under
+    ad-hoc names ('BD28', 't_GD71_1', 'eg 274'), so they are flagged by position afterwards
+    (standards.flag_by_position, run by `lcodb match`). One query per programme and spectrograph."""
+    scfg = cfg['standards']
+    end = until or utcnow()
+    router = Router(cfg, cons, state)
+    n_seen = 0
+    for pid in scfg.get('calib_proposals') or []:
+        key = f'*calib:{pid}*'
+        st = state.execute('SELECT * FROM sync_state WHERE proposal_id=?', (key,)).fetchone()
+        if st is None:
+            state.execute('INSERT INTO sync_state (proposal_id, title, active, is_standard_source) VALUES (?,?,1,1)',
+                          (key, f'{pid}: FLOYDS raw spectra/arcs/flats'))
+        if since:
+            start = since
+        elif full or st is None or not st['synced_until']:
+            start = datetime(2014, 1, 1)
+        else:
+            start = datetime.fromisoformat(st['synced_until']) - timedelta(days=cfg['overlap_days'])
+        k = 0
+        for inst in scfg.get('calib_instruments') or ['en05', 'en06', 'en12']:
+            for f in client.frames(start, end, page_size=cfg['page_size'], proposal_id=pid, instrument_id=inst,
+                                   reduction_level=0, exclude_OBSTYPE=cfg['exclude_obstypes']):
+                router.add(f, standards_only=True)
+                k += 1
+            router.flush()
+        log.info('  %s %s .. %s: %d raw FLOYDS frames', pid, start.date(), end.date(), k)
+        n_seen += k
+        if since is None and until is None:
+            state.execute('UPDATE sync_state SET synced_until=?, n_frames=? WHERE proposal_id=?',
+                          (end.isoformat(timespec='seconds'), k, key))
+        state.commit()
+    return router.n_new, router.n_upd
+
+
 def sync_standards(client, cfg, cons, state, full=False, since=None, until=None):
     """Flux standards on the spectrographs, from any proposal (observatory calib programs,
     engineering, other key projects...), matched by target name. Includes their arcs/flats."""

@@ -8,7 +8,37 @@ Rules (raw frames, same spectrograph `instrument_id`):
 The table is rebuilt every run (cheap), so standards taken after a spectrum are picked up.
 """
 import bisect
+import math
 from collections import defaultdict
+
+
+def flag_by_position(con, radius_arcsec=60.0):
+    """Raw spectra pointed at a known flux standard (median position of the frames already flagged
+    is_standard, by name) are flagged is_standard too, whatever their target name. Targets linked to
+    an AVA source are never flagged. Returns the number of frames newly flagged."""
+    pos = defaultdict(list)
+    for obj, ra, dec in con.execute("""SELECT object, ra, dec FROM frames WHERE is_standard=1 AND rlevel=0
+                                       AND obstype IN ('SPECTRUM','STANDARD') AND ra IS NOT NULL"""):
+        pos[obj].append((ra, dec))
+    ref = []
+    for obj, v in pos.items():
+        v = sorted(v)
+        ref.append((obj, v[len(v) // 2][0], sorted(d for _, d in v)[len(v) // 2]))
+    cand = con.execute("""SELECT id, ra, dec FROM frames WHERE is_standard=0 AND rlevel IN (0, 91)
+                          AND obstype IN ('SPECTRUM','STANDARD') AND ra IS NOT NULL AND ava_id IS NULL""").fetchall()
+    hits = []
+    for fid, ra, dec in cand:
+        for obj, sra, sdec in ref:
+            if abs(dec - sdec) * 3600 > radius_arcsec:
+                continue
+            r1, d1, r2, d2 = map(math.radians, (ra, dec, sra, sdec))
+            c = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(r1 - r2)
+            if math.degrees(math.acos(min(1.0, max(-1.0, c)))) * 3600 <= radius_arcsec:
+                hits.append((fid,))
+                break
+    con.executemany('UPDATE frames SET is_standard=1 WHERE id=?', hits)
+    con.commit()
+    return len(hits)
 
 
 def rebuild(con, n_nearest=5, max_dt_days=30):

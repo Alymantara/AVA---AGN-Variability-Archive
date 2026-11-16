@@ -346,6 +346,55 @@ spectroscopy:
     - "coj"   # Siding Spring (FLOYDS-S, en12)
   default_slit_arcsec: 6.0
   wavelength_range_angstrom: [3200, 10000]
+  # ---- download (ava.pipeline.tasks.spec_download; frames planned from the lcodb spectra DB) ----
+  download:
+    mode: "dry_run"          # dry_run: plan + report, NO archive request | live: fetch missing files
+    select: "new"           # new (daily: nights after the last successful run) | latest | oldest
+    nights: []              # explicit nights (YYYYMMDD) instead of select
+    max_nights: null           # per run (null = all selected)
+    # archive BANZAI products of the science + standard, for comparison: true (-1d and -2d),
+    # "1d" (small) or false. The -2d are ~47 MB each (the raw frames ~0.6 MB).
+    # Production: false (we reduce everything ourselves); the test archive sets true for the comparison.
+    archive_products: false
+    max_frames_per_run: 100
+    overlap_days: 2         # select=new: restart this many days before the last success
+    initial_lookback_days: 30
+    verify_existing: false  # md5-check files already on disk
+  # ---- reduction (ava.pipeline.tasks.spec_reduce: the improved banzai-floyds fork, run externally) ----
+  reduction:
+    python: "/Users/juan/astro/floyds/env-banzai/bin/python"   # environment with the fork installed (py3.12 + torch)
+    package: "/Users/juan/astro/floyds/banzai-floyds"          # the fork's checkout (version recorded per product)
+    skyflats_dir: "/Users/juan/astro/floyds/data/skyflats"     # sky flats of both sites (order trace); registered once
+    work_dir: "banzai"      # relative to spectra_root: calibration DB, shared calibrations, logs, staging
+    workers: 4
+    window_days: 60         # fringe phase-master window
+    keep_2d: true           # keep our -2d products (large) next to the -1d
+    # After a complete run whose products all validate (1-d readable, both orders >= 80 % good bins,
+    # QC row written), make the secondary products lean: drop PROFILE/BACKGROUND/FRINGE from the -2d,
+    # BINNED2D from arcs and lamp flats, and from the -2d except a few examples per object; remove the
+    # staging folders. The -1d products, arcs and flats themselves are kept; a run from raw regenerates all.
+    cleanup:
+      enabled: true
+      drop_binned: true
+      keep_binned_examples: 2
+  # ---- website products (ava.pipeline.tasks.spec_products) ----
+  products:
+    latest_spectrum:
+      red_range: [5300.0, 9050.0]   # observed A shown for the red arm (the order end beyond is noisy)
+    hbeta:
+      broad_components: 1        # Gaussians for broad Hbeta; 1 is robust (same-night pairs 0.5-4 %; 2 gives 8-19 %)
+      fit_window: [4750.0, 5100.0]   # rest A
+      oiii_wing: true            # blue-wing Gaussian in the [O III] doublet
+      min_series: 3              # spectra needed to calibrate with [O III]
+      oiii_reference_qc: ["OK"]  # L1QFLAGS of the spectra that set the reference [O III] flux
+      scale_limits: [0.2, 5.0]   # [O III] scale factors outside this are not used
+    # PrepSpec input (<spec_dir>/<folder>/): one 3-column file (wave, flux, err) per spectrum and arm,
+    # <target>_blue.hjd / <target>_red.hjd listing "file MJD" (mid-exposure). Rewritten each run.
+    prepspec:
+      enabled: true
+      folder: "prepspec"
+      red_min_wavelength: 5300.0   # the red order below its overlap with the blue is unreliable
+      exclude_flags: []            # L1QFLAGS names to leave out, e.g. ["LOWSNR"]
 
 
 # ============================================================

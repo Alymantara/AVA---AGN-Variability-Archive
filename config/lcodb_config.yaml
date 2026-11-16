@@ -64,14 +64,22 @@ headers:
 # --- standard-star matching (spectra DB) ---------------------------------------
 standards:
   n_nearest: 5                # standards kept per science frame AND per slit width
-  max_dt_days: 30
+  max_dt_days: 60             # search limit; picks beyond preferred_dt_days are labelled wide_window
+  preferred_dt_days: 30       # standards within this always win (fixed at 30 d in the spectrum_standards view)
   window_days: 365            # time windows for the by-name search
   # Flux standards. Frames with these target names are flagged is_standard in any proposal,
   # and are searched for across ALL proposals on the spectrographs (spaces/case ignored).
   names: [FEIGE110, FEIGE34, FEIGE66, FEIGE67, EG21, EG274, EG131, GD108, GD153, GD71, GD50,
           BD+284211, BD+332642, BD+254655, BD+174708, HZ44, HZ2, HZ4, HZ21, G191B2B,
           LTT7987, LTT3218, LTT9491, LTT1020, LTT2415, LTT1788, LTT377, LTT4364, LTT6248, LTT7379,
-          CD-32-9927, CD-34-241, HR718, HR3454, HR4468, HR5501, HR7596, HR9087, P177D, P330E]
+          CD-32-9927, CD-34-241, HR718, HR3454, HR4468, HR5501, HR7596, HR9087, P177D, P330E,
+          L745-46A, EGGR274, LTT9239, FEIGE56, HD49798, CD-34]
+  # Observatory calibration programmes: crawled whole for raw FLOYDS frames (spectra, arcs, flats).
+  # Their standards often have ad-hoc names, so any raw spectrum within position_radius_arcsec of a
+  # known standard is flagged is_standard by `lcodb match` (AVA-linked targets never are).
+  calib_proposals: [COJ_calib, OGG_calib]
+  calib_instruments: [en05, en06, en12]
+  position_radius_arcsec: 120   # FLOYDS footprint centres sit up to ~90" from the star
 
 # --- arcs / lamp flats for every spectrum (science and standards) -------------
 calibs:

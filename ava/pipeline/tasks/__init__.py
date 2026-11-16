@@ -12,8 +12,14 @@ from ava.pipeline.tasks.download import download
 from ava.pipeline.tasks.ensemble import ensemble
 from ava.pipeline.tasks.initialise import initialise
 from ava.pipeline.tasks.merge import merge
+from ava.pipeline.tasks.publish_web import publish_web
 from ava.pipeline.tasks.reference import reference_catalog
 from ava.pipeline.tasks.sextract import sextract
+from ava.pipeline.tasks.spec_download import spec_download
+from ava.pipeline.tasks.spec_initialise import spec_initialise
+from ava.pipeline.tasks.spec_products import spec_products
+from ava.pipeline.tasks.spec_reduce import spec_reduce
 from ava.pipeline.tasks.webplot import webplot
 
-__all__ = ["initialise", "reference_catalog", "download", "sextract", "calibrate", "ensemble", "webplot", "merge"]
+__all__ = ["initialise", "reference_catalog", "download", "sextract", "calibrate", "ensemble", "webplot", "merge",
+           "spec_initialise", "spec_download", "spec_reduce", "spec_products", "publish_web"]
