@@ -19,7 +19,6 @@ function classic_state(array $t): array
 
 // Classic table: observing status first (Observing, Archived, to be processed, tba), then name.
 $classic = $targets;
-$hbeta = ava_hbeta_all();   // data_id => Hβ variability (spectroscopy products)
 usort($classic, fn($a, $b) => ((int) ($b['ava'] ?? -1) <=> (int) ($a['ava'] ?? -1))
     ?: strnatcasecmp((string) $a['name'], (string) $b['name']));
 
@@ -96,11 +95,8 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
             <th data-sort="num" class="num">log M<sub>●</sub><br><small>(M<sub>☉</sub>)</small></th>
             <th data-sort="num" class="num">z</th>
             <th data-sort="text">LCO<br>filters</th>
-            <th data-sort="num" class="num">Frames</th>
             <th data-sort="num" class="num">Photo<br>⟨Δt⟩/d</th>
             <th data-sort="num" class="num">Spec<br>⟨Δt⟩/d</th>
-            <th data-sort="num" class="num">Spec<br>epochs</th>
-            <th data-sort="num" class="num">H&beta;<br>F<sub>var</sub></th>
             <th data-sort="num">Status</th>
           </tr>
         </thead>
@@ -120,14 +116,8 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
               <td class="num"><?= fmt_num($t['logm'], 2) ?></td>
               <td class="num"><?= h((string) $t['redshift']) ?></td>
               <td class="filters"><?php foreach (array_keys(ava_target_filters($t)) as $f): ?><span style="color: var(<?= ava_filter_var($f) ?>)"><?= h($f) ?></span><?php endforeach; ?></td>
-              <td class="num"><?= fmt_int($t['db_lco_images']) ?></td>
               <td class="num"><?= $pcad > 0 ? number_format($pcad, 2) : '—' ?></td>
               <td class="num"><?= $scad > 0 ? number_format($scad, 1) : '—' ?></td>
-              <td class="num"><?= fmt_int($t['db_floyds_epochs'] ?: null) ?></td>
-              <?php $hb = $hbeta[$t['data_id']] ?? null; ?>
-              <td class="num" data-v="<?= $hb && is_numeric($hb['fvar']) ? (float) $hb['fvar'] : '' ?>"
-                  <?= $hb ? 'title="' . (int) $hb['n_nights'] . ' nights, F_max/F_min ' . number_format((float) $hb['rmax'], 2) . '"' : '' ?>><?=
-                  $hb && is_numeric($hb['fvar']) ? number_format(100 * (float) $hb['fvar'], 1) . '%' : '—' ?></td>
               <td data-v="<?= (int) $t['ava'] ?>"><span class="st-<?= $sk ?>"><?= h($sl) ?></span></td>
             </tr>
           <?php endforeach; ?>
