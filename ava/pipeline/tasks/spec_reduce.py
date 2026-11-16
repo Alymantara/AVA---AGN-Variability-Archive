@@ -124,7 +124,7 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
     # validation: every product must be usable before anything is cleaned
     invalid = {}
     for r in rows:
-        why = R.validate_product(Path(r["path_1d"]))
+        why = R.validate_product(Path(r["path_1d"]), min_good=float(s["cleanup"].get("min_good_fraction", 0.8)))
         if why:
             invalid[r["basename"]] = why
         r["valid"] = why is None

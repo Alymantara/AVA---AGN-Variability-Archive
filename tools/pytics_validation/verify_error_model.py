@@ -8,15 +8,18 @@ Tests:  same-camera pairs < 1 h (random error), flat in error sextiles, vs Δt;
 Writes docs/figures/pytics/pytics_23_error_model_verification.png + pytics_error_model_verification.csv"""
 import sys, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import errors as ER
 from ava.plots import webplots as wp
 
-ROOT = Path("/Users/juan/astro/AVA"); PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; OUT = ROOT / "docs/figures/pytics"
+ROOT = Path(__file__).resolve().parents[2]; PHOT = cfg.phot_dir(TARGET); OUT = ROOT / "docs/figures/pytics"
 F = ["up", "B", "gp", "V", "rp", "ip", "zs"]; LBL = dict(up="u", B="B", gp="g", V="V", rp="r", ip="i", zs="z")
 fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
 BCOL = {r.lco: r.color for r in fd[fd.lco_flag].drop_duplicates("lco").itertuples()}

@@ -45,7 +45,26 @@ class FitSettings:
     max_shift: float = 20.0                   # Å, any component vs its rest wavelength
     oiii_wing: bool = True
     loss: str = "soft_l1"
-    min_good_fraction: float = 0.8
+    loss_scale: float = 3.0                   # residual (in σ) where the robust loss turns over
+    max_nfev: int = 5000
+    min_good_fraction: float = 0.8            # of the fit window that must have good bins
+    integrated_window: tuple = (4800.0, 4940.0)   # rest Å, the broad-Hβ cross-check integral
+
+
+def settings_from_config(section: dict | None) -> FitSettings:
+    """FitSettings from a config mapping (``spectroscopy.products.hbeta``): every key that names a field;
+    sequences become tuples (windows), lists of pairs tuples of tuples."""
+    from dataclasses import fields
+
+    section = section or {}
+    kw = {}
+    for f in fields(FitSettings):
+        if f.name in section and section[f.name] is not None:
+            v = section[f.name]
+            if isinstance(v, list):
+                v = tuple(tuple(x) if isinstance(x, list) else x for x in v)
+            kw[f.name] = v
+    return FitSettings(**kw)
 
 
 def blue_arm(path, z: float, order: int = 2) -> pd.DataFrame:
@@ -127,7 +146,7 @@ def fit_hbeta(sp: pd.DataFrame, s: FitSettings | None = None) -> dict:
     def res(v):
         return (model(dict(zip(names, v * norm)), w, s) - f) / e
 
-    r = least_squares(res, x0, bounds=(lb, ub), loss=s.loss, f_scale=3.0, x_scale="jac", max_nfev=5000)
+    r = least_squares(res, x0, bounds=(lb, ub), loss=s.loss, f_scale=s.loss_scale, x_scale="jac", max_nfev=s.max_nfev)
     p = dict(zip(names, r.x * norm))
     dof = max(len(w) - len(names), 1)
     chi2nu = float(np.sum(r.fun ** 2) / dof)
@@ -223,10 +242,11 @@ def variability(f, e) -> dict:
             "snr_median": float(np.median(f / e))}
 
 
-def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, window=(4800.0, 4940.0)) -> float:
+def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, window=None) -> float:
     """Cross-check of the broad Hβ flux: flux above the straight continuum through ``continuum_windows``,
     minus the fitted narrow lines ([O III] wings, narrow Hβ), integrated over ``window`` (rest Å)."""
     s = s or FitSettings()
+    window = window or s.integrated_window
     cw = np.zeros(len(sp), bool)
     for lo, hi in s.continuum_windows:
         cw |= (sp.w > lo) & (sp.w < hi)

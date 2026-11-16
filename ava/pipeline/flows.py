@@ -41,8 +41,7 @@ from pathlib import Path
 import yaml
 
 from prefect import flow, get_run_logger, task
-from prefect.concurrency.sync import concurrency
-from prefect.task_runners import ConcurrentTaskRunner
+from prefect.task_runners import ThreadPoolTaskRunner
 
 from ava.config import cfg
 from ava.pipeline.tasks import (
@@ -139,7 +138,7 @@ def ava_target_flow(
     extract: bool = False,
     calibrate_data: bool = False,
     pytics: bool = False,
-    pytics_mode: str = "auto",
+    pytics_mode: str | None = None,
     plot: bool = False,
     merge_data: bool = False,
     save: bool = False,
@@ -283,7 +282,7 @@ def _run_target(target: str, steps: dict[str, bool], run_type: str) -> dict:
 
 @flow(
     name="ava-pipeline",
-    task_runner=ConcurrentTaskRunner(),
+    task_runner=ThreadPoolTaskRunner(max_workers=int(cfg._raw.get("pipeline", {}).get("n_cores") or 4)),
     log_prints=True,
     description=(
         "Run the full AVA photometric pipeline across all (or selected) AGN targets. "
@@ -298,7 +297,7 @@ def ava_pipeline(
     extract: bool = False,
     calibrate_data: bool = False,
     pytics: bool = False,
-    pytics_mode: str = "auto",
+    pytics_mode: str | None = None,
     plot: bool = False,
     merge_data: bool = False,
     save: bool = False,

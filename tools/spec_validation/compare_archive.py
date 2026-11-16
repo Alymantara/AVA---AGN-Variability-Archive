@@ -7,7 +7,7 @@ redshifted position, red-end small-scale scatter (fringing: robust rms of spectr
 7700-8500 A).  Figure → <spec_root>/<target>/plots/compare_archive.png, table → compare_archive.csv."""
 import sys, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")

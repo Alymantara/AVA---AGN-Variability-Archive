@@ -90,6 +90,7 @@ def reference_catalog(target: str, force: bool = False) -> dict:
             max_ruwe=float(rc.get("max_ruwe", 1.4)),
             neighbour_arcsec=float(rc.get("neighbour_arcsec", 3.0)),
             neighbour_dmag=float(rc.get("neighbour_dmag", 2.5)),
+            agn_match_arcsec=float(rc.get("agn_match_arcsec", 1.5)),
         ),
         apass_model=dict(
             **common,
@@ -105,6 +106,7 @@ def reference_catalog(target: str, force: bool = False) -> dict:
             seed=int(rc.random_seed),
             u_anchor=bool(rc.get("u_anchor", True)),
             u_anchor_min_stars=int(rc.get("u_anchor_min_stars", 10)),
+            u_anchor_max_ruwe=float(rc.get("max_ruwe", 1.4)),
             raw_out=out_dir / RAW_DR10,
         ),
     )

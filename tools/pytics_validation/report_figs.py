@@ -1,16 +1,19 @@
 """PyTICS report figures (docs/figures/pytics). Run after the full ensemble run."""
 import sys, json, warnings, time
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import ensemble as E, intercal as IC, store
 from ava.plots import webplots as wp
 
-ROOT = Path("/Users/juan/astro/AVA")
-PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; DB = ROOT / "data/test_archive/frame_qc.sqlite"
+ROOT = Path(__file__).resolve().parents[2]
+PHOT = cfg.phot_dir(TARGET); DB = frame_db_path()
 SCR = Path(sys.argv[1]); OUT = ROOT / "docs/figures/pytics"; OUT.mkdir(parents=True, exist_ok=True)
 wp._style()
 plt.rcParams.update({"font.size": 10, "axes.labelsize": 10, "legend.fontsize": 8, "legend.frameon": False})
@@ -73,7 +76,7 @@ def fig_validation():
 # ---------------------------------------------------------------- 2 convergence
 def fig_convergence():
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
-    d = E.load_target(PHOT, DB, "Mrk_817", "gp"); agn = int(d.loc[d.is_agn, "star_id"].iloc[0])
+    d = E.load_target(PHOT, DB, TARGET, "gp"); agn = int(d.loc[d.is_agn, "star_id"].iloc[0])
     for bf, ls, lab in [(0, "--", "all comparison measurements"), (E.BAD_FLAGS, "-", "FLAGS 4|8|16 removed")]:
         s = E.fit(d, agn_id=agn, bad_flags=bf, max_loops=200)
         h = np.array([x[0] for x in s.history])
@@ -81,7 +84,7 @@ def fig_convergence():
     ax[0].axhline(1e-4, color="grey", lw=0.6); ax[0].set_xlabel("loop"); ax[0].set_ylabel("max |Δp| / σ_p")
     ax[0].set_title("g: convergence (threshold 1e-4)"); ax[0].legend()
     for f in F:
-        s = E.fit(E.load_target(PHOT, DB, "Mrk_817", f), agn_id=sols[f].meta["agn_id"])
+        s = E.fit(E.load_target(PHOT, DB, TARGET, f), agn_id=sols[f].meta["agn_id"])
         h = np.array([x[0] for x in s.history])
         ax[1].semilogy(np.arange(2, len(h) + 2), h, color=COL[f], label=f"{LBL[f]} ({len(h) + 1})")
     ax[1].axhline(1e-4, color="grey", lw=0.6); ax[1].set_xlabel("loop"); ax[1].legend(ncol=2)
@@ -108,7 +111,7 @@ def fig_scopes():
 
 # ---------------------------------------------------------------- 4 epochs
 def fig_epochs():
-    fq = store.read_frame_qc(DB, "Mrk_817").set_index("frame")
+    fq = store.read_frame_qc(DB, TARGET).set_index("frame")
     ep = sols["gp"].epochs.copy()
     ep["airmass"] = ep.frame.map(fq.airmass); ep["fwhm"] = ep.frame.map(fq.fwhm_arcsec); ep["zp"] = ep.frame.map(fq.zp)
     sc = scope_colour(ep.scope.unique())
@@ -133,11 +136,11 @@ def fig_epochs():
 
 # ---------------------------------------------------------------- 5 star repeatability
 def fig_star_rms():
-    fq = store.read_frame_qc(DB, "Mrk_817").set_index("frame")
+    fq = store.read_frame_qc(DB, TARGET).set_index("frame")
     fig, ax = plt.subplots(2, 4, figsize=(14, 6.4), sharey=True)
     ax = ax.ravel(); rows = []
     for i, f in enumerate(F):
-        d = E.clean_comparisons(E.load_target(PHOT, DB, "Mrk_817", f))
+        d = E.clean_comparisons(E.load_target(PHOT, DB, TARGET, f))
         s = sols[f]; st = s.stars.set_index("star_id")
         d = d[d.star_id.isin(st.index) & d.frame.isin(set(s.epochs.frame))].copy()
         d["pf"] = d.mag_inst + d.frame.map(fq.zp)

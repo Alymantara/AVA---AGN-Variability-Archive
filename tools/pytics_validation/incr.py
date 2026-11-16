@@ -1,13 +1,16 @@
 """Incremental-update tests: (A) hold out the last 60 days and add night by night;
 (B) hold out from 61058 (a new scope, 1m006-fa11, appears). Compare with a full refit."""
-import sys, time, warnings; warnings.filterwarnings("ignore"); sys.path.insert(0, "/Users/juan/astro/AVA")
+import sys, time, warnings; warnings.filterwarnings("ignore"); sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path; import numpy as np, pandas as pd
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import ensemble as E
-PHOT = Path("/Users/juan/astro/AVA/data/test_archive/photometry/Mrk_817"); DB = Path("/Users/juan/astro/AVA/data/test_archive/frame_qc.sqlite")
+PHOT = cfg.phot_dir(TARGET); DB = frame_db_path()
 OUT = Path(sys.argv[1]); OUT.mkdir(exist_ok=True)
 rows, nightly = [], []
 for f in ["up", "B", "gp", "V", "rp", "ip", "zs"]:
-    d = E.load_target(PHOT, DB, "Mrk_817", f); agn = int(d.loc[d.is_agn, "star_id"].iloc[0])
+    d = E.load_target(PHOT, DB, TARGET, f); agn = int(d.loc[d.is_agn, "star_id"].iloc[0])
     full = E.fit(d, agn_id=agn)
     lc_full = E.apply(full, d[d.is_agn])[["frame", "MJD", "scope", "mag", "mag_err"]]
     for test, cut in [("A_last60d", d.MJD.max() - 60), ("B_newscope", 61058.0)]:

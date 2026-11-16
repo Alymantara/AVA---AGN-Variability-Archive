@@ -315,14 +315,23 @@ def _xshift(ref, f, step, max_shift=6.0, weight=None):
     return float((lags[i] + d) * step)
 
 
-def _align_weight(w, arm):
+def arm_dispersion(paths, arm: str) -> float:
+    """Median observed bin width (Å) of an arm, from the first readable spectrum."""
+    for p in paths:
+        s = arms(p)[arm]
+        if len(s) > 10:
+            return float(np.median(np.diff(s.w.to_numpy())))
+    raise ValueError(f"no {arm}-arm data to measure the dispersion")
+
+
+def _align_weight(w, mask_ranges):
     wt = np.ones(len(w))
-    for lo, hi in ALIGN_MASK[arm]:
+    for lo, hi in mask_ranges:
         wt[(w > lo) & (w < hi)] = 0.0
     return wt
 
 
-def _arm_on_grid(path, arm, z, grid, red_min_observed=5300.0, red_max_observed=9050.0):
+def _arm_on_grid(path, arm, z, grid, red_min_observed=5300.0, red_max_observed=9050.0):   # limits: products.latest_spectrum.red_range
     s = arms(path)[arm]
     if arm == "red":
         s = s[(s.w >= red_min_observed) & (s.w <= red_max_observed)]
@@ -332,7 +341,9 @@ def _arm_on_grid(path, arm, z, grid, red_min_observed=5300.0, red_max_observed=9
     return np.interp(grid, w, s.f.to_numpy()), np.interp(grid, w, s.e.to_numpy())
 
 
-def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.0, rebuild: bool = False) -> pd.DataFrame:
+def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.0, rebuild: bool = False,
+                windows: dict | None = None, masks: dict | None = None, red_range=(5300.0, 9050.0),
+                highpass_A: float = 60.0) -> pd.DataFrame:
     """Wavelength offset of every spectrum in each arm (Å, rest frame), by cross-correlating the high-passed
     narrow-line window (``ALIGN_WINDOWS``) with a stored reference template.
 
@@ -341,6 +352,9 @@ def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.
     shift_red_A, file size/mtime).  A new spectrum costs one cross-correlation; unchanged ones are read back.
     |shift| > ``max_shift`` → NaN (that arm of that spectrum is left out of the mean/RMS)."""
     spec_dir = Path(spec_dir)
+    windows = {k: tuple(v) for k, v in (windows or ALIGN_WINDOWS).items()}
+    masks = {k: tuple(tuple(x) for x in v) for k, v in (masks or ALIGN_MASK).items()}
+    rmin, rmax = red_range
     tpl_f, off_f = spec_dir / "spec_align_template.npz", spec_dir / "spec_offsets.csv"
     tpl = None
     if tpl_f.exists() and not rebuild:
@@ -349,19 +363,19 @@ def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.
         if abs(float(tpl.get("z", z)) - z) > 1e-6:
             tpl = None
     grids, steps = {}, {}
-    for arm, (lo, hi) in ALIGN_WINDOWS.items():
-        steps[arm] = (1.72 if arm == "blue" else 3.48) / (1 + z)
-        grids[arm] = np.arange(lo - 60, hi + 60, steps[arm])
+    for arm, (lo, hi) in windows.items():
+        steps[arm] = arm_dispersion(t["path"], arm) / (1 + z)        # measured bin width, rest Å
+        grids[arm] = np.arange(lo - highpass_A, hi + highpass_A, steps[arm])
     if tpl is None:                                   # build the template: median, aligned twice
         tpl = {"z": np.array(z)}
         for arm, g in grids.items():
-            k = max(int(60 / steps[arm]) | 1, 5)
-            H = [_highpass(f, k) for f, _ in (_arm_on_grid(p, arm, z, g) for p in t["path"]) if f is not None]
+            k = max(int(highpass_A / steps[arm]) | 1, 5)
+            H = [_highpass(f, k) for f, _ in (_arm_on_grid(p, arm, z, g, rmin, rmax) for p in t["path"]) if f is not None]
             if len(H) == 0:
                 continue
             H = np.array(H)
-            m = (g > ALIGN_WINDOWS[arm][0]) & (g < ALIGN_WINDOWS[arm][1])
-            wt = _align_weight(g[m], arm)
+            m = (g > windows[arm][0]) & (g < windows[arm][1])
+            wt = _align_weight(g[m], masks.get(arm, ()))
             ref = np.median(H, axis=0)
             for _ in range(2):
                 sh = np.array([_xshift(ref[m], h[m], steps[arm], max_shift, wt) for h in H])
@@ -384,14 +398,14 @@ def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.
         row = {"basename": Path(p).name.split("-e91")[0] + "-e00", "path": str(p), "file_size": size, "file_mtime": mtime}
         for arm in ("blue", "red"):
             g = tpl.get(f"grid_{arm}")
-            f = None if g is None else _arm_on_grid(p, arm, z, g)[0]
+            f = None if g is None else _arm_on_grid(p, arm, z, g, rmin, rmax)[0]
             if f is None:
                 row[f"shift_{arm}_A"] = np.nan
                 continue
             st = float(np.median(np.diff(g)))
-            m = (g > ALIGN_WINDOWS[arm][0]) & (g < ALIGN_WINDOWS[arm][1])
-            x = _xshift(tpl[f"ref_{arm}"][m], _highpass(f, max(int(60 / st) | 1, 5))[m], st, max_shift,
-                        _align_weight(g[m], arm))
+            m = (g > windows[arm][0]) & (g < windows[arm][1])
+            x = _xshift(tpl[f"ref_{arm}"][m], _highpass(f, max(int(highpass_A / st) | 1, 5))[m], st, max_shift,
+                        _align_weight(g[m], masks.get(arm, ())))
             row[f"shift_{arm}_A"] = x if abs(x) < max_shift - st / 4 else np.nan   # at the search edge: no match
         rows.append(row)
     off = pd.DataFrame(rows)
@@ -421,6 +435,7 @@ def mean_rms(t: pd.DataFrame, z: float, red_max_observed: float = 9050.0, red_mi
     sig = pd.to_numeric(use.get("oiii_sigma_A", pd.Series(dtype=float)), errors="coerce")
     target_sig = float(np.nanpercentile(sig, resolution_percentile)) if match_resolution and sig.notna().any() else None
     out["resolution_sigma_A"] = target_sig
+    blue_step = None
     for arm in ("blue", "red"):
         specs = []
         for r in use.itertuples():
@@ -447,7 +462,9 @@ def mean_rms(t: pd.DataFrame, z: float, red_max_observed: float = 9050.0, red_mi
         if hi - lo < 20 * step:
             continue
         grid = np.arange(lo, hi, step)
-        disp = (step / (1.72 / (1 + z))) if arm == "red" else 1.0   # red arm: ~2x the Å per spatial pixel
+        if arm == "blue":
+            blue_step = step
+        disp = (step / blue_step) if arm == "red" and blue_step else 1.0   # red arm: more Å per spatial pixel
         nights: dict[str, list] = {}
         for n, w, f, e, sg in specs:
             fi = np.interp(grid, w, f)

@@ -8,16 +8,19 @@
 Campaign window is a parameter (default MJD 59150-59650, Nov 2020 - Feb 2022)."""
 import sys, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import intercal as IC
 from ava.plots import webplots as wp
 
-ROOT = Path("/Users/juan/astro/AVA")
-PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; OUT = ROOT / "docs/figures/pytics"
+ROOT = Path(__file__).resolve().parents[2]
+PHOT = cfg.phot_dir(TARGET); OUT = ROOT / "docs/figures/pytics"
 T0, T1 = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else (59150.0, 59650.0)
 F = ["up", "B", "gp", "V", "rp", "ip", "zs"]; LBL = dict(up="u", B="B", gp="g", V="V", rp="r", ip="i", zs="z")
 fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")

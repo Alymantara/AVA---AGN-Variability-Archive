@@ -7,7 +7,7 @@ spec_lines (frame ids, fit flags, [O III] scale); AVA DB: line_variability recom
 download_state.  Prints PASS / FAIL per check and exits 1 on any failure."""
 import sys, sqlite3, hashlib, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 from ava.config import cfg

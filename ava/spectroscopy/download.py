@@ -37,7 +37,6 @@ import pandas as pd
 
 from ava.lco.download import LOCAL_FILES_DDL, fetch, md5sum
 
-ARCHIVE = "https://archive-api.lco.global"
 RAW_ROLES = ("science", "arc", "flat", "standard", "std_arc", "std_flat")
 PRODUCT_ROLES = ("archive_1d", "archive_2d", "std_archive_1d", "std_archive_2d")
 
@@ -141,7 +140,9 @@ class SpecRunResult:
 
 def frame_url(client, frame_id: int) -> tuple[str, str | None]:
     """Signed download URL (and md5) of one archive frame: one archive request."""
-    d = client.get(f"{ARCHIVE}/frames/{int(frame_id)}/")
+    from ava.lcodb import api
+
+    d = client.get(f"{api.ARCHIVE}/frames/{int(frame_id)}/")
     url = d.get("url") or (d.get("version_set") or [{}])[0].get("url")
     md5 = d.get("md5") or (d.get("version_set") or [{}])[0].get("md5")
     if not url:

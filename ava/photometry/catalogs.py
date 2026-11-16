@@ -97,7 +97,8 @@ def read_catalog(path: Path) -> Catalog | None:
 
 def match_to_reference(cat: Catalog, ref: pd.DataFrame, max_sep_arcsec: float = 1.5,
                        recentre: bool = True, pixscale: float | None = None,
-                       repair_wcs: bool = True, min_matches: int = 10) -> tuple[pd.DataFrame, dict]:
+                       repair_wcs: bool = True, min_matches: int = 10,
+                       recentre_radii_arcsec=(5.0, 15.0), min_recentre_stars: int = 5) -> tuple[pd.DataFrame, dict]:
     """Tag each detection with the reference ``star_id`` it matches (or <NA>).
 
     If fewer than ``min_matches`` stars match and ``pixscale`` (arcsec/px) is
@@ -124,9 +125,9 @@ def match_to_reference(cat: Catalog, ref: pd.DataFrame, max_sep_arcsec: float = 
     if recentre:
         # Estimate the frame's WCS offset from the nearest matches, widening the
         # search when the WCS is off by more than max_sep (a few frames are).
-        for r0 in (max_sep_arcsec, 5.0, 15.0):
+        for r0 in (max_sep_arcsec, *recentre_radii_arcsec):
             near = sep <= r0
-            if near.sum() >= 5:
+            if near.sum() >= min_recentre_stars:
                 dra, ddec = det[near].spherical_offsets_to(refc[idx[near]])
                 off_ra, off_dec = float(np.median(dra.arcsec)), float(np.median(ddec.arcsec))
                 break

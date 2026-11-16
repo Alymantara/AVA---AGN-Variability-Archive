@@ -6,7 +6,7 @@ The red order covers Hβ only when its blue end (≈4500-4900 Å observed) is be
 Fairall 9 at z = 0.046).  Figure → <spec>/<target>/plots/hbeta_fit_arms.png; table → hbeta_arms.csv."""
 import sys, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")

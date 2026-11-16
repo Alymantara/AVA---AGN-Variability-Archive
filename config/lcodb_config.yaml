@@ -50,6 +50,7 @@ max_retries: 6
 request_timeout: 180
 header_workers: 4
 header_rate_per_s: 4        # sustained archive limit seen in Nov 2026; faster gets a multi-hour 429 block
+sync_rate_per_s: 2          # archive listing requests (sync, standards and calibration crawls); null = no limit
 
 # Which frames get their full FITS header downloaded (needed for AIRMASS, seeing, slit, ...).
 # Spectra: every frame (a few 10^4). Photometry: the BANZAI frames (all raw keywords plus

@@ -451,7 +451,7 @@ def fit(d: pd.DataFrame, *, agn_id, max_loops: int = 200, safe: float = 0.6, fra
 # ---------------------------------------------------------------------------
 
 def update(sol: Solution, d: pd.DataFrame, bad_flags: int = BAD_FLAGS, refit_fraction: float = 0.1,
-           refit_rms_factor: float = 2.0, log=None) -> tuple[Solution, dict]:
+           refit_rms_factor: float = 2.0, log=None, refit_rms_floor: float = 0.002) -> tuple[Solution, dict]:
     """Add the epochs of ``d`` that are not in ``sol``.
 
     Star means, star / scope extra variances and scope offsets are kept; each new
@@ -524,7 +524,7 @@ def update(sol: Solution, d: pd.DataFrame, bad_flags: int = BAD_FLAGS, refit_fra
         reasons.append("new scope " + ",".join(new_scopes))
     if frac_upd > refit_fraction:
         reasons.append(f"{frac_upd:.0%} of epochs from updates")
-    if new_rms > refit_rms_factor * full_rms + 0.002:
+    if new_rms > refit_rms_factor * full_rms + refit_rms_floor:
         reasons.append(f"new-epoch rms_t {new_rms*1e3:.1f} mmag vs {full_rms*1e3:.1f}")
     out.meta["needs_refit"] = reasons
     info.update(new_epochs=len(ep), new_scopes=new_scopes, seconds=round(time.time() - t0, 4),
@@ -644,7 +644,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
                min_epochs: int = 10, absolute: bool = True, colour_term: bool = True,
                scope_colour_terms="auto", colour_check_min_gain: float = 0.05, ref_cameras=("fa",),
                intercal_max_gap: float = 3.0, auto_refit: bool = True, update_kw: dict | None = None,
-               apply_kw: dict | None = None, log=print, **fit_kw) -> dict:
+               apply_kw: dict | None = None, zp_kw: dict | None = None, log=print, **fit_kw) -> dict:
     """Calibrate ``data_id`` per filter and write ``agn_lightcurve_pytics.parquet``.
 
     mode: ``full`` refits everything; ``update`` adds new frames to the stored
@@ -701,7 +701,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
 
     def zero_points():
         rel = {f: apply(s, agn[f], **apply_kw)["mag"].to_numpy() for f, s in sols.items()}
-        return agn_zero_points(sols, ref, rel, colour_term=colour_term)
+        return agn_zero_points(sols, ref, rel, colour_term=colour_term, zp_kw=zp_kw)
 
     # ---- 2. per-scope colour terms: decide per filter from the data ------------------------
     if auto_ck and refitted and ref is not None and star_colours is not None:
@@ -710,7 +710,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
         for f in refitted:
             t0 = time.time()
             s1 = fit(data[f], agn_id=sols[f].meta["agn_id"], log=None, colours=star_colours, **fit_kw)
-            z1 = absolute_zp(s1, ref, colour_term=colour_term)
+            z1 = absolute_zp(s1, ref, colour_term=colour_term, **(zp_kw or {}))
             zp1 = z1["zp"] + z1["C"] * (c_agn - z1["c0"])
             s1.meta["agn_colour"] = c_agn
             lc0 = apply(sols[f], agn[f], zps[f][0], **apply_kw)
@@ -834,10 +834,10 @@ def absolute_zp(sol: Solution, ref: pd.DataFrame, *, colour=("lco_g", "lco_i"), 
 
 
 def agn_zero_points(sols: dict, ref: pd.DataFrame, agn_lc: dict | None = None, colour_term: bool = True,
-                    n_iter: int = 3, colour=("gp", "ip")) -> dict:
+                    n_iter: int = 3, colour=("gp", "ip"), zp_kw: dict | None = None) -> dict:
     """{filter: (zp_at_AGN_colour, err)} with the AGN colour from its own calibrated
     mean magnitudes (iterated; the colour term is then evaluated at the AGN's colour)."""
-    fits = {f: absolute_zp(s, ref, colour_term=colour_term) for f, s in sols.items()}
+    fits = {f: absolute_zp(s, ref, colour_term=colour_term, **(zp_kw or {})) for f, s in sols.items()}
     c_agn = float(np.nanmedian([f["c0"] for f in fits.values()]))
     for _ in range(n_iter):
         if agn_lc is None or not all(k in agn_lc for k in colour):

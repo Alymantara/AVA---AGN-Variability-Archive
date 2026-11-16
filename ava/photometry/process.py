@@ -67,7 +67,7 @@ def process_catalog(cat_path: Path, ref: pd.DataFrame, meta: dict, data_id: str,
     ps = _pixscale_from_camera(cam)
     k = cat.science_index(cam)
     diam = (cat.diameters_px or diameter_series_for(cat.n_apertures))[k]
-    m, info = match_to_reference(cat, ref, pixscale=ps)
+    m, info = match_to_reference(cat, ref, pixscale=ps, **MATCH_KW)
     meas = measurements(cat, m, k)
     t = cat.table
     clean = m["star_id"].notna() & (t["sex_flags"] == 0)
@@ -152,7 +152,39 @@ def requalify(frame_db: Path, data_id: str, q: dict) -> pd.DataFrame:
 # Whole target
 # ---------------------------------------------------------------------------
 
-IMAGING_PREFIXES = ("fa", "fl", "fs", "ep")
+def imaging_prefixes() -> tuple[str, ...]:
+    """Camera-name prefixes of the imaging cameras (photometry.imaging_camera_prefixes)."""
+    try:
+        from ava.config import cfg
+
+        v = (cfg._raw.get("photometry", {}) or {}).get("imaging_camera_prefixes")
+    except Exception:  # noqa: BLE001
+        v = None
+    return tuple(v) if v else ("fa", "fl", "fs", "ep")
+
+
+IMAGING_PREFIXES = imaging_prefixes()
+
+
+def match_settings() -> dict:
+    """Catalogue-to-reference matching (photometry.matching): max_sep_arcsec, min_matches (below it the WCS is
+    re-solved), recentre_radii_arcsec (wider searches for the frame offset), min_recentre_stars."""
+    try:
+        from ava.config import cfg
+
+        m = dict((cfg._raw.get("photometry", {}) or {}).get("matching") or {})
+    except Exception:  # noqa: BLE001
+        m = {}
+    out = {}
+    for k, cast in (("max_sep_arcsec", float), ("min_matches", int), ("min_recentre_stars", int)):
+        if m.get(k) is not None:
+            out[k] = cast(m[k])
+    if m.get("recentre_radii_arcsec"):
+        out["recentre_radii_arcsec"] = tuple(float(x) for x in m["recentre_radii_arcsec"])
+    return out
+
+
+MATCH_KW = match_settings()
 
 
 def _work(args):

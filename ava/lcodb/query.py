@@ -169,7 +169,9 @@ class Archive:
         cfg = load_config(config)
         self.cfg = cfg
         paths = dict(spectra=spectra or cfg.db_path('spectra'), photometry=photometry or cfg.db_path('photometry'))
-        if ava is None and cfg.get('ava', {}).get('csv'):
+        if ava is None and cfg.get('ava', {}).get('db'):          # the AVA database (source of truth)
+            ava = Path(cfg.resolve(cfg['ava']['db']))
+        elif ava is None and cfg.get('ava', {}).get('csv'):      # legacy layout: ava.sqlite beside the CSV
             ava = Path(cfg.resolve(cfg['ava']['csv'])).parent / 'ava.sqlite'
         if ava is not None:
             paths['ava'] = ava

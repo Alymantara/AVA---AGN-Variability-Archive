@@ -44,9 +44,12 @@ def load_config(path=None):
     path = Path(path or os.environ.get('LCODB_CONFIG', DEFAULT_CONFIG)).resolve()
     with open(path) as f:
         raw = yaml.safe_load(f)
-    token = os.environ.get('LCO_TOKEN')
+    token = os.environ.get('LCO_TOKEN') or os.environ.get('LCO_API_TOKEN')   # same variables as ava.config
     if not token and raw.get('token_file'):
         tf = Path(os.path.expanduser(raw['token_file']))
         if tf.exists():
             token = tf.read_text().strip() or None
+    if raw.get('archive_url') or raw.get('portal_url'):
+        from . import api
+        api.set_urls(raw.get('archive_url'), raw.get('portal_url'))
     return Config(raw=raw, path=path, token=token)

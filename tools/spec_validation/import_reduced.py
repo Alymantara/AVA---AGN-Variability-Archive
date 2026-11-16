@@ -11,7 +11,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from ava.config import cfg  # noqa: E402
 from ava.pipeline.tasks.download import lcodb_path  # noqa: E402
 from ava.spectroscopy import reduce as R  # noqa: E402

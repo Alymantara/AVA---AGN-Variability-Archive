@@ -130,7 +130,7 @@ class AVAConfig:
         d = self._raw
         for k in keys:
             d = d[k]
-        return str(d)
+        return "" if d is None else str(d)        # YAML null → "" (not the truthy string "None")
 
     # -------------------------------------------------------------------
     # Data root paths (absolute)
@@ -232,11 +232,8 @@ class AVAConfig:
     @property
     def lcodb_config_path(self) -> Path:
         """Path to the lcodb config.yaml."""
-        raw = self._path_key("paths", "lcodb_config")
-        if raw:
-            return self._resolve(raw)
-        # Auto-derive as sibling of banzai-floyds
-        return self.floyds_path.parent / "lco_archive_db" / "config.yaml"
+        raw = self._raw.get("paths", {}).get("lcodb_config")
+        return self._resolve(raw or "config/lcodb_config.yaml")   # default: the repository's own
 
     @property
     def log_dir(self) -> Path:
@@ -255,7 +252,7 @@ class AVAConfig:
     def lco_token(self) -> Optional[str]:
         """LCO API token: env var LCO_API_TOKEN takes precedence, then
         the file named by paths.lco.token_file, then lco.api_token."""
-        env = os.environ.get("LCO_API_TOKEN")
+        env = os.environ.get("LCO_API_TOKEN") or os.environ.get("LCO_TOKEN")   # same variables as lcodb
         if env:
             return env.strip()
         token_file_str = self._raw.get("lco", {}).get("token_file", "~/.lco_token")
@@ -309,12 +306,12 @@ class AVAConfig:
             from MJD 60909 onward.
         target_radius_arcsec : float, optional
             Target aperture radius in arcsec.  Defaults to
-            photometry.science_aperture_radius_arcsec in the config (5.0").
+            photometry.science_aperture_radius_arcsec in the config.
         """
         if target_radius_arcsec is None:
             target_radius_arcsec = float(
                 self._raw.get("photometry", {})
-                         .get("science_aperture_radius_arcsec", 5.0)
+                         .get("science_aperture_radius_arcsec", 5.25)
             )
         from ava.photometry.apertures import science_aperture_index as _sai
         return _sai(camera, mjd, target_radius_arcsec)

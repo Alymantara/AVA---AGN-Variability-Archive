@@ -1,13 +1,16 @@
 """Mrk 817 PyTICS input from the new products (QC-pass frames)."""
 import sys, warnings; warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 import pandas as pd
 from pathlib import Path
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry.store import load_pytics
-PHOT = Path("/Users/juan/astro/AVA/data/test_archive/photometry/Mrk_817")
-DB = Path("/Users/juan/astro/AVA/data/test_archive/frame_qc.sqlite")
+PHOT = cfg.phot_dir(TARGET)
+DB = frame_db_path()
 def load(filt, mjd_range=None):
-    d = load_pytics(PHOT, DB, "Mrk_817", filt=filt, qc_only=True)
+    d = load_pytics(PHOT, DB, TARGET, filt=filt, qc_only=True)
     d["scope"] = d["telid"].astype(str) + "-" + d["camera"].astype(str)
     if mjd_range:
         d = d[(d.MJD >= mjd_range[0]) & (d.MJD < mjd_range[1])]

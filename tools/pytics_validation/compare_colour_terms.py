@@ -3,16 +3,19 @@
 Writes docs/figures/pytics/pytics_15_colour_terms_effect.png and pytics_colour_terms_stats.json."""
 import sys, json, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import ensemble as E, intercal as IC
 from ava.plots import webplots as wp
 
-ROOT = Path("/Users/juan/astro/AVA")
-PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; DB = ROOT / "data/test_archive/frame_qc.sqlite"
+ROOT = Path(__file__).resolve().parents[2]
+PHOT = cfg.phot_dir(TARGET); DB = frame_db_path()
 BEF = Path(sys.argv[1]); OUT = ROOT / "docs/figures/pytics"
 F = ["up", "B", "gp", "V", "rp", "ip", "zs"]; LBL = dict(up="u", B="B", gp="g", V="V", rp="r", ip="i", zs="z")
 fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
@@ -56,7 +59,7 @@ before_rows, after_rows, rep = [], [], []
 fig, ax = plt.subplots(2, 3, figsize=(15, 8))
 lc_b = pd.read_parquet(BEF / "agn_lightcurve_pytics.parquet"); lc_a = pd.read_parquet(PHOT / "agn_lightcurve_pytics.parquet")
 for f in F:
-    d = E.load_target(PHOT, DB, "Mrk_817", f)
+    d = E.load_target(PHOT, DB, TARGET, f)
     sb = E.Solution.load(BEF / "pytics" / f); sa = E.Solution.load(E.solution_dir(PHOT, f))
     rb, ra = star_resid(sb, d), star_resid(sa, d)
     j = rb.join(ra, rsuffix="_a").dropna()

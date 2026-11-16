@@ -1,22 +1,25 @@
 """PyTICS quality figures (docs/figures/pytics/pytics_16..18) from the stored Mrk 817 solution."""
 import sys, json, warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.photometry import ensemble as E, store
 from ava.plots import webplots as wp
 
-ROOT = Path("/Users/juan/astro/AVA")
-PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; DB = ROOT / "data/test_archive/frame_qc.sqlite"
+ROOT = Path(__file__).resolve().parents[2]
+PHOT = cfg.phot_dir(TARGET); DB = frame_db_path()
 OUT = ROOT / "docs/figures/pytics"
 F = ["up", "B", "gp", "V", "rp", "ip", "zs"]; LBL = dict(up="u", B="B", gp="g", V="V", rp="r", ip="i", zs="z")
 fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
 COL = {r.lco: r.color for r in fd[fd.lco_flag].drop_duplicates("lco").itertuples()}
 wp._style(); plt.rcParams.update({"font.size": 10, "legend.frameon": False, "legend.fontsize": 8})
-fq = store.read_frame_qc(DB, "Mrk_817").set_index("frame")
+fq = store.read_frame_qc(DB, TARGET).set_index("frame")
 lc = pd.read_parquet(PHOT / "agn_lightcurve_pytics.parquet")
 stats = {}
 
@@ -29,7 +32,7 @@ def rob(x):
 def residuals(f):
     sol = E.Solution.load(E.solution_dir(PHOT, f))
     st, sc, ep = sol.stars.set_index("star_id"), sol.scopes.set_index("scope"), sol.epochs.set_index("frame")
-    d = E.clean_comparisons(E.load_target(PHOT, DB, "Mrk_817", f))
+    d = E.clean_comparisons(E.load_target(PHOT, DB, TARGET, f))
     d = d[d.star_id.isin(st.index) & d.frame.isin(ep.index)].copy()
     dc = (d.star_id.map(st["colour"]) - sol.meta.get("c0", 0)).fillna(0) if sol.meta.get("colour_terms") else 0.0
     ck = d.scope.map(sc["CK"]).fillna(0) if "CK" in sc else 0.0

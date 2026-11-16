@@ -76,7 +76,7 @@ def main(init, download_data, extract, calibrate_data, pytics, pytics_full, plot
         extract=extract,
         calibrate_data=calibrate_data,
         pytics=pytics or pytics_full,
-        pytics_mode="full" if pytics_full else "auto",
+        pytics_mode="full" if pytics_full else None,      # None: ensemble.mode from the config
         plot=plot,
         merge_data=merge_data,
         save=save,

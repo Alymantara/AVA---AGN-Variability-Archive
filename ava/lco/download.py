@@ -154,7 +154,7 @@ def n_listing_requests(q: Query) -> int:
 
 def pages(client, q: Query, stats: dict) -> Iterator[list[dict]]:
     """Yield archive result pages for every (name, proposal, window), following ``next``."""
-    from ava.lcodb.api import ARCHIVE
+    from ava.lcodb import api
 
     p = q.params
     for name in q.names:
@@ -163,7 +163,7 @@ def pages(client, q: Query, stats: dict) -> Iterator[list[dict]]:
                 params = {p["object"]: name, p["proposal"]: prop, p["rlevel"]: q.rlevel,
                           "start": t0.strftime(DATEFMT), "end": t1.strftime(DATEFMT),
                           "limit": q.page_size, "include_related_frames": "false"}
-                url = f"{ARCHIVE}/frames/"
+                url = f"{api.ARCHIVE}/frames/"
                 while url:
                     d = client.get(url, params)
                     stats["requests"] = stats.get("requests", 0) + 1

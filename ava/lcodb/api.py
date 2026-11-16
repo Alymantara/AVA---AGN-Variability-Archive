@@ -11,8 +11,19 @@ import requests
 
 log = logging.getLogger(__name__)
 
+#: API roots; set from the config (lcodb_config ``archive_url`` / ``portal_url``, AVA ``lco.archive_url`` /
+#: ``lco.base_url``) through :func:`set_urls`.
 ARCHIVE = 'https://archive-api.lco.global'
 PORTAL = 'https://observe.lco.global/api'
+
+
+def set_urls(archive=None, portal=None):
+    """Point every client at these API roots (trailing slashes dropped); None keeps the current value."""
+    global ARCHIVE, PORTAL
+    if archive:
+        ARCHIVE = str(archive).rstrip('/')
+    if portal:
+        PORTAL = str(portal).rstrip('/')
 DATEFMT = '%Y-%m-%d %H:%M:%S'
 
 

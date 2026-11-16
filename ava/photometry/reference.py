@@ -837,6 +837,7 @@ def build_apass_model_catalog(
     seed: int = 42,
     u_anchor: bool = True,
     u_anchor_min_stars: int = 10,
+    u_anchor_max_ruwe: float = 1.4,
     raw_out: Path | None = None,
     agn_ra: float | None = None,
     agn_dec: float | None = None,
@@ -898,7 +899,7 @@ def build_apass_model_catalog(
 
     # 5. u-band anchor to Gaia GSPC
     if u_anchor and use_gaia:
-        stars, u_meta = anchor_u(stars, min_stars=u_anchor_min_stars)
+        stars, u_meta = anchor_u(stars, min_stars=u_anchor_min_stars, max_ruwe=u_anchor_max_ruwe)
         if u_meta["applied"]:
             log(f"u anchored to GSPC: model - GSPC = {u_meta['offset_mag']:+.3f} "
                 f"+/- {u_meta['offset_err_mag']:.3f} mag (n={u_meta['n_stars']}, "

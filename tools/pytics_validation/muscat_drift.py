@@ -1,12 +1,15 @@
 """MuSCAT vs Sinistro AGN flux over time (is the additive MuSCAT correction constant?).
 Each good Sinistro epoch is compared with the MuSCAT nightly flux interpolated to its time (< 1.5 d).
 Writes docs/figures/pytics/pytics_22_muscat_vs_sinistro.png"""
-import sys, warnings; warnings.filterwarnings("ignore"); sys.path.insert(0, "/Users/juan/astro/AVA")
+import sys, warnings; warnings.filterwarnings("ignore"); sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 from pathlib import Path
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
+from ava.config import cfg  # noqa: E402  (AVA_CONFIG selects the archive; AVA_TARGET the target)
+from ava.pipeline.tasks.calibrate import frame_db_path  # noqa: E402
+TARGET = __import__("os").environ.get("AVA_TARGET", "Mrk_817")
 from ava.plots import webplots as wp
-ROOT = Path("/Users/juan/astro/AVA"); PHOT = ROOT / "data/test_archive/photometry/Mrk_817"; OUT = ROOT / "docs/figures/pytics"
+ROOT = Path(__file__).resolve().parents[2]; PHOT = cfg.phot_dir(TARGET); OUT = ROOT / "docs/figures/pytics"
 wp._style(); plt.rcParams.update({"font.size": 9, "legend.frameon": False, "legend.fontsize": 7})
 F = ["gp", "rp", "ip", "zs"]; LBL = dict(gp="g", rp="r", ip="i", zs="z")
 OI = {"1m001-fa11": ("#E69F00", "o"), "1m003-fa20": ("#56B4E9", "s"), "1m006-fa07": ("#009E73", "D"),

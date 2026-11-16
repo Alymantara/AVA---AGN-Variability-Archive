@@ -34,6 +34,7 @@ def _client(cfg, rate=None):
         log.warning('no API token found (%s / LCO_TOKEN): only public data, 100 frames per page',
                     cfg.get('token_file'))
         cfg.raw['page_size'] = min(cfg['page_size'], 100)
+    rate = rate if rate is not None else cfg.get('sync_rate_per_s')   # listing requests (sync, crawls)
     return Client(cfg.token, cfg['request_timeout'], cfg['max_retries'], rate)
 
 
@@ -99,7 +100,7 @@ def cmd_airmass(cfg, a):
 def cmd_match(cfg, a):
     cons, _ = _open(cfg)
     s, c = cfg['standards'], cfg['calibs']
-    nf = standards.flag_by_position(cons['spectra'], s.get('position_radius_arcsec', 60.0))
+    nf = standards.flag_by_position(cons['spectra'], s.get('position_radius_arcsec', 120.0))
     log.info('standards: %d more frames flagged by position', nf)
     nsci, nrow = standards.rebuild(cons['spectra'], s['n_nearest'], s['max_dt_days'])
     log.info('standards: %d science spectra, %d matches', nsci, nrow)

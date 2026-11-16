@@ -1,5 +1,5 @@
 import sys, time, warnings; warnings.filterwarnings("ignore")
-sys.path.insert(0, "/Users/juan/astro/AVA")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[2]))   # repository root
 import numpy as np, pandas as pd
 from ava.photometry import ensemble as E
 d = pd.read_parquet(sys.argv[1]); AGN = int(d.loc[d.is_agn, "star_id"].iloc[0])

@@ -99,6 +99,37 @@ PIXEL_SCALES: dict[str, float] = {
 }
 
 
+#: Science aperture radius (arcsec) when the caller gives none: photometry.science_aperture_radius_arcsec.
+SCIENCE_RADIUS_ARCSEC: float = 5.25
+
+
+def _load_config() -> None:
+    """Take the aperture series, expansion epoch, pixel scales and science radius from the AVA config
+    (``photometry.apertures.*``, ``photometry.pixel_scales``, ``photometry.science_aperture_radius_arcsec``);
+    the module values above are the documented defaults.  Read once, at import."""
+    global EXPANSION_MJD, OLD_DIAMETERS_PX, NEW_DIAMETERS_PX, SCIENCE_RADIUS_ARCSEC
+    try:
+        from ava.config import cfg
+
+        ph = cfg._raw.get("photometry", {}) or {}
+    except Exception:  # noqa: BLE001 — no config (e.g. a bare import): keep the defaults
+        return
+    ap = ph.get("apertures", {}) or {}
+    if ap.get("expansion_mjd") is not None:
+        EXPANSION_MJD = float(ap["expansion_mjd"])
+    if ap.get("old_diameters_px"):
+        OLD_DIAMETERS_PX = tuple(int(x) for x in ap["old_diameters_px"])
+    if ap.get("new_diameters_px"):
+        NEW_DIAMETERS_PX = tuple(int(x) for x in ap["new_diameters_px"])
+    for k, v in (ph.get("pixel_scales") or {}).items():
+        PIXEL_SCALES[str(k).lower()] = float(v)
+    if ph.get("science_aperture_radius_arcsec") is not None:
+        SCIENCE_RADIUS_ARCSEC = float(ph["science_aperture_radius_arcsec"])
+
+
+_load_config()
+
+
 def _pixscale_from_camera(camera: str) -> float:
     """Return the pixel scale (arcsec/px) for a camera ID or family name.
 
@@ -201,7 +232,7 @@ def science_aperture_index_for_catalog(
             from ava.config import cfg
             target_radius_arcsec = float(cfg._raw["photometry"]["science_aperture_radius_arcsec"])
         except Exception:
-            target_radius_arcsec = 5.0
+            target_radius_arcsec = SCIENCE_RADIUS_ARCSEC
     target_diameter_px = 2.0 * target_radius_arcsec / _pixscale_from_camera(camera)
     diameters = tuple(diameters_px) if diameters_px else diameter_series_for(n_apertures)
     if len(diameters) != n_apertures:
@@ -269,7 +300,7 @@ def science_aperture_index(
                 cfg._raw["photometry"]["science_aperture_radius_arcsec"]
             )
         except Exception:
-            target_radius_arcsec = 5.0
+            target_radius_arcsec = SCIENCE_RADIUS_ARCSEC
 
     pixscale = _pixscale_from_camera(camera)
     target_diameter_px = 2.0 * target_radius_arcsec / pixscale
@@ -317,7 +348,7 @@ def audit_aperture_index(
     stored_index: int,
     camera: str,
     mjd: float,
-    target_radius_arcsec: float = 5.0,
+    target_radius_arcsec: float | None = None,
 ) -> dict:
     """Audit a stored aperture index from an existing pkl file.
 
@@ -384,7 +415,7 @@ class ApertureTable:
     def science_index(
         self,
         camera: str,
-        target_radius_arcsec: float = 5.0,
+        target_radius_arcsec: float | None = None,
     ) -> int:
         """Science aperture index for a camera at this epoch."""
         return science_aperture_index(camera, self.mjd, target_radius_arcsec)
@@ -413,7 +444,7 @@ class ApertureTable:
         self,
         label: str = "tab:aper",
         caption: str | None = None,
-        target_radius_arcsec: float = 5.0,
+        target_radius_arcsec: float | None = None,
     ) -> str:
         """Return a complete LaTeX table for inclusion in the pipeline manual.
 

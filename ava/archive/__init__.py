@@ -38,11 +38,7 @@ def get_archive(config: str | Path | None = None) -> Archive:
     """
     if config is None:
         from ava.config import cfg as _ava_cfg
-        lcodb_cfg = getattr(_ava_cfg.paths, 'lcodb_config', None)
-        if not lcodb_cfg:
-            floyds = Path(_ava_cfg.floyds_path)
-            lcodb_cfg = floyds.parent / 'lco_archive_db' / 'config.yaml'
-        config = str(lcodb_cfg)
+        config = str(_ava_cfg.lcodb_config_path)        # resolved against ava_root, not the cwd
     return Archive(config=config)
 
 

@@ -47,9 +47,9 @@ def spec_products(target: str) -> dict:
     plot_dir.mkdir(parents=True, exist_ok=True)
     out = {"target": target, "spectra": len(files), "plots": []}
 
-    s = L.FitSettings(broad_components=int(hb.get("broad_components", 1)),
-                      fit_window=tuple(hb.get("fit_window", (4750.0, 5100.0))),
-                      oiii_wing=bool(hb.get("oiii_wing", True)))
+    s = L.settings_from_config(hb)              # every FitSettings field can be set in spectroscopy.products.hbeta
+    lp = pc.get("latest_spectrum", {}) or {}
+    red_range = tuple(lp.get("red_range", (5300.0, 9050.0)))
     t, night, meta = P.hbeta_series(files, z, s, qc_good=tuple(hb.get("oiii_reference_qc", ["OK"])),
                                     min_series=int(hb.get("min_series", 3)),
                                     scale_limits=tuple(hb.get("scale_limits", (0.2, 5.0))),
@@ -58,12 +58,11 @@ def spec_products(target: str) -> dict:
                 meta.get("n_cached", 0), cfg.spec_dir(target) / "hbeta_fits.parquet")
     method = f"gauss{s.broad_components}b+oiii{'w' if s.oiii_wing else ''}"
     # 1. latest spectrum (two arms) and its Hβ fit (reference)
-    lp = pc.get("latest_spectrum", {}) or {}
     latest = max(files, key=lambda f: P._header(f)["MJD-OBS"])
     hdr = P._header(latest)
     out["latest"] = str(latest)
     out["plots"] += W.latest_spectrum(P.arms(latest), hdr, entry["name"], z, plot_dir / f"lco_latest_{target}_spec",
-                                      formats, red_range=tuple(lp.get("red_range", (5300.0, 9050.0))))
+                                      formats, red_range=red_range)
     sp = L.blue_arm(latest, z)
     fit = L.fit_hbeta(sp, s)
     out["plots"] += W.latest_hbeta_fit(sp, fit, s, hdr, entry["name"], z, plot_dir / f"lco_latest_{target}_hbeta_fit",
@@ -72,7 +71,9 @@ def spec_products(target: str) -> dict:
     if len(t):
         mp = pc.get("mean_rms", {}) or {}
         good = t[t["good"]] if t["good"].any() else t
-        off = P.arm_offsets(good, z, cfg.spec_dir(target), max_shift=float(mp.get("max_shift_A", 6.0)))
+        off = P.arm_offsets(good, z, cfg.spec_dir(target), max_shift=float(mp.get("max_shift_A", 6.0)),
+                            windows=mp.get("align_windows"), masks=mp.get("align_mask"), red_range=red_range,
+                            highpass_A=float(mp.get("highpass_A", 60.0)))
         bad = off[off[["shift_blue_A", "shift_red_A"]].isna().any(axis=1)]
         for r in bad.itertuples():
             logger.warning("  %s: no plausible wavelength offset in some arm (left out of that arm's mean/RMS)",
@@ -84,7 +85,7 @@ def spec_products(target: str) -> dict:
         tm = t[~t["qc"].astype(str).str.split(",").map(lambda f: any(x in excl for x in f))] if excl else t
         if len(tm) < len(t):
             logger.info("%s: mean/RMS without %d spectra flagged %s", target, len(t) - len(tm), list(excl))
-        mr = P.mean_rms(tm, z, red_max_observed=float(lp.get("red_range", (5300.0, 9050.0))[1]), offsets=off,
+        mr = P.mean_rms(tm, z, red_min_observed=red_range[0], red_max_observed=red_range[1], offsets=off,
                         match_resolution=bool(mp.get("match_resolution", True)),
                         resolution_percentile=float(mp.get("resolution_percentile", 90.0)))
         span = f"MJD {t.MJD.min():.0f}–{t.MJD.max():.0f}" if t.MJD.max() - t.MJD.min() > 0.5 else f"MJD {t.MJD.min():.1f}"

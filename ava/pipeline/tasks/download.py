@@ -40,8 +40,11 @@ _CLIENT = None  # process-wide archive client: one rate limiter / 429 state for 
 def archive_client():
     global _CLIENT
     if _CLIENT is None:
+        from ava.lcodb import api
         from ava.lcodb.api import Client
 
+        lco = cfg._raw.get("lco", {}) or {}
+        api.set_urls(lco.get("archive_url"), lco.get("base_url"))
         token = cfg.lco_token
         if not token:
             raise RuntimeError("No LCO API token (lco.token_file / LCO_API_TOKEN)")

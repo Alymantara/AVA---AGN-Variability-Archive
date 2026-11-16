@@ -190,6 +190,7 @@ photometry:
     max_ruwe: 1.4
     neighbour_arcsec: 3.0       # reject stars with a Gaia neighbour this close ...
     neighbour_dmag: 2.5         # ... brighter than G + this (XP contamination)
+    agn_match_arcsec: 1.5       # the AGN = the Gaia source nearest its position within this
 
     # ---- apass_model settings (fallback) ----
     # APASS source:
@@ -265,6 +266,16 @@ photometry:
   # 33 px (10.0"); MuSCAT uses the appended 39 px (10.53") when its catalogue
   # has it, else 33 px (8.9") — see photometry.sextractor.extended_aperture_cameras.
   science_aperture_radius_arcsec: 5.25
+  # Camera pixel scales (arcsec/px) by camera-name prefix or family; used for the science aperture,
+  # FWHM in arcsec and the WCS repair.
+  pixel_scales: {fa: 0.389, fl: 0.389, sinistro: 0.389, fs: 0.304, spectral: 0.304, ep: 0.270, muscat: 0.270, muscat3: 0.270}
+  imaging_camera_prefixes: ["fa", "fl", "fs", "ep"]   # cameras whose frames are extracted
+  # Catalogue-to-reference matching (ava.photometry.catalogs.match_to_reference)
+  matching:
+    max_sep_arcsec: 1.5        # a detection is a reference star within this
+    min_matches: 10            # fewer matched stars: the frame WCS is re-solved from star patterns
+    recentre_radii_arcsec: [5.0, 15.0]   # wider searches for the frame offset when the WCS is off
+    min_recentre_stars: 5
 
   apertures:
     # ----------------------------------------------------------------
@@ -377,14 +388,26 @@ spectroscopy:
       enabled: true
       drop_binned: true
       keep_binned_examples: 2
+      min_good_fraction: 0.8     # validation: each order needs this fraction of good bins
   # ---- website products (ava.pipeline.tasks.spec_products) ----
   products:
     latest_spectrum:
       red_range: [5300.0, 9050.0]   # observed A shown for the red arm (the order end beyond is noisy)
     hbeta:
+      # every field of ava.spectroscopy.lines.FitSettings can be set here (rest-frame Å)
       broad_components: 1        # Gaussians for broad Hbeta; 1 is robust (same-night pairs 0.5-4 %; 2 gives 8-19 %)
-      fit_window: [4750.0, 5100.0]   # rest A
-      oiii_wing: true            # blue-wing Gaussian in the [O III] doublet
+      fit_window: [4750.0, 5100.0]
+      continuum_windows: [[4750.0, 4790.0], [5070.0, 5100.0]]
+      cont5100: [5080.0, 5120.0]   # window of the 5100 A continuum flux
+      broad_sigma: [8.0, 80.0]     # broad Gaussian sigma limits (~500-5000 km/s)
+      narrow_sigma: [1.0, 15.0]    # narrow lines (instrument + [O III])
+      max_shift: 20.0              # any line centre vs its rest wavelength
+      oiii_wing: true              # blue-wing Gaussian in the [O III] doublet
+      loss: "soft_l1"              # robust least squares (scipy loss)
+      loss_scale: 3.0              # residual (sigma) where the robust loss turns over
+      max_nfev: 5000
+      min_good_fraction: 0.8       # of the fit window with good bins, else the spectrum is not fitted
+      integrated_window: [4800.0, 4940.0]   # broad-Hbeta cross-check integral
       min_series: 3              # spectra needed to calibrate with [O III]
       oiii_reference_qc: ["OK"]  # L1QFLAGS of the spectra that set the reference [O III] flux
       scale_limits: [0.2, 5.0]   # [O III] scale factors outside this are not used
@@ -396,6 +419,9 @@ spectroscopy:
       resolution_percentile: 90.0  # target width: this percentile of the fitted [O III] sigmas
       max_shift_A: 6.0             # larger offsets: that arm of that spectrum is left out
       exclude_flags: ["CRLINE"]    # L1QFLAGS left out: clipped emission lines put spikes in the RMS
+      align_windows: {blue: [4900.0, 5050.0], red: [6250.0, 6800.0]}   # rest A: [O III]; [O I] + [S II]
+      align_mask: {blue: [], red: [[6450.0, 6650.0]]}   # Halpha + [N II] (20.5 A alias with [N II] 6583)
+      highpass_A: 60.0             # running-median width removed before the cross-correlation
     # PrepSpec input (<spec_dir>/<folder>/): one 3-column file (wave, flux, err) per spectrum and arm,
     # <target>_blue.hjd / <target>_red.hjd listing "file MJD" (mid-exposure). Rewritten each run.
     prepspec:
@@ -432,12 +458,16 @@ ensemble:
   auto_refit: true        # full refit when an update reports needs_refit
   refit_fraction: 0.1     # needs_refit when more than this fraction of epochs come from updates
   refit_rms_factor: 2.0   # ... or median rms_t of updated epochs > factor x full-fit median + 2 mmag
+  refit_rms_floor: 0.002  # mag added to that threshold (refit when rms_t > factor x full + floor)
   # --- AGN light curve (ensemble.apply) -------------------------------------------
   max_rms_t: 0.05         # mag; epochs with larger rms_t are good = False
   min_stars: 5            # epochs with fewer comparison stars are good = False
   # --- absolute zero point (ensemble.absolute_zp) --------------------------------
   absolute: true          # tie star means to reference_stars.csv (ZP + colour term at the AGN colour)
   colour_term: true       # fit C x (g-i) in the absolute ZP
+  absolute_clip: 3.0      # sigma clip of the star-by-star ZP fit (x robust scatter)
+  absolute_floor: 0.01    # mag added in quadrature to each star; also the minimum clip scatter
+  absolute_max_rms_star: 0.05   # mag; stars more variable than this are not used for the ZP
   # --- flux-flux intercalibration of the AGN (ava.photometry.intercal) -------------
   # additive host-light offset of cameras whose aperture (arcsec) differs from Sinistro 10.5" (MuSCAT 8.9")
   intercal_reference_cameras: ["fa"]   # camera prefixes forming the reference light curve
@@ -483,7 +513,7 @@ intercalibration:
 # ============================================================
 pipeline:
   # Number of parallel worker processes for batch runs.
-  n_cores: 4
+  n_cores: 4            # targets processed at the same time (Prefect thread pool)
 
   # If true, re-reduce frames that already have an entry in lco_latest.pkl.
   overwrite: false
@@ -506,6 +536,10 @@ pipeline:
     work_pool: "ava-process"
     schedule_cron: "30 10 * * *"  # daily 10:30 UTC, after `lcodb daily` (09:30)
     schedule_timezone: "UTC"
+    # Steps of the scheduled run (scripts/deploy.py; flags override). Known: init, download_data, extract,
+    # calibrate_data, pytics, plot, merge_data, save, spec_init, spec_download_data, spec_reduce_data,
+    # spec_products_data, publish.
+    nightly_steps: ["download_data", "extract", "calibrate_data", "plot", "publish"]
 
 
 # ============================================================
@@ -516,6 +550,7 @@ plots:
   filter_dict: "data/reference/filter_dict.txt"
   recent_days: 60          # the "latest" plot: days before the last observation
   rms_last_epochs: 500     # standards plot: epochs per star used for median / RMS
+  season_gap_days: 60.0    # "last season" plots start after the last gap longer than this
   formats: ["png", "pdf"]
 
 

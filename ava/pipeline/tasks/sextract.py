@@ -47,7 +47,7 @@ from prefect import get_run_logger, task
 from ava.config import cfg
 
 
-IMAGING_PREFIXES = ("fa", "fl", "fs", "ep")
+from ava.photometry.process import IMAGING_PREFIXES  # noqa: E402  (photometry.imaging_camera_prefixes)
 
 
 def frames_to_extract(target: str) -> tuple[list[Path], int, int]:
