@@ -1,0 +1,1191 @@
+\documentclass[12pt,a4paper]{article}
+
+%% ---- Packages ----
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{mdframed}
+\usepackage{fontenc}
+\usepackage{inputenc}
+
+%% ---- Colours ----
+\definecolor{noteblue}{RGB}{30,100,180}
+\definecolor{warnorange}{RGB}{200,100,20}
+\definecolor{codegrey}{RGB}{240,240,245}
+\definecolor{linkblue}{RGB}{10,80,160}
+
+%% ---- Hyperref ----
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = linkblue,
+  urlcolor   = linkblue,
+  citecolor  = linkblue,
+  pdftitle   = {AGN Variability Archive -- Pipeline Manual},
+  pdfauthor  = {J.V. Hernandez Santisteban},
+}
+
+%% ---- Code listings ----
+\lstdefinestyle{shell}{
+  backgroundcolor=\color{codegrey},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray!40},
+  numbers=none,
+}
+\lstdefinestyle{python}{
+  backgroundcolor=\color{codegrey},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray!40},
+  language=Python,
+  keywordstyle=\color{noteblue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{warnorange},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=5pt,
+}
+
+%% ---- Headers / footers ----
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textsc{AGN Variability Archive}}
+\fancyhead[R]{\textsc{Pipeline Manual}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+%% ---- Section style ----
+\titleformat{\section}{\large\bfseries\color{noteblue}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+%% ---- Note / warning boxes ----
+\newmdenv[
+  linecolor=noteblue,
+  backgroundcolor=noteblue!5,
+  roundcorner=4pt,
+  skipabove=6pt,skipbelow=6pt,
+  innerleftmargin=8pt,innerrightmargin=8pt,
+]{notebox}
+\newmdenv[
+  linecolor=warnorange,
+  backgroundcolor=warnorange!5,
+  roundcorner=4pt,
+  skipabove=6pt,skipbelow=6pt,
+  innerleftmargin=8pt,innerrightmargin=8pt,
+]{warnbox}
+
+%%============================================================
+\begin{document}
+%%============================================================
+
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\Huge\bfseries AGN Variability Archive}\\[0.5em]
+{\Large\bfseries Photometric Pipeline Manual}\\[2em]
+{\large Version 1.0 --- November 2026}\\[1em]
+{\large J.V.\ Hernandez Santisteban}\\[0.5em]
+{\normalsize School of Physics \& Astronomy, University of St Andrews}\\[3em]
+
+\begin{abstract}
+\noindent
+This manual documents the photometric data-reduction pipeline of the AGN Variability Archive
+(AVA), a multi-band monitoring programme conducted with the Las Cumbres Observatory (LCO)
+global telescope network.  The pipeline has been in production since 2021 and processes light
+curves for approximately 70 AGN supporting reverberation mapping campaigns.  Six stages are
+described in detail: orchestration, initialisation, data download, source extraction with
+SExtractor, photometric calibration against the APASS catalogue, and inter-calibration across
+telescopes with the CALI algorithm.  Outputs include calibrated flux light curves in mJy,
+diagnostic plots, and a merged light curve.  The manual also catalogues known limitations and
+maps each stage to its replacement in AVA~v2.
+\end{abstract}
+
+\vfill
+{\small\textit{Internal technical document.  Not for distribution.}}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+%%============================================================
+\section{Overview}
+\label{sec:overview}
+%%============================================================
+
+The AGN Variability Archive (AVA) photometric pipeline processes multi-band imaging light
+curves from the Las Cumbres Observatory global telescope network for approximately 70 active
+galactic nuclei.  The overarching scientific goal is reverberation mapping: measuring the
+time lag between AGN accretion-disc continuum variability and the response in the broad
+emission-line region, which yields black-hole mass estimates.
+
+\subsection{Instruments and telescopes}
+
+Photometry is obtained with two camera families:
+\begin{itemize}
+  \item \textbf{Sinistro} (fa-series detectors, 1\,m telescopes) at sites coj, ogg, lsc,
+        cpt, elp, tfn.
+  \item \textbf{Spectral} (fs-series detectors, 2\,m Faulkes telescopes) at ogg and coj.
+\end{itemize}
+Standard LCO broadband filters are used: $u'g'r'i'z'$ (SDSS system), plus $B$, $V$, $R$,
+$I$ (Johnson--Cousins) for some targets.  FLOYDS spectrographs on the 2\,m telescopes
+provide simultaneous spectroscopic monitoring handled by a separate pipeline
+(see the FLOYDS RM report).  Some targets also have Liverpool Telescope (LT/IO:O)
+photometry ingested through a parallel processing branch.
+
+\subsection{Pipeline outputs}
+
+For each target on each observing night the pipeline produces:
+\begin{enumerate}
+  \item Calibrated flux light curves (mJy, all filters), appended to \texttt{lco\_latest.pkl}.
+  \item Publication-quality and diagnostic plots (\textsc{pdf} + \textsc{png}) copied to the
+        AVA website.
+  \item An inter-calibrated merged light curve correcting telescope-to-telescope flux offsets.
+  \item Standard-star catalogues (\texttt{lco\_latest\_stan.pkl}) for internal photometric
+        quality monitoring.
+\end{enumerate}
+
+\subsection{Data flow}
+
+\begin{figure}[h!]
+\centering
+\begin{minipage}{0.85\linewidth}
+\begin{lstlisting}[style=shell]
+target_list.txt
+      |
+      v
+ava_update.py  <-- flags: -o -d -e -c -p -m -s
+  (one shell script per target, run with nohup)
+      |
+      +-> ava_initialise.py    set up directories, fetch APASS catalogue
+      +-> download_data.py     pull BANZAI FITS from LCO archive API
+      +-> ava_sextractor.py    SExtractor aperture photometry  ->  _cat.fits
+      +-> ava_calibrate.py     match APASS, fit zeropoint  ->  lco_latest.pkl
+      +-> ava_webplot.py       convert to mJy, plot all filters + Swift
+      `-> ava_merge.py         CALI inter-calibration across telescopes
+\end{lstlisting}
+\end{minipage}
+\caption{End-to-end data flow.  Each stage is an independent Python script
+  invoked by a generated shell script; state passes via pickle files and FITS
+  catalogues on disk.}
+\label{fig:flow}
+\end{figure}
+
+\subsection{Technology stack}
+Python~3, \texttt{numpy}/\texttt{scipy}, \texttt{astropy}, \texttt{pandas},
+\texttt{matplotlib}, \texttt{lmfit}, SExtractor (external binary),
+\texttt{pycali\_jvhs} (custom MCMC inter-calibration wrapper).
+
+%%============================================================
+\section{Stage 0 --- Orchestration: \texttt{ava\_update.py}}
+\label{sec:orchestrator}
+%%============================================================
+
+\texttt{ava\_update.py} is the master driver.  It reads a plain-text target list, loops over
+every target, writes one shell script per target that chains the requested pipeline stages,
+and launches all scripts simultaneously using \texttt{nohup ... \&}.
+
+\subsection{Target list}
+
+A \textsc{csv} file (default \texttt{target\_list.txt}) with at minimum the columns:
+\begin{itemize}[noitemsep]
+  \item \texttt{targets} --- the LCO target-name string used in archive queries.
+  \item \texttt{directory} --- the per-target folder slug, e.g.\ \texttt{Fairall\_9}.
+  \item \texttt{LCO} / \texttt{LT} --- boolean flags enabling the LCO and LT branches.
+\end{itemize}
+
+\subsection{Command-line flags}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+Flag & Stage \\
+\midrule
+\texttt{-o} & Initialise directories (\texttt{ava\_initialise.py}) \\
+\texttt{-d} & Download new data from LCO archive \\
+\texttt{-e} & Source extraction with SExtractor \\
+\texttt{-c} & Photometric calibration \\
+\texttt{-p} & Web plots (\texttt{ava\_webplot.py}) \\
+\texttt{-m} & Inter-calibration with CALI \\
+\texttt{-s} & Save CALI merged output \\
+\texttt{-i} & Colour image generation \\
+\texttt{-r} & Remove \texttt{lco\_latest*} scratch files \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \texttt{-project} argument selects the LCO key-project semester: \texttt{KEY2014A-002},
+\texttt{KEY2018B-001}, \texttt{KEY2020B-006}, or \texttt{latest} (auto-detects the most
+recent epoch folder present on disk and sets that night as the start date).
+
+\subsection{Script generation}
+
+For each target the driver opens \texttt{1script2rule\textit{dir}.sh}, writes the requested
+stage commands as lines, closes the file, makes it executable, and launches it with
+\texttt{nohup}.  Log output goes to \texttt{lco\_\textit{dir}\_logall.out}.
+
+\begin{warnbox}
+\textbf{Migration target.}  All scripts contain absolute paths hardcoded to
+\texttt{/data/jvhs1/agn/} and \texttt{/data3/jvhs1/agn/}.  These must be replaced by
+paths read from \texttt{config/ava\_config.yaml} in AVA~v2.
+\end{warnbox}
+
+%%============================================================
+\section{Stage 1 --- Initialisation: \texttt{ava\_initialise.py}}
+\label{sec:init}
+%%============================================================
+
+Run once per new target (\texttt{-o}).  Creates the directory tree under
+\texttt{master\_dir} and fetches reference catalogues.
+
+\subsection{Directory structure}
+\begin{lstlisting}[style=shell]
+<master_dir>/<obj>/          # working directory
+<master_dir>/<obj>/UVOT/     # Swift/UVOT data placeholder
+<master_dir>/raw_data/<obj>/ # raw FITS downloads
+\end{lstlisting}
+
+\subsection{APASS catalogue download}
+
+The script uses the \texttt{mechanize} Python browser library to query the APASS
+(AAVSO Photometric All-Sky Survey) web form for a cone search centred on the target's
+RA/Dec.  The resulting CSV (\texttt{apass\_\textit{obj}.csv}) is the primary photometric
+reference catalogue used in calibration.
+
+\begin{warnbox}
+\textbf{Migration target.}  This relies on a brittle web scrape that breaks on UI
+changes.  AVA~v2 should use \texttt{astroquery.vizier.query\_region()} on APASS\,DR9,
+or the Pan-STARRS PS1 catalogue via the LCO archive tools.
+\end{warnbox}
+
+%%============================================================
+\section{Stage 2 --- Download: \texttt{download\_data.py}}
+\label{sec:download}
+%%============================================================
+
+Queries the LCO science archive API (\texttt{archive-api.lco.global/frames/}) using an
+authentication token for BANZAI-reduced frames (\texttt{rlevel=91}) and downloads them
+to the target's raw data directory, organised by night (\texttt{YYYYMMDD/}).
+
+\subsection{Date range logic}
+
+When \texttt{-project latest} is set, the script inspects the most recent epoch folder
+present on disk and uses that night as the start date, so only new data is fetched.  For
+older semesters the date range is hardcoded (e.g.\ KEY2018B-001: 2018-06-01 to
+2020-07-01).
+
+\begin{notebox}
+\textbf{AVA v2.}  The download step is replaced entirely by \texttt{lcodb sync} +
+\texttt{lcodb daily}, which maintains a local metadata database without bulk-downloading
+FITS files.  Images are fetched on demand at reduction time via the archive frame URL.
+\end{notebox}
+
+%%============================================================
+\section{Stage 3 --- Source Extraction: \texttt{ava\_sextractor.py}}
+\label{sec:sextractor}
+%%============================================================
+
+Runs SExtractor on every BANZAI-reduced FITS frame (\texttt{*e91.fits.fz}) found under
+the target's raw data directory.
+
+\subsection{Input preparation}
+
+BANZAI frames are stored as compressed multi-extension FITS (\texttt{.fz}).  The script
+opens each file with \texttt{astropy.io.fits}, extracts the \texttt{SCI} extension, writes
+it to a temporary single-extension file (\texttt{temp\_sextractor\_file.fits}), and passes
+that to SExtractor.  This step is necessary because SExtractor cannot handle
+multi-extension FITS natively.
+
+\subsection{SExtractor configuration}
+
+Fixed configuration files (\texttt{default.sex}, \texttt{default.param},
+\texttt{default.conv}, \texttt{default.nnw}, \texttt{default.psfex}) are stored in a
+template directory and copied to each target's working folder at initialisation.  The key
+output is a source catalogue in FITS binary-table format (\texttt{\_cat.fits}) written to
+\texttt{sextractor\_ava/}.
+
+\subsection{Apertures}
+
+SExtractor is run with 12 aperture sizes simultaneously (\texttt{MAG\_APER},
+\texttt{MAGERR\_APER}), producing a 12-element array per source.  The science aperture
+index used in calibration depends on telescope and epoch (see Section~\ref{sec:aper}).
+
+\subsection{Skip logic}
+
+If a \texttt{\_cat.fits} file already exists and is non-empty for a given frame,
+SExtractor is not re-run, making the stage incremental.
+
+%%============================================================
+\section{Stage 4 --- Photometric Calibration: \texttt{ava\_calibrate.py}}
+\label{sec:calibrate}
+%%============================================================
+
+The core science stage.  Reads every BANZAI FITS frame and its SExtractor catalogue,
+performs absolute aperture photometry on the AGN and on APASS standard stars, fits a
+photometric zeropoint, and appends the result to \texttt{lco\_latest.pkl}.
+
+\subsection{Incremental processing}
+
+If \texttt{lco\_latest.pkl} already exists, only frames whose filename (\texttt{flname})
+does not appear in it are processed.  The \texttt{-f} flag forces full reprocessing.
+
+\subsection{Coordinate matching}
+
+The AGN position is read from the target database.  SExtractor source positions are matched
+using \texttt{SkyCoord.match\_to\_catalog\_sky()}.  Frames where the nearest source is more
+than 3\,arcsec from the AGN position are skipped.
+
+\subsection{Extinction and colour correction}
+
+For each frame, site-specific extinction coefficients are read from
+\texttt{lco\_ext\_coefficients.csv} (columns: \texttt{Filter}, \texttt{siteid},
+\texttt{dome}, \texttt{K}, \texttt{C\_t}, \texttt{Color1}, \texttt{Color2}).
+The corrected instrumental magnitude is:
+\begin{equation}
+  m_{\rm inst,corr} = m_{\rm inst} + 2.5\log_{10}(t_{\rm exp}) - K\,X - C_t\,c
+  \label{eq:ext}
+\end{equation}
+where $X$ is airmass (minus 1), $t_{\rm exp}$ is exposure time in seconds, and $c$ is the
+star's colour from APASS.  Both the AGN and each standard star receive this correction
+before zeropoint fitting.
+
+
+\subsection{Aperture correction}
+
+
+\subsection{Aperture index resolution}
+\label{sec:aper-index}
+
+The SExtractor aperture series changed in 2025: two smaller diameters (3\,px
+and 5\,px) were prepended to the original 10-aperture series, shifting every
+old index by $+2$.  Using a fixed integer index across epochs therefore
+samples \emph{different physical apertures} in the two epochs, corrupting the
+light curves silently.
+
+The correct solution, implemented in \texttt{ava.photometry.apertures}, is to
+compute the index at reduction time from:
+\begin{enumerate}
+  \item the \emph{target aperture radius} (a configuration parameter,
+        default  = 5$\,arcsec, i.e.\ 10\,arcsec diameter), and
+  \item the \emph{pixel scale} read from the FITS header \texttt{PIXSCALE} key.
+\end{enumerate}
+
+\begin{lstlisting}[style=python]
+from ava.photometry.apertures import science_aperture_index
+
+# pixscale from FITS header; mjd from MJD-OBS keyword
+idx = science_aperture_index(pixscale=0.389, mjd=61000.0)
+# or from a full header dict:
+from ava.photometry.apertures import science_aperture_index_from_header
+idx = science_aperture_index_from_header(header_dict)
+\end{lstlisting}
+
+Tables~\ref{tab:aper-new} and \ref{tab:aper-old} list the physical aperture
+diameters for every index and camera family.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{rr rrr}
+\toprule
+ & & \multicolumn{3}{c}{Physical diameter (arcsec)} \
+\cmidrule(lr){3-5}
+Index & Diam (px) & Sinistro 1\,m & Spectral 2\,m & MuSCAT3 2\,m \
+      &           & (0.389\,\arcsec/px) & (0.304\,\arcsec/px) & (0.270\,\arcsec/px) \
+\midrule
+  0 &  3 &  1.17 &  0.91 &  0.81 \
+  1 &  5 &  1.95 &  1.52 &  1.35 \
+  2 &  8 &  3.11 &  2.43 &  2.16 \
+  3 & 11 &  4.28 &  3.34 &  2.97 \
+  4 & 13 &  5.06 &  3.95 &  3.51 \
+  5 & 15 &  5.83 &  4.56 &  4.05 \
+  6 & 18 &  7.00 &  5.47 &  4.86 \
+  7 & 21 &  8.17 &  6.38 &  5.67 \
+  8 & 24 &  9.34 &  7.30 &  6.48 \
+  9 & 27 & 10.50 &  8.21 &  7.29 \
+ 10 & 30 & 11.67 &  9.12 &  8.10 \
+ 11 & 33 & 12.84 & 10.03 &  8.91 \
+\bottomrule
+\end{tabular}
+\caption{New aperture series (2025+, 12 apertures).
+  \texttt{PHOT\_APERTURES = 3,5,8,11,13,15,18,21,24,27,30,33} in
+  \texttt{default.sex}.  Rows in bold indicate the index selected for a
+  5\,arcsec-radius (10\,arcsec-diameter) science aperture on each camera.}
+\label{tab:aper-new}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{rr rrr}
+\toprule
+ & & \multicolumn{3}{c}{Physical diameter (arcsec)} \
+\cmidrule(lr){3-5}
+Index & Diam (px) & Sinistro 1\,m & Spectral 2\,m & MuSCAT3 2\,m \
+      &           & (0.389\,\arcsec/px) & (0.304\,\arcsec/px) & (0.270\,\arcsec/px) \
+\midrule
+  0 &  8 &  3.11 &  2.43 &  2.16 \
+  1 & 11 &  4.28 &  3.34 &  2.97 \
+  2 & 13 &  5.06 &  3.95 &  3.51 \
+  3 & 15 &  5.83 &  4.56 &  4.05 \
+  4 & 18 &  7.00 &  5.47 &  4.86 \
+  5 & 21 &  8.17 &  6.38 &  5.67 \
+  6 & 24 &  9.34 &  7.30 &  6.48 \
+  7 & 27 & 10.50 &  8.21 &  7.29 \
+  8 & 30 & 11.67 &  9.12 &  8.10 \
+  9 & 33 & 12.84 & 10.03 &  8.91 \
+\bottomrule
+\end{tabular}
+\caption{Old aperture series (pre-2025, 10 apertures).
+  \texttt{PHOT\_APERTURES = 8,11,13,15,18,21,24,27,30,33} in
+  \texttt{default.sex}.  Note: index~7 here (27\,px, 10.5\,arcsec on 1\,m)
+  maps to index~9 in the new series.}
+\label{tab:aper-old}
+\end{table}
+
+\begin{notebox}
+\textbf{Science aperture for re-ingestion.}  For the half-million existing
+frames, re-compute the science index via
+\texttt{science\_aperture\_index(pixscale, mjd)} rather than storing a fixed
+integer.  The function automatically selects the old (pre-MJD\,60909) or new
+(MJD\,$\geq$\,60909) series and returns the index closest to the configured
+target radius (default 5\,arcsec).  Results: Sinistro 1\,m new series
+index~9 (27\,px $= 10.50$"), old series index~7 (27\,px $= 10.50$") ---
+the \emph{same physical aperture} in both epochs, confirming the fix is
+consistent.  Spectral/MuSCAT3 2\,m: new series index~11
+(33\,px $= 10.03$"/8.91"); old series index~9 (same physical size).
+\end{notebox}
+
+
+\label{sec:aper}
+
+Because the science aperture is not necessarily the largest, the script computes aperture
+corrections: the median magnitude step between adjacent aperture indices is accumulated
+outward to give a correction to infinite aperture for each of the 12 apertures.
+
+The science aperture index is not fixed --- it depends on telescope family and epoch:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Telescope & Condition & Aperture index \\
+\midrule
+1\,m & default & 7 \\
+1\,m & MJD $> 66909$ & 9 \\
+2\,m & MJD $\leq 60909$ & 10 \\
+2\,m & MJD $> 60909$ & 12 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{notebox}
+\textbf{Note.}  The physical aperture sizes in arcsec corresponding to each index depend on
+the pixel scale.  For 1\,m Sinistro frames ($0.389$\,arcsec/px): index~7 corresponds to a
+diameter of approximately 7\,arcsec; index~9 to approximately 9\,arcsec.  The 2026
+expansion was introduced to maintain a consistent metric aperture as the LCO pixel scale
+configuration changed. (\textit{Confirm exact MJD thresholds and arcsec values with
+J.V.H.S.})
+\end{notebox}
+
+\subsection{Zeropoint fitting}
+
+The zeropoint is estimated in two independent ways, both stored in the output:
+
+\textbf{Bootstrap mean} (\texttt{zp0}, \texttt{zp0\_err}).  For each aperture, the median
+shift (standard $-$ instrumental corrected) is bootstrap-resampled 50~times to give a
+robust mean and uncertainty.
+
+\textbf{\texttt{lmfit} fit} (\texttt{zp0\_fit}, \texttt{zp0\_err}).  A linear fit with
+slope fixed to~1.0 and sigma-clipping of outliers yields a second independent estimate.
+
+A minimum of 3~standard stars is required.  If fewer are available, or if the FWHM seeing
+exceeds 9\,arcsec, the frame is flagged (\texttt{flag=1}) and stored with NaN photometry.
+
+\subsection{Output columns in \texttt{lco\_latest.pkl}}
+
+One row per FITS frame.  Array-valued columns (aperture vectors of length~12) are stored
+as Python lists within DataFrame cells.
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+Column & Type & Description \\
+\midrule
+\texttt{flname}      & str    & Full path to BANZAI FITS file \\
+\texttt{Object}      & str    & Target name from FITS header \\
+\texttt{Filter}      & str    & LCO filter name \\
+\texttt{MJD}         & float  & Mid-exposure MJD \\
+\texttt{mag\_aper}   & list[12] & Aperture magnitudes (instrumental + offset) \\
+\texttt{err\_aper}   & float  & Photometric error at science aperture \\
+\texttt{zp\_mag}     & list[12] & Bootstrap zeropoints per aperture \\
+\texttt{zp\_err}     & list[12] & Zeropoint uncertainties \\
+\texttt{zp0\_fit}    & float  & \texttt{lmfit} zeropoint \\
+\texttt{zp0\_err}    & float  & \texttt{lmfit} zeropoint uncertainty \\
+\texttt{corrects}    & list[12] & Aperture corrections \\
+\texttt{extra\_fair} & float  & Extinction + colour correction applied to AGN \\
+\texttt{flag}        & int    & 0 = good; 1 = too few standards or bad seeing \\
+\texttt{n\_std}      & int    & Number of standard stars used \\
+\texttt{dist}        & float  & AGN--catalogue separation (arcsec) \\
+\texttt{seeing}      & float  & Measured FWHM (arcsec) \\
+\texttt{airmass}     & float  & Airmass $-1$ \\
+\texttt{observatory} & str    & LCO site ID \\
+\texttt{telid}       & str    & Telescope ID from filename \\
+\texttt{skymag}      & float  & Sky background magnitude \\
+\texttt{m\_fit}      & float  & Slope of linear photometric solution \\
+\texttt{b\_fit}      & float  & Intercept of linear photometric solution \\
+\texttt{X}, \texttt{Y} & float & AGN pixel position in image \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%============================================================
+\section{Stage 5 --- Plotting \& Web Output: \texttt{ava\_webplot.py}}
+\label{sec:webplot}
+%%============================================================
+
+Reads \texttt{lco\_latest.pkl} and produces three sets of plots per target plus writes
+calibrated light-curve data as text files for the website.
+
+\subsection{Flux conversion}
+
+Calibrated magnitudes are converted to flux density in mJy:
+\begin{equation}
+  f_\nu \,[\text{mJy}] = 10^{(m + \mathrm{ZP} - 8.9)\,/\,-2.5} \times 10^3
+  \label{eq:flux}
+\end{equation}
+with uncertainties $\sigma_f = f_\nu \,/\, 1.0857 \times \sigma_m$.
+
+\subsection{Quality cuts applied at plot time}
+
+\begin{itemize}[noitemsep]
+  \item \texttt{flag == 0} (calibration succeeded)
+  \item \texttt{dist < 3.5}\,arcsec (AGN position match)
+  \item \texttt{n\_std >= 3} (at least 3~standard stars)
+\end{itemize}
+
+\subsection{Plots produced}
+
+\begin{enumerate}
+  \item \textbf{Full light curve} (\texttt{lco\_latest\_\textit{obj}.pdf/png}).  One panel
+        per filter over the full time baseline.  FLOYDS epoch times are marked as vertical
+        ticks on the top panel.
+  \item \textbf{Last 60~days} (\texttt{lco\_latest\_\textit{obj}\_last6.pdf/png}).  Same
+        layout restricted to the 60~days preceding the most recent observation.  Y-axis
+        limits are set from the 4th--96th flux percentile with 50\,\% padding.
+  \item \textbf{Swift} (\texttt{lco\_latest\_\textit{obj}\_swift.pdf/png}).  Reads
+        \texttt{ava\_swift\_updated.csv} and plots UV and X-ray light curves.
+\end{enumerate}
+
+\subsection{Diagnostic plots (\texttt{-d} flag)}
+
+\begin{itemize}[noitemsep]
+  \item Seeing, airmass, and zeropoint (transparency) vs time per site.
+  \item Standard-star magnitude vs photometric RMS, with the AGN overlaid.  This is the
+        primary internal photometric quality diagnostic.
+\end{itemize}
+
+\subsection{Remote delivery}
+
+Plots are \texttt{scp}\textquotesingle d to the web server
+(\texttt{ringworld.st-andrews.ac.uk:/polaris2/jvhs1/halpha\_survey/ava\_latest/}) by the
+generated shell script.
+
+%%============================================================
+\section{Stage 6 --- Inter-calibration: \texttt{ava\_merge.py}}
+\label{sec:merge}
+%%============================================================
+
+Photometry from different telescopes, cameras, and sites cannot be concatenated directly:
+each has its own zeropoint offset.  \texttt{ava\_merge.py} uses
+\texttt{pycali\_jvhs} --- a custom Python wrapper around the CALI MCMC
+inter-calibration algorithm --- to solve for per-telescope flux scale factors and merge
+the light curves into a single consistent time series.
+
+\subsection{Input}
+
+The script reads \texttt{<obj>\_edited.csv} from the parent directory.  This is the
+calibrated light-curve file (essentially \texttt{lco\_latest.pkl} converted to CSV and
+optionally hand-edited to remove bad epochs).  It must exist before merging can proceed.
+
+\subsection{CALI algorithm}
+
+For each filter, unique telescope identifiers (\texttt{telid}) are found.
+\texttt{pycali\_jvhs.pycali()} is run with an MCMC chain of $10{,}000$ steps (extended
+by $10{,}000$ on each retry if convergence is not achieved).  CALI models the light curve
+as a common signal observed by each telescope with an additive offset and a flux scaling
+factor, marginalising over these nuisance parameters.
+
+\subsection{Output}
+
+Merged light-curve files and plots are written to the \texttt{ava\_merging/} subdirectory,
+then copied to \texttt{ava\_plots/} and \texttt{scp}\textquotesingle d to the web server.
+
+\begin{warnbox}
+\textbf{Migration target.}  \texttt{pycali\_jvhs} is a private package not on PyPI and
+must be installed separately.  AVA~v2 should document the install procedure or replace
+it with PyROA or CREAM.
+\end{warnbox}
+
+%%============================================================
+\section{Data Products \& File Conventions}
+\label{sec:products}
+%%============================================================
+
+All intermediate and final products are stored per-target under a fixed directory tree
+rooted at \texttt{master\_dir} (currently \texttt{/data3/jvhs1/agn/}).
+
+\begin{longtable}{>{\ttfamily}p{5.5cm}p{8.5cm}}
+\toprule
+File / folder & Contents \\
+\midrule
+apass\_\textit{obj}.csv & APASS reference star catalogue \\
+apass\_pytics.csv & APASS catalogue reformatted for pytics column names \\
+lco\_latest.pkl & Running pandas DataFrame of all calibrated photometry \\
+lco\_latest\_stan.pkl & Running DataFrame of all calibrated standard stars \\
+lco\_latest\_\textit{obj}.pdf/png & Full light-curve plot \\
+lco\_latest\_\textit{obj}\_last6.pdf/png & Last-60-days light-curve plot \\
+lco\_latest\_\textit{obj}\_swift.pdf/png & Swift UV + X-ray plot \\
+lco\_latest\_\textit{obj}\_\textit{filt}\_sky.pdf/png & Diagnostic plots \\
+lco\_latest\_\textit{obj}\_stan.pdf/png & Standard-star RMS plot \\
+sextractor\_ava/ & SExtractor catalogues (\texttt{*\_cat.fits}) \\
+ava\_merging/ & CALI workspace and merged output files \\
+UVOT/ & Swift/UVOT data placeholder \\
+default.sex, etc. & SExtractor configuration files \\
+filter\_dict.txt & Filter name / wavelength / colour mapping \\
+lco\_ext\_coefficients.csv & Extinction and colour-term coefficients \\
+\bottomrule
+\caption{Per-target working directory contents.}
+\end{longtable}
+
+\textbf{Raw FITS data} are stored at
+\texttt{<master\_dir>/raw\_data/<obj>/YYYYMMDD/*e91.fits.fz}, one sub-folder per
+observing night.
+
+\begin{warnbox}
+\textbf{Pickle portability.}  \texttt{lco\_latest.pkl} stores 12-element aperture
+vectors as Python lists inside a pandas DataFrame.  Reading them requires
+\texttt{np.stack(lco.mag\_aper[mask], axis=0)}.  This format is fragile across
+pandas/numpy versions.  AVA~v2 should migrate to HDF5 or Parquet, or store photometry
+directly in the \texttt{lcodb} SQLite database.
+\end{warnbox}
+
+%%============================================================
+\section{Known Issues, Limitations \& Migration Notes}
+\label{sec:issues}
+%%============================================================
+
+This section catalogues the technical debt that must be resolved before the pipeline can
+be safely migrated to a new machine or handed to a new user.
+
+\begin{enumerate}
+
+\item \textbf{Hardcoded absolute paths.}  Every script contains literal paths to
+      \texttt{/data/jvhs1/agn/} or \texttt{/data3/jvhs1/agn/}.  These are the single
+      largest portability blocker.  AVA~v2 must replace all of them with paths read from
+      \texttt{config/ava\_config.yaml}.
+
+\item \textbf{APASS via web scrape.}  \texttt{ava\_initialise.py} fetches the APASS
+      catalogue using the \texttt{mechanize} browser library.  Replacement:
+      \texttt{astroquery.vizier.query\_region()} on APASS\,DR9 or Pan-STARRS\,PS1.
+
+\item \textbf{Pickle-based state.}  \texttt{lco\_latest.pkl} with nested arrays is not
+      portable across versions.  Replace with HDF5 / Parquet or the \texttt{lcodb}
+      SQLite database.
+
+\item \textbf{SExtractor as external binary.}  \texttt{os.system(`sex ...')} with no
+      version checking.  Replace with \texttt{sep} (Python SExtractor) or
+      \texttt{photutils}.
+
+\item \textbf{Aperture index by magic number.}  Bare integer literals with inline MJD
+      comparisons.  Must become a named config parameter with documented physical meaning.
+
+\item \textbf{Credential in source code.}  \texttt{ava\_update.py} contains a hardcoded
+      LCO archive username and password.  Replace with the token-based auth used by
+      \texttt{lcodb}.
+
+\item \textbf{SCP for delivery.}  Hardcoded hostname and path for plot delivery.
+      Decouple pipeline from delivery mechanism.
+
+\item \textbf{pycali\_jvhs undocumented dependency.}  Private package not on PyPI.
+      Must be packaged or replaced with PyROA / CREAM.
+
+\item \textbf{No test suite.}  No automated tests for any stage.  AVA~v2 should add
+      unit tests for calibration arithmetic and integration tests on reference frames.
+
+\item \textbf{Parallel execution via shell.}  Per-target parallelism via
+      \texttt{nohup}~scripts provides no job management, logging, or failure recovery.
+      AVA~v2 should use Python \texttt{multiprocessing} or a lightweight task queue.
+
+\end{enumerate}
+
+%%============================================================
+
+%%============================================================
+\section{Installation Guide}
+\label{sec:install}
+%%============================================================
+
+This chapter documents how to install the AVA pipeline on a new machine from
+scratch.  Follow the steps in order.  Where a command differs between macOS
+and Linux, both variants are shown.
+
+\subsection{Prerequisites}
+
+The pipeline requires the following to be present on the machine before
+installation begins:
+
+\begin{itemize}
+  \item \textbf{Conda} (Miniconda or Anaconda) --- used to create an isolated
+        Python environment.  Install from
+        \url{https://docs.conda.io/en/latest/miniconda.html}.
+  \item \textbf{Git} --- to clone the repositories.
+  \item \textbf{SExtractor} --- the external source-extraction binary.
+        On macOS: \texttt{brew install sextractor}.
+        On Linux: \texttt{sudo apt install sextractor} or compile from source.
+  \item \textbf{SSH access} to the LCO data storage machine (if working
+        remotely), and to the web server \texttt{ringworld.st-andrews.ac.uk}
+        (for plot delivery).
+\end{itemize}
+
+\subsection{Step 1 --- Clone the repositories}
+
+\begin{lstlisting}[style=shell]
+# Choose a base directory (adjust to taste)
+BASE=~/astro
+
+mkdir -p $BASE && cd $BASE
+
+# AVA main repository
+git clone https://github.com/jvhs1/AVA.git
+
+# banzai-floyds (spectroscopy pipeline)
+# Use the rm-improvements branch for the RM-optimised version
+git clone https://github.com/LCOGT/banzai-floyds.git floyds/banzai-floyds
+cd $BASE/floyds/banzai-floyds
+git checkout rm-improvements
+cd $BASE
+\end{lstlisting}
+
+\subsection{Step 2 --- Create the conda environment}
+
+\begin{lstlisting}[style=shell]
+cd $BASE/AVA
+conda env create -f environment.yml
+conda activate ava
+\end{lstlisting}
+
+This creates an environment named \texttt{ava} with Python~3.12 and all
+required packages.  To verify:
+\begin{lstlisting}[style=shell]
+python -c "import ava; print(ava.__version__)"
+\end{lstlisting}
+
+\subsection{Step 3 --- Install AVA and its sibling packages}
+
+\begin{lstlisting}[style=shell]
+# Install AVA itself in editable mode
+pip install -e "$BASE/AVA"
+
+# Install banzai-floyds in editable mode (spectroscopy only)
+pip install -e "$BASE/floyds/banzai-floyds"
+
+# pycali_jvhs (inter-calibration; install from local copy)
+# pip install -e /path/to/pycali_jvhs
+# Ask J.V.H.S. for the source if not already present.
+\end{lstlisting}
+
+After this step the \texttt{lcodb} command is available (it is bundled inside
+AVA):
+\begin{lstlisting}[style=shell]
+lcodb --help
+\end{lstlisting}
+
+\subsection{Step 4 --- Set the LCO API token}
+
+Obtain your personal API token from
+\url{https://observe.lco.global} $\to$ Profile $\to$ API~token.
+
+\begin{lstlisting}[style=shell]
+echo 'YOUR_TOKEN_HERE' > ~/.lco_token
+chmod 600 ~/.lco_token
+\end{lstlisting}
+
+\begin{warnbox}
+Never put the token directly in a config file or commit it to git.
+\end{warnbox}
+
+\subsection{Step 5 --- Create and configure your local config file}
+
+\begin{lstlisting}[style=shell]
+cd $BASE/AVA
+cp config/ava_config.yaml config/ava_config.local.yaml
+\end{lstlisting}
+
+Open \texttt{config/ava\_config.local.yaml} in an editor and update the
+\texttt{paths} section to match the new machine.  The keys that \emph{must}
+be set are listed in Table~\ref{tab:paths}.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{>{\ttfamily}p{5.2cm} p{4.5cm} p{4.0cm}}
+\toprule
+Key & Description & Production value \\
+\midrule
+paths.photometry\_root   & Root of photometry data tree & \texttt{/data3/jvhs1/agn} \\
+paths.photometry\_raw    & Raw frames subfolder         & \texttt{raw\_data} \\
+paths.spectra\_root      & Root of spectroscopy data tree & \texttt{/data2/jvhs1/agn} \\
+paths.spectra\_raw       & Raw FLOYDS frames subfolder  & \texttt{raw\_data} \\
+paths.plots\_dir         & Shared plot output directory & \texttt{/data3/jvhs1/agn/ava\_plots} \\
+paths.swift\_db          & Swift/UVOT merged CSV        & \texttt{/data3/jvhs1/agn/ava\_swift\_updated.csv} \\
+paths.template\_dir      & SExtractor config templates  & \texttt{/data3/jvhs1/agn/template\_pipeline} \\
+paths.floyds\_pipeline   & banzai-floyds working copy   & \texttt{\$BASE/floyds/banzai-floyds} \\
+paths.database           & AVA SQLite master DB         & \texttt{data/ava.db} \\
+paths.ava\_csv           & AVA master CSV               & \texttt{data/ava/ava.csv} \\
+\midrule
+paths.web\_server\_host  & Web server hostname          & \texttt{ringworld.st-andrews.ac.uk} \\
+paths.web\_server\_path  & Remote plot destination      & \texttt{/polaris2/.../ava\_latest} \\
+paths.web\_server\_user  & SSH user on web server       & \texttt{jvhs1} \\
+\bottomrule
+\end{tabular}
+\caption{Path keys that must be set for each machine.  Relative paths are
+  resolved from \texttt{ava\_root} (auto-detected as the repository root if
+  left blank).}
+\label{tab:paths}
+\end{table}
+
+Point AVA at the local config:
+\begin{lstlisting}[style=shell]
+# Option A: environment variable (add to ~/.bashrc or ~/.zshrc)
+export AVA_CONFIG="$BASE/AVA/config/ava_config.local.yaml"
+
+# Option B: symlink the local copy over the default
+ln -sf ava_config.local.yaml config/ava_config.yaml
+\end{lstlisting}
+
+Verify that the config loads and all paths resolve:
+\begin{lstlisting}[style=python]
+from ava.config import cfg
+print(cfg)
+# AVAConfig(
+#   config  = /home/.../config/ava_config.local.yaml
+#   root    = /home/.../AVA
+#   phot    = /data3/jvhs1/agn
+#   spec    = /data2/jvhs1/agn
+#   db      = /home/.../AVA/data/ava.db
+# )
+\end{lstlisting}
+
+\subsection{Step 6 --- Initialise the LCO archive databases}
+
+This step builds the \texttt{lcodb} archive databases by crawling the LCO
+archive API.  It is a one-time operation that takes between a few minutes
+(spectra) and several hours (photometry headers) depending on the data volume.
+
+\begin{lstlisting}[style=shell]
+# Crawl all KEY proposals (metadata only; no FITS files downloaded)
+lcodb sync
+
+# Download FITS headers for all spectra (~10^4 frames, minutes)
+lcodb headers --db spectra
+
+# Compute airmass for frames without it in the header
+lcodb airmass
+
+# Build science->standard and spectrum->arc/flat matching tables
+lcodb match
+
+# Link LCO target names to AVA sources
+lcodb link
+
+# Check status
+lcodb status
+\end{lstlisting}
+
+After this step, the archive databases are ready at the paths set in
+\texttt{config/lcodb\_config.yaml} (default: \texttt{data/lcodb/}).
+
+\subsection{Step 7 --- Migrate the existing AVA database}
+
+If migrating from an existing machine, copy the master SQLite database and
+run the migration script to import it into the new schema:
+
+\begin{lstlisting}[style=shell]
+# Copy from the old machine (adjust path)
+scp jvhs1@oldmachine:/path/to/ava.sqlite data/ava/ava.sqlite.old
+
+# Migrate into the new AVA database
+python -m ava.database.migrate \
+    --source data/ava/ava.sqlite.old \
+    --dest data/ava.db
+\end{lstlisting}
+
+\subsection{Step 8 --- Schedule the daily update}
+
+The daily update fetches new frames from the LCO archive and updates the
+databases.  Add the following to \texttt{crontab -e}:
+
+\begin{lstlisting}[style=shell]
+# Run every day at 09:30 UTC
+30 9 * * * /path/to/AVA/scripts/lcodb_daily.sh
+\end{lstlisting}
+
+Or on macOS using \texttt{launchd}, create a plist pointing to the same script.
+
+\subsection{Step 9 --- Verify the installation}
+
+\begin{lstlisting}[style=python]
+from ava.archive import get_archive
+a = get_archive()
+print(a)              # Archive(spectra=ok, photometry=ok, ava=ok)
+a.overview()          # Should show the full AGN table
+a.summary('Fairall 9')
+\end{lstlisting}
+
+Run the test suite to confirm all units pass:
+\begin{lstlisting}[style=shell]
+pytest tests/ -v
+\end{lstlisting}
+
+\subsection{Data directory structure on the production machine}
+
+For reference, the expected layout on the production machine
+(\texttt{ringworld} / \texttt{data2--3}) is:
+
+\begin{lstlisting}[style=shell]
+# Photometry  (--  /data3/jvhs1/agn/ --)
+/data3/jvhs1/agn/
+  raw_data/
+    <target_slug>/
+      YYYYMMDD/
+        *e91.fits.fz        # BANZAI-reduced frames
+  <target_slug>/
+    apass_<target>.csv      # APASS reference catalogue
+    apass_pytics.csv        # Reformatted for pytics
+    lco_latest.pkl          # Calibrated photometry (all epochs)
+    lco_latest_stan.pkl     # Calibrated standard stars
+    lco_latest_*.pdf/png    # Light-curve plots
+    sextractor_ava/
+      *_cat.fits            # SExtractor catalogues
+    ava_merging/            # CALI workspace
+  ava_plots/                # Plots copied here before web delivery
+  ava_swift_updated.csv     # Swift/UVOT merged database
+  template_pipeline/        # SExtractor config templates
+
+# Spectroscopy  (--  /data2/jvhs1/agn/ --)
+/data2/jvhs1/agn/
+  raw_data/
+    <target_slug>/
+      YYYYMMDD/
+        *e91.fits.fz        # BANZAI FLOYDS frames
+  <target_slug>/            # banzai-floyds reduction products
+\end{lstlisting}
+
+
+%%============================================================
+\section{Spectroscopic Archive: Standards \& Coverage}
+\label{sec:spec-archive}
+%%============================================================
+
+\textit{Last updated: 2026-11-15. Source:
+\texttt{floyds/lco\_archive\_db/db/spectra.sqlite} (252\,MB).}
+
+\subsection{Overall statistics}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Science spectra (raw, \texttt{rlevel=0}) & 9{,}524 \\
+Standard spectra (raw) & 20{,}712 \\
+Science spectra with $\geq 1$ matched standard & \textbf{9{,}524 (100\,\%)} \\
+Science spectra with no standard & \textbf{0} \\
+Total \texttt{std\_match} rows & 63{,}615 \\
+BANZAI 1d products available & 3{,}110 / 21{,}477 (14.5\,\%) \\
+Total FLOYDS exposure time & 1{,}926\,h across 8{,}860 frames, 5{,}139 epochs \\
+Targets with any FLOYDS data & 57 of 71 \\
+\bottomrule
+\end{tabular}
+\caption{FLOYDS spectroscopic archive summary (2026-11-15).}
+\end{table}
+
+\begin{notebox}
+\textbf{Full standard coverage.}  Every one of the 9{,}524 science spectra has
+at least one matched flux standard in \texttt{spectra.sqlite}.  No coverage
+gaps exist in the current archive.
+\end{notebox}
+
+\subsection{Spectrograph and slit usage}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{llrll}
+\toprule
+Instrument & Site & Science spectra & First obs & Last obs \\
+\midrule
+en06 (FLOYDS-N) & ogg (Haleakala)     & 5{,}656 & 2014-08-05 & 2026-11-14 \\
+en12 (FLOYDS-S) & coj (Siding Spring) & 2{,}570 & 2019-04-14 & 2026-11-11 \\
+en05 (FLOYDS-S, retired) & coj        &   634   & 2014-05-19 & 2019-02-03 \\
+\bottomrule
+\end{tabular}
+\caption{Science spectra by spectrograph.}
+\end{table}
+
+Slit-width distribution: 5{,}854 at 6\,arcsec; 1{,}380 at 2\,arcsec;
+126 at 1.6\,arcsec; 10 at 1.2\,arcsec; 1{,}490 with no slit keyword in the
+header.
+
+\subsection{Standard selection}
+
+The \texttt{spectrum\_standards} view in \texttt{spectra.sqlite} assigns one
+standard per science spectrum using this priority order:
+
+\begin{enumerate}
+  \item \textbf{\texttt{same\_slit}} --- nearest standard taken with the same
+        slit width (2{,}849 spectra, mean $\langle\Delta t\rangle = 176$\,h).
+  \item \textbf{\texttt{nearest\_2arcsec}} --- nearest 2\,arcsec standard when
+        no same-slit option exists (4{,}280 spectra, $\langle\Delta t\rangle =
+        48$\,h).
+  \item \textbf{\texttt{nearest\_any}} --- nearest standard of any slit
+        (1{,}731 spectra, $\langle\Delta t\rangle = 30$\,h).
+\end{enumerate}
+
+Standards are \emph{never taken in the same observing block} as the science
+(\texttt{same\_block = 0} throughout); FLOYDS standards are submitted as
+separate queue requests.  The minimum $\Delta t$ is typically $\approx
+12$\,minutes.
+
+\subsection{Targets with large average standard $\Delta t$}
+\label{sec:std-dt}
+
+The targets below had sparse standard coverage during their campaigns and
+may carry systematic flux calibration offsets.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+Target & Science spectra & $\langle|\Delta t|\rangle$ (hours) \\
+\midrule
+Mrk\,1220      &  86 & 552 \\
+3C\,120        & 153 & 299 \\
+Mrk\,110       & 217 & 232 \\
+SDSS\,J2353    &  13 & 168 \\
+PKS\,2004-447  &   7 &  88 \\
+PG\,1302-102   &  99 &  71 \\
+NGC\,3783      & 177 &  58 \\
+Mrk\,1239      &  49 &  55 \\
+Mrk\,766       &  50 &  50 \\
+\bottomrule
+\end{tabular}
+\caption{Targets with $\langle|\Delta t|\rangle > 50$\,h to nearest standard.
+  These are predominantly old campaigns (KEY2014A-002, KEY2018B-001) where
+  dedicated FLOYDS standards were taken less frequently.}
+\end{table}
+
+\subsection{Targets with no FLOYDS data (14)}
+
+SDSS-RM201, SDSS-RM562, PG\,1310-108, 2MASS\,J21368-6438,
+2MASX\,J21075970-3754087, PG\,2304+043, RX\,J22198-0935, NGC\,4395,
+PKS\,0558-504, NGC\,2617, Zw\,535-12, SDSS\,J1430+2303, Mrk\,704,
+IGR\,J17062-6143.
+
+\subsection{Database update log}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+File & Location & Updated \\
+\midrule
+\texttt{ava.db}                 & \texttt{AVA/data/} & 2026-11-15 \\
+\texttt{ava.csv}                & \texttt{AVA/data/ava/} & 2026-11-15 \\
+\texttt{ava\_link\_overrides.csv} & \texttt{AVA/data/ava/} & 2026-11-15 \\
+\texttt{spectra.sqlite}         & \texttt{floyds/lco\_archive\_db/db/} & 2026-11-15 \\
+\texttt{photometry.sqlite}      & \texttt{floyds/lco\_archive\_db/db/} & live (daily) \\
+\bottomrule
+\end{tabular}
+\caption{AVA data files and their last update dates.  \texttt{spectra.sqlite}
+  and \texttt{photometry.sqlite} remain in the \texttt{floyds/} sandbox and
+  are accessed read-only via \texttt{get\_archive()}.  A snapshot of
+  \texttt{spectra.sqlite} taken before the 2026-11-15 calibration update is
+  kept as \texttt{spectra\_before\_calib\_20261115.sqlite}.}
+\end{table}
+
+
+\appendix
+\section{Running the Pipeline}
+\label{app:run}
+%%============================================================
+
+\textbf{Full run for a single target on the latest data:}
+\begin{lstlisting}[style=shell]
+python ava_update.py -d -e -c -p -list target_list.txt -project latest
+\end{lstlisting}
+
+\textbf{Monitor progress:}
+\begin{lstlisting}[style=shell]
+ps aux | grep 'python download_'
+ps aux | grep 'python ava_sextractor'
+ps aux | grep 'python ava_calibrate'
+tail -100 lco_Fairall_9_logall.out
+\end{lstlisting}
+
+\textbf{Force full recalibration (e.g.\ after aperture change):}
+\begin{lstlisting}[style=shell]
+python ava_calibrate.py -obj Fairall_9 -s -j   # -j applies 2026 aperture fix
+\end{lstlisting}
+
+\textbf{Inter-calibration:}
+\begin{lstlisting}[style=shell]
+python ava_update.py -m -s -list target_list.txt
+\end{lstlisting}
+
+%%============================================================
+\section{Glossary}
+\label{app:glossary}
+%%============================================================
+
+\begin{description}
+  \item[APASS] AAVSO Photometric All-Sky Survey.  Provides $BVgri$ magnitudes for
+        stars used as photometric standards.
+  \item[BANZAI] LCO automated image-reduction pipeline.  Delivers bias-subtracted,
+        flat-fielded, astrometry-solved FITS frames at \texttt{rlevel=91}.
+  \item[CALI] Cross-calibration algorithm for multi-telescope light curves.  Fits
+        per-telescope flux scale factors using MCMC.
+  \item[MJD] Modified Julian Date. MJD = JD $-$ 2400000.5.
+  \item[ZP] Photometric zeropoint.  The magnitude of a source that would produce
+        1 ADU/s in the instrument.
+  \item[SExtractor] Source-Extractor; software for source detection and aperture
+        photometry in astronomical images.
+\end{description}
+
+\vfill
+\hrule
+\vspace{4pt}
+{\small
+Created: 2026-11-15 \quad
+Author: J.V.\ Hernandez Santisteban \quad
+Pipeline version: v1.3 (legacy) / AVA~v2 (in development)
+}
+
+\end{document}

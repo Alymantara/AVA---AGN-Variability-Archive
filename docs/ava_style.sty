@@ -1,0 +1,194 @@
+%% ava_style.sty — AVA Brand Identity: Deep Space (v4)
+%% Proposal B: Ink Blue (#1A3A5C), Abyss (#0A1628), Gold (#D4A017)
+%%
+%% Body font: TeX Gyre Termes (Times clone) + mathptmx
+%% Title page: TikZ overlay — requires 2 pdflatex passes
+%%
+%% Usage: \usepackage{ava_style}
+%%   \avatitlepage{Manual Title}{Version}{YYYY-MM-DD}{Full Name}{Email}{Address}
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ava_style}[2026/11/16 v4 AVA Deep Space brand style]
+
+%% ---- Core packages -------------------------------------------------
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\usetikzlibrary{positioning,calc}
+\RequirePackage{titlesec}
+\RequirePackage{fancyhdr}
+\RequirePackage{mdframed}
+\RequirePackage{listings}
+\RequirePackage{hyperref}
+\RequirePackage{graphicx}
+\RequirePackage{geometry}
+\RequirePackage{amsmath}
+\RequirePackage[protrusion=true,expansion=false]{microtype}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{multirow}
+\RequirePackage{makecell}
+\RequirePackage{enumitem}
+\RequirePackage{longtable}
+\RequirePackage{parskip}
+
+%% ---- Body font: TeX Gyre Termes (Times clone) + mathptmx ----------
+\RequirePackage{tgtermes}
+\RequirePackage{mathptmx}
+
+%% ---- Brand colours -------------------------------------------------
+\definecolor{avaInkBlue}{RGB}{26,58,92}       % #1A3A5C  primary
+\definecolor{avaAbyss}{RGB}{10,22,40}         % #0A1628  dark background
+\definecolor{avaGold}{RGB}{212,160,23}        % #D4A017  accent / wordmark
+\definecolor{avaSky}{RGB}{45,106,159}         % #2D6A9F  link
+\definecolor{avaAurora}{RGB}{58,158,110}      % #3A9E6E  success
+\definecolor{avaCopper}{RGB}{200,90,0}        % #C85A00  warning
+\definecolor{avaPaper}{RGB}{247,246,242}      % #F7F6F2  page bg
+\definecolor{avaCharcoal}{RGB}{17,24,39}      % #111827  body text
+\definecolor{avaCodeBG}{RGB}{238,236,230}     % warm code bg
+\definecolor{avaMidBlue}{RGB}{14,44,80}       % midpoint gold->blue gradient
+
+%% Legacy aliases
+\colorlet{noteblue}{avaInkBlue}
+\colorlet{warnorange}{avaCopper}
+\colorlet{codegrey}{avaCodeBG}
+\colorlet{linkblue}{avaSky}
+\colorlet{goodgreen}{avaAurora}
+
+%% ---- Hyperref ------------------------------------------------------
+\hypersetup{colorlinks=true,linkcolor=avaSky,urlcolor=avaSky,citecolor=avaSky}
+
+%% ---- Section headings ----------------------------------------------
+\titleformat{\section}
+  {\large\bfseries\color{avaInkBlue}}{}{0em}{}[\color{avaInkBlue}\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{avaInkBlue}}{}{0em}{}
+\titleformat{\subsubsection}[runin]{\normalsize\itshape\color{avaInkBlue}}{}{0em}{}[.]
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{3pt}
+
+%% ---- Headers / footers ---------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape\textcolor{avaInkBlue}{AGN Variability Archive}}
+\fancyhead[R]{\small\itshape\textcolor{avaInkBlue}{\AVAManualTitle}}
+\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{avaInkBlue!40}\hrule width\headwidth height\headrulewidth}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}\renewcommand{\headrulewidth}{0pt}}
+
+%% Default manual title for header (override with \renewcommand{\AVAManualTitle}{...})
+\newcommand{\AVAManualTitle}{Manual}
+
+%% ---- Callout boxes -------------------------------------------------
+\newmdenv[linecolor=avaInkBlue,backgroundcolor=avaInkBlue!5,
+  skipabove=8pt,skipbelow=8pt,innerleftmargin=12pt,innerrightmargin=8pt,
+  linewidth=3pt,leftline=true,rightline=false,topline=false,bottomline=false]{notebox}
+
+\newmdenv[linecolor=avaCopper,backgroundcolor=avaCopper!5,
+  skipabove=8pt,skipbelow=8pt,innerleftmargin=12pt,innerrightmargin=8pt,
+  linewidth=3pt,leftline=true,rightline=false,topline=false,bottomline=false]{warnbox}
+
+\newmdenv[linecolor=avaAurora,backgroundcolor=avaAurora!5,
+  skipabove=8pt,skipbelow=8pt,innerleftmargin=12pt,innerrightmargin=8pt,
+  linewidth=3pt,leftline=true,rightline=false,topline=false,bottomline=false]{goodbox}
+
+%% ---- Code listings -------------------------------------------------
+\lstdefinestyle{shell}{
+  backgroundcolor=\color{avaCodeBG},basicstyle=\ttfamily\small,
+  breaklines=true,frame=single,rulecolor=\color{avaInkBlue!25},framesep=4pt}
+\lstdefinestyle{python}{
+  backgroundcolor=\color{avaCodeBG},basicstyle=\ttfamily\small,
+  breaklines=true,frame=single,rulecolor=\color{avaInkBlue!25},
+  language=Python,keywordstyle=\color{avaInkBlue}\bfseries,
+  commentstyle=\color{avaInkBlue!55},stringstyle=\color{avaCopper},
+  numbers=left,numberstyle=\tiny\color{avaInkBlue!35},numbersep=5pt,framesep=4pt}
+
+%% ---- Title page ----------------------------------------------------
+%% \avatitlepage{Manual Title}{Version}{Date}{Name}{Email}{Address}
+%%
+%% TikZ layout (from paper top):
+%%   0 to -5.8cm       : dark Abyss bar (AVA wordmark | banner | logos)
+%%   -5.8 to -6.082cm  : gradient rule (gold | midBlue | InkBlue)
+%%   Below (~6.4cm top margin):
+%%     Project name + manual name (centred)
+%%     Logos (St Andrews left, LCO right)
+%%     Thin rule
+%%     Version / Date
+%%     Author name, email, address
+%%
+\newcommand{\avatitlepage}[6]{%
+  \begin{titlepage}%
+  \newgeometry{top=7.0cm,bottom=2cm,left=2.5cm,right=2.5cm}%
+  %% =========================================================
+  %% HEADER BLOCK + GRADIENT RULE — TikZ overlay
+  %% =========================================================
+  \begin{tikzpicture}[remember picture,overlay]
+    %% Dark Abyss bar: full width, 5.8 cm from paper top
+    \fill[avaAbyss]
+      (current page.north west)
+      rectangle ([yshift=-5.8cm]current page.north east);
+    %% AVA wordmark: gold, 52pt, left
+    \node[anchor=west, inner sep=0pt, text=avaGold,
+          font=\fontsize{52}{52}\selectfont\bfseries]
+      at ([xshift=1.5cm,yshift=-3.0cm]current page.north west)
+      {AVA};
+    %% Fairall 9 banner: centred, 8cm x 1.6cm
+    \node[anchor=center, inner sep=0pt]
+      at ([yshift=-3.0cm]current page.north)
+      {\includegraphics[width=8cm,height=1.6cm,keepaspectratio=false]{banner}};
+    %% St Andrews logo: right of centre
+    \node[anchor=east, inner sep=0pt]
+      at ([xshift=-3.2cm,yshift=-3.0cm]current page.north east)
+      {\includegraphics[height=1.4cm]{standrews-logo}};
+    %% LCO logo: rightmost
+    \node[anchor=east, inner sep=0pt]
+      at ([xshift=-0.8cm,yshift=-3.0cm]current page.north east)
+      {\includegraphics[height=1.0cm]{lco_logo}};
+    %% Gradient rule: gold | midBlue | InkBlue, 8pt thick
+    \fill[avaGold]
+      ([yshift=-5.8cm]current page.north west)
+      rectangle ([xshift=0.333\paperwidth,yshift=-6.082cm]current page.north west);
+    \fill[avaMidBlue]
+      ([xshift=0.333\paperwidth,yshift=-5.8cm]current page.north west)
+      rectangle ([xshift=0.667\paperwidth,yshift=-6.082cm]current page.north west);
+    \fill[avaInkBlue]
+      ([xshift=0.667\paperwidth,yshift=-5.8cm]current page.north west)
+      rectangle ([yshift=-6.082cm]current page.north east);
+  \end{tikzpicture}%
+  %% =========================================================
+  %% TITLE AREA (centred, below the gradient rule)
+  %% =========================================================
+  \vspace*{0.6cm}%
+  %% Project name
+  \begin{center}
+    {\fontsize{22}{26}\selectfont\bfseries\color{avaInkBlue}
+      AGN Variability Archive\par}%
+    \vspace{0.3em}%
+    %% Manual name — large, centred
+    {\fontsize{18}{22}\selectfont\itshape\color{avaAbyss} #1\par}%
+  \end{center}%
+  \vspace{1.2cm}%
+  %% ---- Logos row (St Andrews left, LCO right) --------------------
+  \noindent
+  \includegraphics[height=1.4cm]{standrews-logo}%
+  \hfill
+  \includegraphics[height=1.0cm]{lco_logo}%
+  \par
+  \vspace{0.9em}%
+  %% ---- Thin separator rule --------------------------------------
+  {\color{avaInkBlue!35}\rule{\textwidth}{0.8pt}\par}%
+  \vspace{0.8em}%
+  %% ---- Version and date -----------------------------------------
+  {\normalsize\color{avaInkBlue!70}
+    Version #2 \enspace|\enspace #3\par}%
+  \vspace{1.0em}%
+  %% ---- Author block ---------------------------------------------
+  {\normalsize\bfseries\color{avaAbyss} #4\par}%
+  \vspace{0.15em}%
+  {\small\color{avaSky} #5\par}%
+  \vspace{0.15em}%
+  {\small\color{avaInkBlue!70} #6\par}%
+  \vfill
+  \end{titlepage}%
+}
+
+\endinput

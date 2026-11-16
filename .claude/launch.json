@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prefect-ui",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": [
+        "-c",
+        "PREFECT_HOME=/private/tmp/claude-501/-Users-juan--claude-spares-spare-DNDMft/d087e150-e9e7-4d86-b5db-76fe01e3690c/scratchpad/prefect_home exec /private/tmp/claude-501/-Users-juan--claude-spares-spare-DNDMft/d087e150-e9e7-4d86-b5db-76fe01e3690c/scratchpad/venv/bin/prefect server start --host 127.0.0.1 --port 4200"
+      ],
+      "port": 4200
+    }
+  ]
+}

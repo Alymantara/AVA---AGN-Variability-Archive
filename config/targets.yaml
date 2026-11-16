@@ -1,0 +1,1044 @@
+# ============================================================
+#  AVA Target List
+#  One entry per AGN.  Edit here to add / disable targets.
+#
+#  Fields:
+#    name        — human-readable name (publication style)
+#    data_id     — filesystem slug = working directory name
+#    ra_deg      — right ascension, decimal degrees J2000 (field / pointing centre)
+#    dec_deg     — declination, decimal degrees J2000 (field / pointing centre)
+#    agn_ra_deg, agn_dec_deg — OPTIONAL nucleus position, only when the
+#                   pointing is offset from the AGN (e.g. NGC 4395).  Used to
+#                   identify the AGN; defaults to ra_deg / dec_deg.
+#    lco_active  — true if currently observed by LCO photometry
+#    lt_active   — true if Liverpool Telescope branch is active
+#    agn_field_id — 1-based row index of the AGN in apass_pytics.csv
+#                   (the field-star catalogue used by ava_calibrate).
+#                   NULL / omit if not yet determined.
+#    lco_names   — list of all LCO archive OBJECT spellings for this
+#                   target.  Used to route incoming daily images to the
+#                   correct AGN.  Must match FITS OBJECT keyword exactly.
+# ============================================================
+
+targets:
+  - name:         "1H 1934-063"
+    data_id:       "1H1934-063"
+    ra_deg:        294.387600
+    dec_deg:       -6.218002
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  7567
+    lco_names:
+      - "1H 1934-063"
+
+  - name:         "1H2106-099"
+    data_id:       "1H2106-099"
+    ra_deg:        317.291541
+    dec_deg:       -9.670766
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2003
+    lco_names:
+      - "1H2106-099"
+
+  - name:         "1Zw1"
+    data_id:       "1Zw1"
+    ra_deg:        13.395553
+    dec_deg:       12.693333
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  692
+    lco_names:
+      - "1Zw1"
+
+  - name:         "3C120"
+    data_id:       "3C120"
+    ra_deg:        68.296233
+    dec_deg:       5.354338
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  425
+    lco_names:
+      - "3C120"
+
+  - name:         "3C273"
+    data_id:       "3C273"
+    ra_deg:        187.277915
+    dec_deg:       2.052389
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  314
+    lco_names:
+      - "3C273"
+
+  - name:         "3C 279"
+    data_id:       "3C279"
+    ra_deg:        194.046520
+    dec_deg:       -5.789312
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  800
+    lco_names:
+      - "3C 279"
+
+  - name:         "3c382"
+    data_id:       "3C382"
+    ra_deg:        278.763990
+    dec_deg:       32.696000
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  3302
+    lco_names:
+      - "3c382"
+
+  - name:         "Ark120"
+    data_id:       "Ark_120"
+    ra_deg:        79.047539
+    dec_deg:       -0.149766
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2573
+    lco_names:
+      - "Ark120"
+
+  - name:         "Ark564"
+    data_id:       "Ark_564"
+    ra_deg:        340.663901
+    dec_deg:       29.725362
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1927
+    lco_names:
+      - "Ark564"
+
+  - name:         "Arp151"
+    data_id:       "Arp_151"
+    ra_deg:        171.400644
+    dec_deg:       54.382536
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  358
+    lco_names:
+      - "Arp151"
+
+  - name:         "ESO 362-G18"
+    data_id:       "ESO_362-18"
+    ra_deg:        79.900000
+    dec_deg:       -32.657778
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1642
+    lco_names:
+      - "ESO 362-G18"
+
+  - name:         "ESO_511-30"
+    data_id:       "ESO_511-30"
+    ra_deg:        214.843330
+    dec_deg:       -26.644610
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2643
+    lco_names:
+      - "ESO_511-30"
+
+  - name:         "Fairall9"
+    data_id:       "fairall_9"
+    ra_deg:        20.940679
+    dec_deg:       -58.805781
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  3019
+    lco_names:
+      - "Fairall9"
+
+  - name:         "IC4329"
+    data_id:       "IC_4329"
+    ra_deg:        207.272140
+    dec_deg:       -30.295880
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2623
+    lco_names:
+      - "IC4329"
+
+  - name:         "IGR_J17062-6143"
+    data_id:       "IGR_J17062-6143"
+    ra_deg:        256.567833
+    dec_deg:       -61.711275
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  12036
+    lco_names:
+      - "IGR_J17062-6143"
+
+  - name:         "SDSS01320027"
+    data_id:       "J0132-0027"
+    ra_deg:        23.147047
+    dec_deg:       -0.451332
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  656
+    lco_names:
+      - "SDSS01320027"
+
+  - name:         "J1421+3855"
+    data_id:       "J1421+3855"
+    ra_deg:        215.275120
+    dec_deg:       38.923008
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  534
+    lco_names:
+      - "J1421+3855"
+
+  - name:         "J21079-3754"
+    data_id:       "J2107-3754"
+    ra_deg:        316.998833
+    dec_deg:       -37.902522
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1419
+    lco_names:
+      - "J21079-3754"
+
+  - name:         "MCG-6-30-15"
+    data_id:       "MCG-6-30-15"
+    ra_deg:        203.974030
+    dec_deg:       -34.295600
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2624
+    lco_names:
+      - "MCG-6-30-15"
+
+  - name:         "MCG+04-22-042"
+    data_id:       "MCG_04-22-042"
+    ra_deg:        140.929160
+    dec_deg:       22.908888
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  831
+    lco_names:
+      - "MCG+04-22-042"
+
+  - name:         "MCG_08-11-011"
+    data_id:       "MCG_08-11-011"
+    ra_deg:        88.723369
+    dec_deg:       46.439341
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  4466
+    lco_names:
+      - "MCG_08-11-011"
+
+  - name:         "MR 2251-178"
+    data_id:       "MR_2251-178"
+    ra_deg:        343.524524
+    dec_deg:       -17.582056
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  721
+    lco_names:
+      - "MR 2251-178"
+
+  - name:         "Mrk1018"
+    data_id:       "Mrk_1018"
+    ra_deg:        31.566666
+    dec_deg:       -0.291388
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  748
+    lco_names:
+      - "Mrk1018"
+
+  - name:         "Mrk 1044"
+    data_id:       "Mrk_1044"
+    ra_deg:        37.523010
+    dec_deg:       -8.998113
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  640
+    lco_names:
+      - "Mrk 1044"
+
+  - name:         "Mrk 1048"
+    data_id:       "Mrk_1048"
+    ra_deg:        38.657842
+    dec_deg:       -8.788061
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  676
+    lco_names:
+      - "Mrk 1048"
+
+  - name:         "Mrk110"
+    data_id:       "Mrk_110"
+    ra_deg:        141.303533
+    dec_deg:       52.286219
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  612
+    lco_names:
+      - "Mrk110"
+
+  - name:         "Mrk1220"
+    data_id:       "Mrk_1220"
+    ra_deg:        133.663512
+    dec_deg:       17.689563
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1191
+    lco_names:
+      - "Mrk1220"
+
+  - name:         "Mrk1239"
+    data_id:       "Mrk_1239"
+    ra_deg:        148.079167
+    dec_deg:       -1.612222
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1041
+    lco_names:
+      - "Mrk1239"
+
+  - name:         "Mrk1298"
+    data_id:       "Mrk_1298"
+    ra_deg:        172.319704
+    dec_deg:       -4.402013
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  826
+    lco_names:
+      - "Mrk1298"
+
+  - name:         "Mrk 142"
+    data_id:       "Mrk_142"
+    ra_deg:        156.380329
+    dec_deg:       51.676352
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  532
+    lco_names:
+      - "Mrk 142"
+
+  - name:         "Mrk 279"
+    data_id:       "Mrk_279"
+    ra_deg:        208.264310
+    dec_deg:       69.308169
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  219
+    lco_names:
+      - "Mrk 279"
+
+  - name:         "Mrk335"
+    data_id:       "Mrk_335"
+    ra_deg:        1.581250
+    dec_deg:       20.202777
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  938
+    lco_names:
+      - "Mrk335"
+
+  - name:         "Mrk 359"
+    data_id:       "Mrk_359"
+    ra_deg:        21.885508
+    dec_deg:       19.178844
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  805
+    lco_names:
+      - "Mrk 359"
+
+  - name:         "Mrk376"
+    data_id:       "Mrk_376"
+    ra_deg:        108.562910
+    dec_deg:       45.698611
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2109
+    lco_names:
+      - "Mrk376"
+
+  - name:         "MRK493"
+    data_id:       "Mrk_493"
+    ra_deg:        239.790095
+    dec_deg:       35.029880
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  937
+    lco_names:
+      - "MRK493"
+
+  - name:         "Mrk509"
+    data_id:       "Mrk_509"
+    ra_deg:        311.040410
+    dec_deg:       -10.723610
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2965
+    lco_names:
+      - "Mrk509"
+
+  - name:         "Mrk 590"
+    data_id:       "Mrk_590"
+    ra_deg:        33.639833
+    dec_deg:       -0.766716
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  706
+    lco_names:
+      - "Mrk 590"
+
+  - name:         "Mrk704"
+    data_id:       "Mrk_704"
+    ra_deg:        139.607990
+    dec_deg:       16.304983
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  967
+    lco_names:
+      - "Mrk704"
+
+  - name:         "Mrk 766"
+    data_id:       "Mrk_766"
+    ra_deg:        184.610480
+    dec_deg:       29.812925
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  469
+    lco_names:
+      - "Mrk 766"
+
+  - name:         "Mrk 817"
+    data_id:       "Mrk_817"
+    ra_deg:        219.092008
+    dec_deg:       58.794277
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  559
+    lco_names:
+      - "Mrk 817"
+
+  - name:         "Mrk841"
+    data_id:       "Mrk_841"
+    ra_deg:        226.004973
+    dec_deg:       10.437716
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1017
+    lco_names:
+      - "Mrk841"
+
+  - name:         "Mrk876"
+    data_id:       "Mrk_876"
+    ra_deg:        243.488247
+    dec_deg:       65.719432
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  994
+    lco_names:
+      - "Mrk876"
+
+  - name:         "Mrk9"
+    data_id:       "Mrk_9"
+    ra_deg:        114.237500
+    dec_deg:       58.770277
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1263
+    lco_names:
+      - "Mrk9"
+
+  - name:         "Mrk926"
+    data_id:       "Mrk_926"
+    ra_deg:        346.181156
+    dec_deg:       -8.685731
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  865
+    lco_names:
+      - "Mrk926"
+
+  - name:         "ngc 1365"
+    data_id:       "NGC_1365"
+    ra_deg:        53.401908
+    dec_deg:       -36.140650
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  745
+    lco_names:
+      - "ngc 1365"
+
+  - name:         "NGC1566"
+    data_id:       "NGC_1566"
+    ra_deg:        65.009267
+    dec_deg:       -54.942710
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1269
+    lco_names:
+      - "NGC1566"
+
+  - name:         "NGC2617"
+    data_id:       "NGC_2617"
+    ra_deg:        128.911659
+    dec_deg:       -4.088306
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2715
+    lco_names:
+      - "NGC2617"
+
+  - name:         "NGC3227"
+    data_id:       "NGC_3227"
+    ra_deg:        155.877370
+    dec_deg:       19.865080
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  612
+    lco_names:
+      - "NGC3227"
+
+  - name:         "ngc 3783"
+    data_id:       "NGC_3783"
+    ra_deg:        174.757123
+    dec_deg:       -37.738613
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2387
+    lco_names:
+      - "ngc 3783"
+
+  - name:         "NGC4051"
+    data_id:       "NGC_4051"
+    ra_deg:        180.789990
+    dec_deg:       44.531013
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  449
+    lco_names:
+      - "NGC4051"
+
+  - name:         "NGC4151"
+    data_id:       "NGC_4151"
+    ra_deg:        182.635738
+    dec_deg:       39.405849
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  423
+    lco_names:
+      - "NGC4151"
+
+  - name:         "NGC4395offset"
+    data_id:       "NGC_4395"
+    ra_deg:        186.539170      # telescope pointing (offset field), NOT the nucleus
+    dec_deg:       33.559208
+    agn_ra_deg:    186.453583      # nucleus = Gaia DR3 4016037658643693696 (4.34' from pointing)
+    agn_dec_deg:   33.546864
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  652
+    lco_names:
+      - "NGC4395offset"
+
+  - name:         "NGC4593"
+    data_id:       "NGC_4593"
+    ra_deg:        189.914348
+    dec_deg:       -5.344176
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1198
+    lco_names:
+      - "NGC4593"
+
+  - name:         "NGC5548"
+    data_id:       "NGC_5548"
+    ra_deg:        214.498084
+    dec_deg:       25.136833
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  905
+    lco_names:
+      - "NGC5548"
+
+  - name:         "NGC 5723"
+    data_id:       "NGC_5723"
+    ra_deg:        219.741333
+    dec_deg:       46.689583
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  63
+    lco_names:
+      - "NGC 5723"
+
+  - name:         "NGC6814"
+    data_id:       "NGC_6814"
+    ra_deg:        295.669100
+    dec_deg:       -10.323630
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  7168
+    lco_names:
+      - "NGC6814"
+
+  - name:         "NGC7469"
+    data_id:       "NGC_7469"
+    ra_deg:        345.815308
+    dec_deg:       8.873689
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1159
+    lco_names:
+      - "NGC7469"
+
+  - name:         "PDS 456"
+    data_id:       "PDS_456"
+    ra_deg:        262.082450
+    dec_deg:       -14.265510
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  9864
+    lco_names:
+      - "PDS 456"
+
+  - name:         "PG 0804+761"
+    data_id:       "PG_0804+761"
+    ra_deg:        122.744432
+    dec_deg:       76.045125
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1702
+    lco_names:
+      - "PG 0804+761"
+
+  - name:         "PG 0844+349"
+    data_id:       "PG_0844+349"
+    ra_deg:        131.926870
+    dec_deg:       34.751245
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  846
+    lco_names:
+      - "PG 0844+349"
+
+  - name:         "PG 0923+201"
+    data_id:       "PG_0923+201"
+    ra_deg:        141.477976
+    dec_deg:       19.901407
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  987
+    lco_names:
+      - "PG 0923+201"
+
+  - name:         "PG 1119+120"
+    data_id:       "PG_1119+120"
+    ra_deg:        170.446325
+    dec_deg:       11.738586
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  581
+    lco_names:
+      - "PG 1119+120"
+
+  - name:         "PG1244+026"
+    data_id:       "PG_1244+026"
+    ra_deg:        191.646886
+    dec_deg:       2.369107
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  695
+    lco_names:
+      - "PG1244+026"
+
+  - name:         "PG1302-102"
+    data_id:       "PG_1302-102"
+    ra_deg:        196.387562
+    dec_deg:       -10.555397
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1253
+    lco_names:
+      - "PG1302-102"
+
+  - name:         "PG1310-109"
+    data_id:       "PG_1310-108"
+    ra_deg:        198.274088
+    dec_deg:       -11.128435
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1115
+    lco_names:
+      - "PG1310-109"
+
+  - name:         "PG2304+043"
+    data_id:       "PG_2304+043"
+    ra_deg:        346.762146
+    dec_deg:       4.549194
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  983
+    lco_names:
+      - "PG2304+043"
+
+  - name:         "PHL1811"
+    data_id:       "PHL_1811"
+    ra_deg:        328.756450
+    dec_deg:       -9.371035
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1345
+    lco_names:
+      - "PHL1811"
+
+  - name:         "PKS 2004-447"
+    data_id:       "PKS_2004"
+    ra_deg:        301.979929
+    dec_deg:       -44.578967
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  2754
+    lco_names:
+      - "PKS 2004-447"
+
+  - name:         "1438+02"
+    data_id:       "RX_J1438"
+    ra_deg:        219.635031
+    dec_deg:       2.801178
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  1149
+    lco_names:
+      - "1438+02"
+
+  - name:         "RXJ0134.2-4258"
+    data_id:       "RXJ0134.2-4258"
+    ra_deg:        23.570458
+    dec_deg:       -42.973950
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  813
+    lco_names:
+      - "RXJ0134.2-4258"
+
+  - name:         "SDSSJ1430+23"
+    data_id:       "SDSS_J1430"
+    ra_deg:        217.566870
+    dec_deg:       23.062333
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  663
+    lco_names:
+      - "SDSSJ1430+23"
+
+  - name:         "SDSSJ2353"
+    data_id:       "SDSS_J2353"
+    ra_deg:        358.340901
+    dec_deg:       -1.257816
+    lco_active:    false
+    lt_active:     true
+    agn_field_id:  566
+    lco_names:
+      - "SDSSJ2353"
+
+  - name:         "sdssrm016"
+    data_id:       "sdssrm016"
+    ra_deg:        214.028971
+    dec_deg:       53.158270
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  30
+    lco_names:
+      - "sdssrm016"
+
+  - name:         "sdssrm017"
+    data_id:       "sdssrm017"
+    ra_deg:        213.351150
+    dec_deg:       53.090820
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm017"
+
+  - name:         "sdssrm021"
+    data_id:       "sdssrm021"
+    ra_deg:        213.312383
+    dec_deg:       53.027619
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  59
+    lco_names:
+      - "sdssrm021"
+
+  - name:         "sdssrm033"
+    data_id:       "sdssrm033"
+    ra_deg:        213.884821
+    dec_deg:       52.818312
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  65
+    lco_names:
+      - "sdssrm033"
+
+  - name:         "sdssrm191"
+    data_id:       "sdssrm191"
+    ra_deg:        214.189914
+    dec_deg:       53.746329
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  3
+    lco_names:
+      - "sdssrm191"
+
+  - name:         "sdssrm215"
+    data_id:       "sdssrm215"
+    ra_deg:        214.967641
+    dec_deg:       53.228039
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  62
+    lco_names:
+      - "sdssrm215"
+
+  - name:         "sdssrm305"
+    data_id:       "sdssrm305"
+    ra_deg:        212.517805
+    dec_deg:       52.528055
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm305"
+
+  - name:         "sdssrm316"
+    data_id:       "sdssrm316"
+    ra_deg:        215.218490
+    dec_deg:       52.939561
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm316"
+
+  - name:         "sdssrm320"
+    data_id:       "sdssrm320"
+    ra_deg:        215.160505
+    dec_deg:       53.404582
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm320"
+
+  - name:         "sdssrm338"
+    data_id:       "sdssrm338"
+    ra_deg:        214.981770
+    dec_deg:       53.668655
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  61
+    lco_names:
+      - "sdssrm338"
+
+  - name:         "sdssrm371"
+    data_id:       "sdssrm371"
+    ra_deg:        212.847582
+    dec_deg:       52.225466
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm371"
+
+  - name:         "sdssrm392"
+    data_id:       "sdssrm392"
+    ra_deg:        215.301221
+    dec_deg:       52.696458
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  63
+    lco_names:
+      - "sdssrm392"
+
+  - name:         "sdssrm428"
+    data_id:       "sdssrm428"
+    ra_deg:        214.734145
+    dec_deg:       53.979160
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm428"
+
+  - name:         "sdssrm457"
+    data_id:       "sdssrm457"
+    ra_deg:        213.571361
+    dec_deg:       51.956279
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  39
+    lco_names:
+      - "sdssrm457"
+
+  - name:         "sdssrm519"
+    data_id:       "sdssrm519"
+    ra_deg:        214.301233
+    dec_deg:       51.945979
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  64
+    lco_names:
+      - "sdssrm519"
+
+  - name:         "sdssrm551"
+    data_id:       "sdssrm551"
+    ra_deg:        212.946103
+    dec_deg:       51.938825
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  48
+    lco_names:
+      - "sdssrm551"
+
+  - name:         "sdssrm589"
+    data_id:       "sdssrm589"
+    ra_deg:        215.205338
+    dec_deg:       52.181473
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  43
+    lco_names:
+      - "sdssrm589"
+
+  - name:         "sdssrm622"
+    data_id:       "sdssrm622"
+    ra_deg:        212.813281
+    dec_deg:       51.869164
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm622"
+
+  - name:         "sdssrm634"
+    data_id:       "sdssrm634"
+    ra_deg:        212.899532
+    dec_deg:       51.834589
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  60
+    lco_names:
+      - "sdssrm634"
+
+  - name:         "sdssrm645"
+    data_id:       "sdssrm645"
+    ra_deg:        215.165816
+    dec_deg:       52.066589
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  60
+    lco_names:
+      - "sdssrm645"
+
+  - name:         "sdssrm694"
+    data_id:       "sdssrm694"
+    ra_deg:        214.277816
+    dec_deg:       51.727795
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm694"
+
+  - name:         "sdssrm707"
+    data_id:       "sdssrm707"
+    ra_deg:        216.071766
+    dec_deg:       53.035798
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  47
+    lco_names:
+      - "sdssrm707"
+
+  - name:         "sdssrm720"
+    data_id:       "sdssrm720"
+    ra_deg:        211.325088
+    dec_deg:       53.258339
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm720"
+
+  - name:         "sdssrm779"
+    data_id:       "sdssrm779"
+    ra_deg:        214.847360
+    dec_deg:       54.367148
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm779"
+
+  - name:         "sdssrm781"
+    data_id:       "sdssrm781"
+    ra_deg:        215.264704
+    dec_deg:       51.972074
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm781"
+
+  - name:         "sdssrm840"
+    data_id:       "sdssrm840"
+    ra_deg:        214.188125
+    dec_deg:       54.427987
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  null
+    lco_names:
+      - "sdssrm840"
+
+  - name:         "SMSS_J1144-43"
+    data_id:       "SMSS_J1144-43"
+    ra_deg:        176.199040
+    dec_deg:       -43.149800
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  4519
+    lco_names:
+      - "SMSS_J1144-43"
+
+  - name:         "Swift_J1727"
+    data_id:       "Swift_J1727"
+    ra_deg:        261.930500
+    dec_deg:       -16.205292
+    lco_active:    false
+    lt_active:     false
+    agn_field_id:  1277
+    lco_names:
+      - "Swift_J1727"
+
+  - name:         "test926"
+    data_id:       "test_926"
+    ra_deg:        346.181156
+    dec_deg:       -8.685731
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  865
+    lco_names:
+      - "test926"
+
+  - name:         "Zw535-012"
+    data_id:       "Z_535-12"
+    ra_deg:        9.087246
+    dec_deg:       45.664909
+    lco_active:    true
+    lt_active:     false
+    agn_field_id:  3484
+    lco_names:
+      - "Zw535-012"

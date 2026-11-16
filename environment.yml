@@ -1,0 +1,36 @@
+name: ava
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  # Astronomy
+  - astropy>=5.3
+  - astroquery>=0.4.6
+  - specutils>=1.11
+  - ccdproc>=2.4
+  - photutils>=1.9
+  # Numerics
+  - numpy>=1.24
+  - scipy>=1.11
+  - pandas>=2.0
+  - matplotlib>=3.7
+  # Tools
+  - pyyaml>=6.0
+  - click>=8.1
+  - sqlalchemy>=2.0
+  - requests>=2.31
+  - python-dotenv>=1.0
+  - plotly>=5.17
+  - pyarrow>=14.0
+  - numba>=0.58          # PyTICS ensemble (ava.photometry.ensemble)
+  - astroalign>=2.5
+  - ipykernel
+  - jupyterlab
+  - pip:
+    - flask>=3.0
+    - flask-sqlalchemy>=3.1
+    - gunicorn>=21.0
+    - prefect>=2.14
+    - banzai-floyds  # or install via: pip install -e /path/to/floyds/banzai-floyds

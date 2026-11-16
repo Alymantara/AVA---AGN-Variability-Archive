@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ava"
+version = "0.1.0"
+description = "AGN Variability Archive — LCO spectroscopy and photometry pipeline"
+authors = [{ name = "Juan Hernandez Santisteban", email = "jvhs1@st-andrews.ac.uk" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    # Astronomy core
+    "astropy>=5.3",
+    "astroquery>=0.4.6",
+    "specutils>=1.11",
+    # Data / numerics
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "pandas>=2.0",
+    # Image reduction
+    "ccdproc>=2.4",
+    "photutils>=1.9",
+    # Database
+    "sqlalchemy>=2.0",
+    # Config & CLI
+    "pyyaml>=6.0",
+    "click>=8.1",
+    "python-dotenv>=1.0",
+    # Plotting
+    "matplotlib>=3.7",
+    "plotly>=5.17",
+    # HTTP (LCO API)
+    "requests>=2.31",
+    # Calibrated photometry storage (measurements.parquet) and WCS repair from star patterns
+    "pyarrow>=14.0",
+    "astroalign>=2.5",
+    # PyTICS ensemble solver (ava.photometry.ensemble)
+    "numba>=0.58",
+]
+
+[project.optional-dependencies]
+web = [
+    "flask>=3.0",
+    "flask-sqlalchemy>=3.1",
+    "gunicorn>=21.0",
+]
+pipeline = [
+    "prefect>=2.14",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black>=23.0",
+    "ruff>=0.1",
+    "ipykernel",
+    "jupyterlab",
+]
+
+[project.scripts]
+# Pipeline entry points
+ava-ingest   = "ava.scripts.ingest_lco_data:main"
+ava-spec     = "ava.scripts.run_spectroscopy:main"
+ava-phot     = "ava.scripts.run_photometry:main"
+ava-db       = "ava.scripts.update_database:main"
+ava-web      = "ava.scripts.serve_web:main"
+# LCO archive database CLI (replaces the standalone `lcodb` command)
+lcodb        = "ava.lcodb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ava*"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

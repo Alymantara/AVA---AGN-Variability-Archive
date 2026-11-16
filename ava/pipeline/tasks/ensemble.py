@@ -1,0 +1,166 @@
+"""
+Ensemble task — PyTICS intercalibration of the calibrated photometry.
+
+Runs after ``calibrate`` (needs ``frame_qc`` + ``measurements.parquet``) and
+writes, in ``cfg.phot_dir(target)``:
+
+  pytics/<filter>/{stars,scopes,epochs,star_scope}.parquet + meta.json
+                                    the stored solution (read back by updates)
+  pytics/absolute_zp_stars.parquet  star means vs reference_stars.csv
+  pytics/intercal.csv               flux-flux fit of every scope vs the Sinistro reference
+  agn_lightcurve_pytics.parquet/.csv
+                                    AGN: ensemble-calibrated, absolute (AB), with the
+                                    additive camera correction in mag_ic / F_ic (mJy)
+
+``mode="full"`` refits the whole data set on demand (~1 min for Mrk 817,
+21k frames, 8 filters); ``mode="auto"`` (daily) adds only the new frames to
+the stored solution (tens of ms per filter) and refits when the update says
+so.  Merged light-curve figures go to ``cfg.plots_dir`` as
+``lco_latest_<obj>_merged[_last6]``.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from prefect import get_run_logger, task
+
+from ava.config import cfg
+
+
+def _matches(scope: str, prefixes) -> bool:
+    cam = scope.split("-", 1)[-1]
+    return any(cam.startswith(p) for p in prefixes)
+
+
+def intercal_lightcurve(phot: Path, ec) -> pd.DataFrame:
+    """Flux-flux fit vs the reference cameras; correct the configured cameras."""
+    from ava.photometry import intercal as IC
+
+    lc = pd.read_parquet(phot / "agn_lightcurve_pytics.parquet")
+    scopes = sorted(lc["scope"].unique())
+    ref = [s for s in scopes if _matches(s, ec.intercal_reference_cameras)]
+    table = IC.intercalibrate(lc, ref, max_gap=float(ec.intercal_max_gap_days),
+                              min_pairs=int(ec.get("intercal_min_pairs", 10)))
+    table["corrected"] = table["scope"].map(lambda s: _matches(s, ec.intercal_correct_cameras))
+    fix = [s for s in scopes if _matches(s, ec.intercal_correct_cameras)]
+    if ec.get("intercal_per_season", False):
+        # one additive offset per observing season for the corrected cameras (MuSCAT step
+        # between seasons, docs/future_improvements.md); the all-data fit fills seasons
+        # with too few pairs
+        lc["season"] = IC.seasons(lc["MJD"], float(ec.get("intercal_season_gap_days", 60.0)))
+        ts = IC.intercalibrate_by_season(lc, ref, fix, max_gap=float(ec.intercal_max_gap_days),
+                                         min_pairs=int(ec.get("intercal_min_pairs", 10)))
+        table = pd.concat([table.assign(season=-1), ts.assign(corrected=True)], ignore_index=True)
+    table.to_csv(phot / "pytics" / "intercal.csv", index=False)
+    out = IC.apply_intercal(lc, table, scopes=fix, additive_only=True)
+    out = add_error_model(out, phot, ec)
+    out.to_parquet(phot / "agn_lightcurve_pytics.parquet", compression="zstd", index=False)
+    out.to_csv(phot / "agn_lightcurve_pytics.csv", index=False, float_format="%.6f")
+    return out
+
+
+def add_error_model(lc: pd.DataFrame, phot: Path, ec) -> pd.DataFrame:
+    """Fit the empirical error model (ava.photometry.errors) on the AGN pairs and add
+    mag_err_model[_rand] / Ferr_model[_rand]; always computed (for verification), used for
+    the products only when ``error_model: fitted``."""
+    from ava.photometry import errors as ER
+
+    table = ER.fit_error_model(lc, mag="mag_ic", max_dt=float(ec.get("error_model_max_dt_hours", 1.0)) / 24,
+                               max_dt_cross=float(ec.get("error_model_cross_dt_days", 0.25)),
+                               min_pairs=int(ec.get("error_model_min_pairs", 150)),
+                               min_cross_pairs=int(ec.get("error_model_min_cross_pairs", 30)),
+                               min_error_range=float(ec.get("error_model_min_error_range", 2.5)))
+    table.to_csv(phot / "pytics" / "error_model.csv", index=False)
+    out = ER.apply_error_model(lc, table)
+    k = out["F_ic"] * np.log(10) / 2.5
+    out["Ferr_model"] = k * out["mag_err_model"]
+    out["Ferr_model_rand"] = k * out["mag_err_model_rand"]
+    return out
+
+
+#: filter_dict names for the shareable CSV
+FILTER_NAMES = {"up": "u", "B": "B", "gp": "g", "V": "V", "rp": "r", "ip": "i", "zs": "z", "Y": "Y",
+                "R": "R", "I": "I", "U": "U"}
+
+
+def export_merged_csv(lc: pd.DataFrame, path: Path, target: str, error_model: str = "pytics") -> pd.DataFrame:
+    """The shareable merged light curve: good epochs only, intercalibrated, AB mag and mJy.
+
+    Columns: target, MJD, filter, telescope, camera, flux_mJy, flux_err_mJy (total,
+    PyTICS: σ_phot ⊕ rms_t ⊕ rms_sc), flux_err_random_mJy (σ_phot ⊕ rms_t: epoch-to-epoch
+    scatter; rms_sc is a per-camera systematic), mag_AB, mag_AB_err, mag_AB_err_random,
+    frame.  1 mJy = AB 16.4.  ``error_model="fitted"``: the errors are the empirical model
+    (total = random ⊕ camera term; ava.photometry.errors) instead of the PyTICS ones."""
+    from ava.photometry import intercal as IC
+
+    g = lc[lc["good"]].copy()
+    if error_model == "fitted":
+        e_tot, e_rand = g["mag_err_model"], g["mag_err_model_rand"]
+        f_tot, f_rand = g["Ferr_model"], g["Ferr_model_rand"]
+    else:
+        e_tot, e_rand = g["mag_ic_err"], g["mag_err_rand"]
+        f_tot, f_rand = g["Ferr_ic"], g["F_ic"] * g["mag_err_rand"] * np.log(10) / 2.5 / g["ic_a"]
+    out = pd.DataFrame({
+        "target": target, "MJD": g["MJD"].round(6), "filter": g["Filter"].map(FILTER_NAMES).fillna(g["Filter"]),
+        "telescope": g["telid"], "camera": g["camera"],
+        "flux_mJy": g["F_ic"], "flux_err_mJy": f_tot, "flux_err_random_mJy": f_rand,
+        "mag_AB": g["mag_ic"], "mag_AB_err": e_tot, "mag_AB_err_random": e_rand,
+        "frame": g["frame"]}).sort_values(["filter", "MJD"])
+    out.to_csv(path, index=False, float_format="%.5f")
+    return out
+
+
+@task(name="ensemble", tags=["pytics"])
+def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
+    """PyTICS calibration of ``target`` (full on demand, incremental daily); all settings from
+    ``cfg.ensemble``."""
+    import shutil
+
+    from ava.photometry import ensemble as E
+    from ava.pipeline.tasks.calibrate import frame_db_path
+
+    logger = get_run_logger()
+    ec = cfg.ensemble
+    phot = cfg.phot_dir(target)
+    sct = ec.get("scope_colour_terms", "auto")
+    sct = list(sct) if isinstance(sct, (list, tuple)) else (sct if sct == "auto" else bool(sct))
+    report = E.run_target(
+        phot, frame_db_path(), target, list(ec.filters), mode=mode or ec.mode,
+        min_epochs=int(ec.min_epochs), absolute=bool(ec.absolute), colour_term=bool(ec.colour_term),
+        scope_colour_terms=sct, colour_check_min_gain=float(ec.get("colour_check_min_gain", 0.05)),
+        ref_cameras=tuple(ec.intercal_reference_cameras), intercal_max_gap=float(ec.intercal_max_gap_days),
+        auto_refit=bool(ec.auto_refit), log=logger.info,
+        update_kw=dict(refit_fraction=float(ec.get("refit_fraction", 0.1)),
+                       refit_rms_factor=float(ec.get("refit_rms_factor", 2.0)), bad_flags=int(ec.bad_flags)),
+        apply_kw=dict(max_rms_t=float(ec.get("max_rms_t", 0.05)), min_stars=int(ec.get("min_stars", 5))),
+        max_loops=int(ec.max_loops), safe=float(ec.safe), frac=float(ec.frac), tiny=float(ec.get("tiny", 1e-4)),
+        star_lim=int(ec.star_lim), bad_ids=tuple(ec.get("bad_ids", []) or []), bad_flags=int(ec.bad_flags),
+        rms_err_floor=float(ec.get("rms_err_floor", 1e-3)), atol=float(ec.get("atol", 1e-5)))
+    lc = intercal_lightcurve(phot, ec)
+    files = []
+    if ec.get("export_csv", True):
+        csv = phot / f"{target}_LCO_merged_lightcurve.csv"
+        export_merged_csv(lc, csv, target, error_model=str(ec.get("error_model", "pytics")))
+        files.append(str(csv))
+        cfg.plots_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(csv, cfg.plots_dir / csv.name)
+    if plot:
+        from ava.pipeline.tasks.webplot import spectroscopy_epochs
+        from ava.plots import webplots as wp
+
+        fd = wp.load_filter_dict(cfg._resolve(cfg.plots.filter_dict))
+        merged = pd.DataFrame({"mjd_mid": lc["MJD"], "filter": lc["Filter"], "mag": lc["mag_ic"],
+                               "mag_err": lc["mag_err_model" if ec.get("error_model", "pytics") == "fitted" else "mag_ic_err"],
+                               "qc_pass": lc["good"].astype(int)})
+        spec, last = spectroscopy_epochs(target)
+        cfg.plots_dir.mkdir(parents=True, exist_ok=True)
+        base = cfg.plots_dir / f"lco_latest_{target}_merged"
+        files += wp.plot_lightcurves(merged, fd, base, spec_mjd=spec, last_spec_mjd=last,
+                                     formats=list(cfg.plots.formats))
+        files += wp.plot_lightcurves(merged, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last,
+                                     recent_days=float(cfg.plots.recent_days), formats=list(cfg.plots.formats))
+    logger.info("%s: ensemble %s", target, {f: (r["mode"], r["n_epochs"], r.get("colour_terms")) for f, r in report.items()})
+    return {"target": target, "filters": report, "plots": files}

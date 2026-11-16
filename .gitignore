@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environments
+.env
+env/
+venv/
+env-*/
+*.conda
+
+# Data (large files — point to real location via config)
+data/raw/
+data/reduced/
+data/products/
+*.fits
+*.fit
+*.fz
+*.sqlite
+*.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# LCO archive databases (large; rebuilt by lcodb sync)
+data/lcodb/
+data/ava/*.sqlite
+
+# Old pipeline (kept for reference, not part of AVA)
+__old_pipeline__/
+
+# Sandbox test archive (scripts/make_test_archive.py)
+data/test_archive/
+
+# ---- added for the first commit (code + docs only) ----
+# All local data except the small static inputs the code reads
+data/*
+!data/reference/
+
+# Poster (large, separate deliverable)
+poster/
+
+# LaTeX build products (manual PDFs are built from the .tex sources)
+docs/*.pdf
+docs/*.aux
+docs/*.out
+docs/*.toc
+docs/*.tmp
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+docs/test_title.*
+
+# Test / tool caches and personal Claude settings
+.pytest_cache/
+.claude/settings.local.json

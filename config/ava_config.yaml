@@ -1,0 +1,475 @@
+# ============================================================
+#  AGN Variability Archive — Global Configuration
+#  ============================================================
+#
+#  HOW TO USE THIS FILE
+#  --------------------
+#  On a new machine:
+#    1. Copy this file:   cp config/ava_config.yaml config/ava_config.local.yaml
+#    2. Edit the local copy to set machine-specific paths (paths section).
+#    3. Point AVA at it:  export AVA_CONFIG=/path/to/ava_config.local.yaml
+#       or symlink:       ln -sf ava_config.local.yaml config/ava_config.yaml
+#
+#  Sensitive values (API tokens, passwords) must NEVER be written here.
+#  Set them as environment variables instead (see the comments on each key).
+#
+#  Relative paths are resolved from ava_root.
+#  Absolute paths are used as-is.
+# ============================================================
+
+
+# --- Project identity ----------------------------------------
+project:
+  name: "AGN Variability Archive"
+  version: "0.2.0"
+  contact: "jvhs1@st-andrews.ac.uk"
+
+
+# ============================================================
+#  PATHS  —  the most important section to edit on a new machine
+# ============================================================
+paths:
+
+  # Root of the AVA code repository (leave blank to auto-detect
+  # from the location of this config file).
+  ava_root: ""
+
+  # ---- Spectroscopy data (FLOYDS) -------------------------
+  # Where FLOYDS raw and reduced FITS files live.
+  # On the production machine: /data2/jvhs1/agn/
+  # Sub-structure expected:
+  #   <spectra_root>/raw_data/<target_slug>/YYYYMMDD/*.fits.fz   (raw)
+  #   <spectra_root>/<target_slug>/                               (products)
+  spectra_root: "/data2/jvhs1/agn"
+
+  # Raw FLOYDS frames (absolute, or relative to spectra_root)
+  spectra_raw: "raw_data"
+
+  # ---- Photometry data ------------------------------------
+  # Where photometric FITS files, SExtractor catalogues, and
+  # calibrated light-curve pickles live.
+  # On the production machine: /data3/jvhs1/agn/
+  # Sub-structure expected:
+  #   <photometry_root>/raw_data/<target_slug>/YYYYMMDD/*.fits.fz
+  #   <photometry_root>/<target_slug>/sextractor_ava/*_cat.fits
+  #   <photometry_root>/<target_slug>/lco_latest.pkl
+  #   <photometry_root>/<target_slug>/lco_latest_stan.pkl
+  photometry_root: "/data3/jvhs1/agn"
+
+  # Raw photometry frames (absolute, or relative to photometry_root)
+  photometry_raw: "raw_data"
+
+  # ---- Shared / website -----------------------------------
+  # Plots are copied here before being pushed to the web server.
+  # On the production machine: /data3/jvhs1/agn/ava_plots/
+  plots_dir: "/data3/jvhs1/agn/ava_plots"
+
+  # Swift/UVOT merged database (absolute path to CSV).
+  swift_db: "/data3/jvhs1/agn/ava_swift_updated.csv"
+
+  # Template directory: SExtractor configs, filter_dict.txt, etc.
+  # Copied to each per-target directory at initialisation.
+  # On the production machine: /data3/jvhs1/agn/template_pipeline/
+  template_dir: "/data3/jvhs1/agn/template_pipeline"
+
+  # ---- AVA code / archive ---------------------------------
+  # Path to the banzai-floyds working copy (for spectroscopy pipeline).
+  floyds_pipeline: "/Users/juan/astro/floyds/banzai-floyds"
+
+  # Path to the lcodb config.yaml that points at the archive DBs.
+  # Leave blank to auto-derive as <floyds_pipeline>/../lco_archive_db/config.yaml
+  lcodb_config: "config/lcodb_config.yaml"
+
+  # AVA SQLite database (AGN master table).
+  database: "data/ava.db"
+
+  # AVA master CSV (read by lcodb link to match LCO names to AVA sources).
+  ava_csv: "data/ava/ava.csv"
+
+  # Log directory (relative to ava_root).
+  logs: "logs"
+
+  # Sandbox archive for testing the pipeline from scratch
+  # (built by scripts/make_test_archive.py; never production data).
+  test_archive: "data/test_archive"
+
+  # ---- Web server delivery --------------------------------
+  # Remote server and path for scp-based plot delivery.
+  # Set to "" to disable remote copy.
+  # (ringworld.st-andrews.ac.uk is retired — remote copy disabled.)
+  web_server_host: ""
+  web_server_path: ""
+  web_server_user: ""
+
+
+# ============================================================
+#  LCO API
+# ============================================================
+lco:
+  # API token for the LCO archive and observation portal.
+  # Preferred: store ONLY the token in ~/.lco_token (chmod 600)
+  # or set env var LCO_API_TOKEN.  Do NOT paste the token here.
+  token_file: "~/.lco_token"
+  api_token: ""             # fallback if token_file is absent
+
+  # LCO archive / portal account name (not secret).  Passwords are never
+  # stored anywhere: all API access uses the token above.
+  username: "jvhs1@st-andrews.ac.uk"
+
+  base_url: "https://observe.lco.global/api/"
+  archive_url: "https://archive-api.lco.global/"
+
+  # Active key-project proposal IDs (auto-discovered by lcodb,
+  # but listed here for the legacy download scripts).
+  proposals:
+    - "KEY2026B-007"
+    - "KEY2023B-001"
+    - "KEY2020B-006"
+    - "KEY2018B-001"
+    - "KEY2014A-002"
+
+
+# ============================================================
+#  DOWNLOAD  (ava.lco.download; port of __old_pipeline__/download_data.py)
+# ============================================================
+download:
+  # "dry_run": search the archive and report what would be fetched (listing
+  #            requests are sent; NO file is downloaded).  "live": also fetch.
+  mode: "dry_run"
+  # Which kinds the daily pipeline (-d) handles: phot (BANZAI L91) / spec (raw L0 FLOYDS).
+  daily_kinds: ["phot"]
+  # Proposals searched by the daily run (backfill takes --proposal; default: lco.proposals).
+  daily_proposals: ["KEY2026B-007"]
+  overlap_days: 2               # daily: restart this many days before the last successful update
+  initial_lookback_days: 30     # daily: first run for a target
+  max_frames_per_run: 50        # files per target per run (daily); backfill: --max-frames
+  window_days: 365              # archive search window (pagination handles any number of frames;
+                                # each page's URLs are used before the next page is requested)
+  page_size: 100                # frames per archive page (URLs are used before the next page)
+  rate_per_s: 1.0               # archive requests per second (lcodb sees blocks above ~4/s)
+  verify_existing: false        # md5-check files already on disk
+  unlinked_radius_arcmin: 10    # report unlinked LCO OBJECT names this close to the AGN
+  # Archive query parameter names (the API renamed the legacy OBJECT / PROPID / RLEVEL).
+  archive_params:
+    object: "target_name"
+    proposal: "proposal_id"
+    rlevel: "reduction_level"
+
+
+# ============================================================
+#  DATABASE  (AVA master table)
+# ============================================================
+database:
+  engine: "sqlite"       # sqlite | postgresql
+  # SQLite: uses paths.database above.
+  # PostgreSQL: fill in the keys below.
+  host: ""
+  port: 5432
+  name: "ava"
+  user: ""
+  password: ""           # use env var AVA_DB_PASSWORD instead
+
+
+# ============================================================
+#  PHOTOMETRY PIPELINE
+# ============================================================
+photometry:
+
+  # Instruments to process.
+  instruments:
+    - "sinistro"   # fa-series, 1 m telescopes
+    - "spectral"   # fs-series, 2 m Faulkes telescopes
+    - "muscat3"    # MuSCAT3, 2 m Haleakala
+
+  # Filters processed (LCO internal names).
+  filters: ["up", "gp", "rp", "ip", "zs", "B", "V", "R", "I"]
+
+  # Reference catalogue for absolute calibration (built by `run_pipeline.py -o`;
+  # see ava.photometry.reference).
+  reference:
+    # "gspc"        = Gaia DR3 Synthetic Photometry Catalogue, used directly
+    #                 (all-sky; matches SDSS to 0.01-0.02 mag).  Default.
+    # "apass_model" = APASS + atmosphere-model synthetic photometry (legacy).
+    method: "gspc"
+    fallback: "apass_model"     # used if GSPC fails or is too sparse; "" = none
+    min_stars: 20               # GSPC quality stars needed in each of g, r, i
+    # GSPC quality cuts
+    max_ruwe: 1.4
+    neighbour_arcsec: 3.0       # reject stars with a Gaia neighbour this close ...
+    neighbour_dmag: 2.5         # ... brighter than G + this (XP contamination)
+
+    # ---- apass_model settings (fallback) ----
+    # APASS source:
+    #   "vizier" = APASS DR9 from VizieR II/336 (all-sky; B V g r i = all the
+    #              fit bands).  Default.
+    #   "aavso"  = APASS DR10 scraped from the AAVSO form (adds u', z_s, Y;
+    #              AAVSO refuses requests from some networks).
+    apass_source: "vizier"
+    apass_url: "https://www.aavso.org/download-apass-data"
+    # VizieR mirrors, tried in order (some mirrors hold incomplete copies:
+    # vizier.cfa.harvard.edu lacks GSPC + APASS DR9 around NGC 5548).
+    vizier_servers:
+      - "vizier.cds.unistra.fr"
+      - "vizier.cfa.harvard.edu"
+    # Cone radius.  Must exceed the largest camera footprint: Sinistro is
+    # 26.5' x 26.5', i.e. corners at 18.7' from the pointing centre.
+    radius_arcmin: 20.0
+    # Static inputs (relative to ava_root).
+    atmosphere_grid: "data/reference/ava_atmo_models.csv"   # BT-Settl/NextGen, logg 4.5, [M/H] 0
+    lco_filters: "data/reference/lco_filters"              # lco_<band>.txt transmission curves
+    # Extinction: E(B-V)_star = E(B-V)_SF11 * (1 - exp(-d |sin b| / h)),
+    # with d from the Gaia DR3 parallax.  Stars without a parallax with
+    # S/N >= min_parallax_snr get the full line-of-sight value.
+    gaia: true
+    dust_scale_height_pc: 125.0
+    min_parallax_snr: 5.0
+    gaia_match_arcsec: 1.5
+    # Monte-Carlo draws from the fit covariance for synthetic-mag errors.
+    n_draws: 1000
+    random_seed: 42
+    # u band: the model extrapolation is ~0.2 mag too faint (vs Gaia GSPC,
+    # Fairall 9, Nov 2026).  Tie lco_u to GSPC SDSS u with one per-field
+    # offset; skipped if fewer than u_anchor_min_stars usable stars.
+    u_anchor: true
+    u_anchor_min_stars: 10
+
+  # SExtractor (run_pipeline.py -e; production machine only).
+  sextractor:
+    binary: "sex"                              # or "source-extractor"
+    config_dir: "data/reference/sextractor"    # default.sex/.param/.conv/.nnw (12-aperture series)
+    max_frames_per_run: 2000
+    # Aperture series: PHOT_APERTURES in <config_dir>/default.sex, APPEND-ONLY —
+    # new (larger) apertures go at the end so existing indices never change.
+    # Now 3,5,8,11,13,15,18,21,24,27,30,33 + 36,39,43,48 px (added Nov 2026 so
+    # MuSCAT reaches 10.5" = 39 px).
+    # Cameras whose science aperture may use the appended apertures; all other
+    # cameras keep choosing among the original 12 (numbers never change).
+    extended_aperture_cameras: ["ep"]
+    # Optional per-camera override (2-letter prefix -> px list); none in use.
+    camera_apertures_px: {}
+    # Re-extract catalogues whose APERDIAM differs from the current series,
+    # for these cameras only.  OFF: the MuSCAT re-extraction is for a later date.
+    reextract_on_aperture_change: false
+    reextract_cameras: ["ep"]
+
+  # Seeing limit: frames with FWHM above this are flagged (flag=1).
+  seeing_limit_arcsec: 9.0
+
+  # Minimum number of standard stars required for calibration.
+  min_standards: 3
+
+  # Pixel-edge exclusion zone (pixels). Sources within this many
+  # pixels of the frame boundary are excluded from the standard-star fit.
+  pix_edge: 30
+
+  # Aperture configuration.
+  # SExtractor measures every aperture of the append-only series in
+  # photometry.sextractor.config_dir/default.sex (12 originally, 16 since Nov 2026).
+  # The science aperture is the one nearest this physical size, chosen per
+  # catalogue from its own aperture list (APERDIAM header, else its aperture
+  # count) and the camera pixel scale — never from the observing date.
+  # 5.25" radius = 10.5" diameter = Sinistro's 27 px aperture.  Spectral keeps
+  # 33 px (10.0"); MuSCAT uses the appended 39 px (10.53") when its catalogue
+  # has it, else 33 px (8.9") — see photometry.sextractor.extended_aperture_cameras.
+  science_aperture_radius_arcsec: 5.25
+
+  apertures:
+    # ----------------------------------------------------------------
+    # SExtractor aperture series (PHOT_APERTURES in default.sex)
+    # Two series exist depending on the data epoch:
+    #
+    # OLD series (pre-2025, 10 apertures) — diameters in pixels:
+    #   Index:  0    1    2    3    4    5    6    7    8    9
+    #   px_d:   8   11   13   15   18   21   24   27   30   33
+    #
+    # NEW series (2025+, 12 apertures) — 3 and 5 px prepended:
+    #   Index:  0    1    2    3    4    5    6    7    8    9   10   11
+    #   px_d:   3    5    8   11   13   15   18   21   24   27   30   33
+    #
+    # The expansion in 2025 shifted all old indices by +2.
+    # Using a fixed index across epochs therefore samples different
+    # physical apertures. The correct solution is to compute the index
+    # from the pixel scale and science_aperture_radius_arcsec above.
+    # ----------------------------------------------------------------
+
+    # Diameter series for each epoch (pixels). Do not change unless
+    # default.sex is also changed.
+    old_diameters_px: [8, 11, 13, 15, 18, 21, 24, 27, 30, 33]
+    new_diameters_px: [3, 5, 8, 11, 13, 15, 18, 21, 24, 27, 30, 33]
+
+    # MJD at which the new series was adopted (frames from this MJD
+    # onwards were extracted with the 12-aperture series).
+    # Pre-2025 data: use old_diameters_px.
+    # 2025+:         use new_diameters_px.
+    expansion_mjd: 60909.0   # 2025-10-18: 3px and 5px apertures prepended to default.sex
+
+    # Legacy fixed indices (kept for reference and backward-compatible
+    # re-ingestion of old pkl files).  Do not use for new processing.
+    _legacy_sinistro_old_index: 7   # was 21px = 8.2" (Sinistro)
+    _legacy_spectral_old_index: 5   # was 21px = 6.4" (Spectral)
+
+  # Per-frame calibration (run_pipeline.py -c; ava.photometry.calibration).
+  calibration:
+    min_snr: 20.0          # standards: S/N in the science aperture
+    max_peak_frac: 0.8     # standards: FLUX_MAX + BACKGROUND < this x SATURATE
+    sigma_floor: 0.01      # mag, added in quadrature to each standard (stops the brightest dominating)
+    clip_kappa: 3.0
+    min_standards: 5
+    frame_db: null         # SQLite holding frame_qc; null = the lcodb photometry DB
+    n_workers: 4
+
+  # Frame QC (flags stored in frame_qc.qc_flags; qc_pass = no flag).
+  qc:
+    min_matched: 30            # reference stars matched
+    max_zp_scatter: 0.05       # mag, star-to-star scatter about the frame zero point
+    max_fwhm_arcsec: 4.5
+    max_zp_dev: 0.5            # mag, |ZP - median ZP of the target's camera/filter| (clouds, focus)
+    # Per-filter overrides (~2x the typical value; Mrk 817, Nov 2026).  z_s and Y scatter
+    # more until LCO<->SDSS-z / PS1-y colour terms exist; u has few standards.
+    # Per-camera overrides (applied after per_filter).  MuSCAT3's 9' field holds only
+    # ~9 Gaia GSPC stars around Mrk 817 (median; Sinistro 26': ~134).
+    per_camera:
+      ep: {min_matched: 5}
+    per_filter:
+      up: {min_matched: 10, max_zp_scatter: 0.08}
+      zs: {max_zp_scatter: 0.12}
+      Y:  {max_zp_scatter: 0.25}
+
+  # Extinction correction coefficients file
+  # (relative to per-target directory, or absolute).
+  extinction_coefficients: "lco_ext_coefficients.csv"
+
+  # Colour correction applied (true = use C_t * colour term).
+  colour_correction: true
+
+
+# ============================================================
+#  SPECTROSCOPY PIPELINE  (FLOYDS / banzai-floyds)
+# ============================================================
+spectroscopy:
+  instrument: "floyds"
+  sites:
+    - "ogg"   # Haleakala (FLOYDS-N, en06)
+    - "coj"   # Siding Spring (FLOYDS-S, en12)
+  default_slit_arcsec: 6.0
+  wavelength_range_angstrom: [3200, 10000]
+
+
+# ============================================================
+#  ENSEMBLE  (PyTICS, ava.photometry.ensemble — Vieliute et al. 2025)
+# ============================================================
+ensemble:
+  # --- what to run -------------------------------------------------------------
+  filters: ["up", "B", "gp", "V", "rp", "ip", "zs", "Y"]
+  mode: "auto"            # auto = update the stored solution if any, else full fit; or full / update
+  min_epochs: 10          # skip a filter with fewer QC-pass frames
+  # --- PyTICS fit (ava.photometry.ensemble.fit; defaults = published PyTICS) ------
+  max_loops: 200          # PyTICS MAX_LOOPS
+  safe: 0.6               # PyTICS damping of dmagt, m_star (and the colour terms)
+  tiny: 1.0e-4            # PyTICS convergence: every |Δp| / σ_p below this
+  frac: 0.5               # comparison stars: > frac x max number of points (Brightest_Reduced)
+  star_lim: 100           # comparison stars: brightest N (Star_Lim)
+  bad_ids: []             # star_ids never used as comparison stars (the AGN is always excluded)
+  bad_flags: 28           # SExtractor FLAGS dropping a comparison measurement (4 sat | 8 edge | 16 aperture); 0 = PyTICS
+  rms_err_floor: 0.001    # mag; floor on rms_t / rms_sc / rms* errors in the convergence test; 0 = PyTICS
+  atol: 1.0e-5            # mag; also stop when the gauge-free solution moves < atol for 3 loops; 0 = PyTICS
+  # --- per telescope+camera colour terms CK_k x (g-i) (AVA extension) --------------
+  # auto: fit with and without, keep them per filter only if the AGN agrees better between the
+  # reference cameras (offsets + same-night pairs) by >= colour_check_min_gain. Or true / false / list of filters.
+  scope_colour_terms: "auto"
+  colour_check_min_gain: 0.05
+  # --- incremental update (ensemble.update) -------------------------------------
+  auto_refit: true        # full refit when an update reports needs_refit
+  refit_fraction: 0.1     # needs_refit when more than this fraction of epochs come from updates
+  refit_rms_factor: 2.0   # ... or median rms_t of updated epochs > factor x full-fit median + 2 mmag
+  # --- AGN light curve (ensemble.apply) -------------------------------------------
+  max_rms_t: 0.05         # mag; epochs with larger rms_t are good = False
+  min_stars: 5            # epochs with fewer comparison stars are good = False
+  # --- absolute zero point (ensemble.absolute_zp) --------------------------------
+  absolute: true          # tie star means to reference_stars.csv (ZP + colour term at the AGN colour)
+  colour_term: true       # fit C x (g-i) in the absolute ZP
+  # --- flux-flux intercalibration of the AGN (ava.photometry.intercal) -------------
+  # additive host-light offset of cameras whose aperture (arcsec) differs from Sinistro 10.5" (MuSCAT 8.9")
+  intercal_reference_cameras: ["fa"]   # camera prefixes forming the reference light curve
+  intercal_correct_cameras: ["ep"]     # camera prefixes corrected (F' = F - b, a = 1)
+  intercal_max_gap_days: 3.0           # interpolate the reference across gaps shorter than this
+  intercal_min_pairs: 10               # nights needed to fit a camera
+  # One additive offset per observing season for the corrected cameras (MuSCAT r/i/z
+  # shift by 1-2 % between seasons for Mrk 817; not seeing, aperture unchanged).
+  # Opt-in until understood (re-extraction with a larger MuSCAT aperture may remove it).
+  intercal_per_season: false
+  intercal_season_gap_days: 60.0     # a gap longer than this starts a new season
+  # --- shareable product ---------------------------------------------------------
+  export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv (+ copy in plots_dir): mJy and AB mag
+
+  # --- AGN error model (ava.photometry.errors; UNDER VERIFICATION) ---
+  # Always fitted and written (pytics/error_model.csv, columns mag_err_model[_rand],
+  # Ferr_model[_rand]) so it can be checked; "fitted" also uses it for the CSV and plots.
+  #   σ_rand² = (k σ_phot)² + (β rms_t)² + s0²  per filter x camera family, from same-camera
+  #   AGN pairs < error_model_max_dt_hours; σ_tot² = σ_rand² + s_cam² from different-camera
+  #   pairs < error_model_cross_dt_days.
+  error_model: "pytics"            # "pytics" (σ_phot ⊕ rms_t ⊕ rms_sc) | "fitted"
+  error_model_max_dt_hours: 1.0
+  error_model_cross_dt_days: 0.25
+  error_model_min_pairs: 150       # fewer: pooled over the filter, then PyTICS
+  error_model_min_cross_pairs: 30
+  error_model_min_error_range: 2.5 # p90/p10 of the quoted errors below which only a scale factor is fitted
+
+# ============================================================
+#  INTER-CALIBRATION  (CALI / pycali_jvhs)
+# ============================================================
+intercalibration:
+  # pycali_jvhs settings
+  mcmc_steps: 10000          # Initial chain length
+  mcmc_retry_steps: 10000    # Steps added per retry on non-convergence
+
+
+# ============================================================
+#  PIPELINE BEHAVIOUR
+# ============================================================
+pipeline:
+  # Number of parallel worker processes for batch runs.
+  n_cores: 4
+
+  # If true, re-reduce frames that already have an entry in lco_latest.pkl.
+  overwrite: false
+
+  # Verbosity.
+  verbose: true
+  log_level: "INFO"   # DEBUG | INFO | WARNING | ERROR
+
+  # Where targets come from: "database" (paths.database — the source of
+  # truth) or "yaml" (target_list below, a reference copy only).
+  target_source: "database"
+  # Optional: restrict every run to these data_ids (used by the sandbox).
+  only_targets: []
+  # Reference copy of the target list (used only with target_source: yaml).
+  target_list: "config/targets.yaml"
+
+  # Prefect orchestration (scripts/run_pipeline.py, scripts/deploy.py).
+  prefect:
+    deployment_name: "ava-daily"
+    work_pool: "ava-process"
+    schedule_cron: "30 10 * * *"  # daily 10:30 UTC, after `lcodb daily` (09:30)
+    schedule_timezone: "UTC"
+
+
+# ============================================================
+#  PLOTS  (webplot step, -p; ava.plots.webplots — port of ava_webplot.py)
+# ============================================================
+plots:
+  # Filter names, wavelengths and colours (hex) — the legacy filter_dict.txt.
+  filter_dict: "data/reference/filter_dict.txt"
+  recent_days: 60          # the "latest" plot: days before the last observation
+  rms_last_epochs: 500     # standards plot: epochs per star used for median / RMS
+  formats: ["png", "pdf"]
+
+
+# ============================================================
+#  WEBSITE
+# ============================================================
+web:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  secret_key: ""   # use env var AVA_SECRET_KEY

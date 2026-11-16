@@ -1,0 +1,6 @@
+.lc-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.cover-content { position: absolute; left: 128px; right: 128px; bottom: 148px; }
+.cover-eyebrow { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; margin-bottom: 24px; }
+.cover-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 76px; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 20px; }
+.cover-sub { font-family: 'Source Serif 4', serif; font-size: 28px; font-style: italic; opacity: 0.65; }
+.footer { position: absolute; bottom: 56px; left: 128px; right: 128px; display: flex; justify-content: space-between; align-items: center; font-family: 'Inter', sans-serif; font-size: 16px; opacity: 0.35; }
