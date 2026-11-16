@@ -1,0 +1,213 @@
+/* Sticky footer styles
+-------------------------------------------------- */
+
+html,
+body {
+height: 100%;
+/* The html and body elements cannot have any padding or margin. */
+}
+
+/* Wrapper for page content to push down footer */
+#wrap {
+    min-height: 100%;
+    height: auto !important;
+    height: 100%;
+    /* Negative indent footer by it's height */
+    margin: 0 auto -60px;
+}
+
+/* Set the fixed height of the footer here */
+#push, #footer {
+    height: 50px;
+}
+#footer {
+    background-color: #f5f5f5;
+}
+
+.header{
+   background-color: #000000;
+   background-image: url(../images/banner_2.png); 
+   background-position: 100% 100%;
+   background-repeat: no-repeat;
+}
+
+/* Lastly, apply responsive CSS fixes as necessary */
+@media (max-width: 767px) {
+    #footer {
+      margin-left: -20px;
+      margin-right: -20px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+}
+
+#chart {
+    padding: 5px  !important;
+    /*margin:5px 50px 50px 250px;*/
+    /*border: 1px solid #ccc; */
+    }
+
+#aladin-lite-div {
+    margin: 5px;
+    /*margin:5px 50px 50px 250px;*/
+}
+
+#list {
+    padding: 0px;
+    margin: 0px;
+    border: 0px;
+}
+.column-id {
+    min-width: 5px;
+}
+
+.column-name-list {
+	min-width: 85px;
+}
+
+.column-mout-list1 {
+	max-width: 30px;
+}
+
+.column-mout-list2 {
+	max-width: 5px;
+}
+
+.column-mout-list3 {
+	max-width: 35px;
+}
+
+.column-dates {
+    max-width: 150px;
+}
+
+.column-mout-list4 {
+	max-width: 45px;
+}
+
+.column-dist {
+	min-width: 90px;
+}
+
+.column-fx-list {
+	min-width: 90px;
+}
+
+.column-name {
+	min-width: 200px;
+}
+
+.column-val {
+	min-width: 75px;
+}
+
+.column-ref {
+	min-width: 220px;
+}
+
+/* Sortable tables */
+/*table.sortable thead {
+    font-weight: bold;
+    cursor: default;
+    padding: 0px;
+}*/
+
+.dataTables_filter {
+   float: left !important;
+}
+
+.dataTables_paginate{
+    float: right !important;
+}
+.dataTables_paginate{color:#FFFFFF}
+
+table.sortable thead .sorting:after,
+table.sortable thead .sorting:before,
+table.sortable thead .sorting_asc:after,
+table.sortable thead .sorting_asc:before,
+table.sortable thead .sorting_asc_disabled:after,
+table.sortable thead .sorting_asc_disabled:before,
+table.sortable thead .sorting_desc:after,
+table.sortable thead .sorting_desc:before,
+table.sortable thead .sorting_desc_disabled:after,
+table.sortable thead .sorting_desc_disabled:before{
+    font-weight: bold;
+    cursor: default;
+    padding: 0px;
+}
+
+a {
+  color: #0275d8;
+}
+
+td {
+  /*border-right: solid 1px #f00; */
+  border-left: solid 2px #f200;
+}
+
+/*@import url('//cdn.datatables.net/1.10.2/css/jquery.dataTables.css');*/
+ td.details-control {
+    background: url('../images/Plus_font_awesome.png') no-repeat center center;
+    background-size: 10px 10px;
+    cursor: pointer;
+}
+tr.shown td.details-control {
+    background: url('../images/minus_font_awesome.png') no-repeat center center;
+    background-size: 10px 10px;
+}
+
+tr.hide-table-padding td {
+  padding: 0;
+  }
+
+  .expand-button {
+    position: relative;
+  }
+
+  .accordion-toggle .expand-button:after
+  {
+    position: absolute;
+    left:.75rem;
+    top: 50%;
+    transform: translate(0, -50%);
+    content: '-';
+  }
+  .accordion-toggle.collapsed .expand-button:after
+  {
+    content: '+';
+  }
+
+.hiddenRow {
+    padding: 0 !important;
+}
+/* Style tab links */
+.tablink {
+  background-color: #555;
+  color: white;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 17px;
+  width: 25%;
+}
+
+.tablink:hover {
+  background-color: #777;
+}
+
+/* Style the tab content (and add height:100% for full page content) */
+.tabcontent {
+  color: white;
+  display: none;
+  padding: 100px 50px;
+  height: 100%;
+}
+
+.my-header h2 { 
+  display: inline;
+}
+.my-header span { 
+  float: right;
+}

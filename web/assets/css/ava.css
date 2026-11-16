@@ -1,0 +1,265 @@
+/* =========================================================================
+   AVA — AGN Variability Archive
+   Brand layer on top of Bootstrap 5.3 (dark colour mode).
+   Filter colours (--ava-f-*) are injected per page from filter_dict.txt.
+   ========================================================================= */
+
+:root,
+[data-bs-theme="dark"] {
+  /* Brand palette */
+  --ava-abyss: #0A1628;
+  --ava-ink: #1A3A5C;
+  --ava-gold: #D4A017;
+  --ava-sky: #2D6A9F;
+  --ava-aurora: #3A9E6E;
+  --ava-copper: #C85A00;
+  --ava-paper: #F7F6F2;
+
+  /* Derived tones (all from the palette above) */
+  --ava-surface: color-mix(in srgb, var(--ava-ink) 35%, var(--ava-abyss));
+  --ava-surface-2: color-mix(in srgb, var(--ava-ink) 60%, var(--ava-abyss));
+  --ava-text: color-mix(in srgb, var(--ava-paper) 92%, var(--ava-abyss));
+  --ava-muted: color-mix(in srgb, var(--ava-paper) 62%, var(--ava-abyss));
+  /* Sky at full strength fails WCAG contrast on Abyss; link text uses a Paper tint of Sky. */
+  --ava-link: color-mix(in srgb, var(--ava-sky) 55%, var(--ava-paper));
+
+  /* Bootstrap mapping */
+  --bs-body-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-body-bg: var(--ava-abyss);
+  --bs-body-color: var(--ava-text);
+  --bs-secondary-color: var(--ava-muted);
+  --bs-emphasis-color: var(--ava-paper);
+  --bs-border-color: var(--ava-ink);
+  --bs-primary: var(--ava-sky);
+  --bs-primary-rgb: 45, 106, 159;
+  --bs-success-rgb: 58, 158, 110;
+  --bs-warning-rgb: 200, 90, 0;
+  --bs-link-color: var(--ava-link);
+  --bs-link-color-rgb: 140, 175, 205;
+  --bs-link-hover-color: var(--ava-paper);
+  --bs-link-hover-color-rgb: 247, 246, 242;
+  --bs-heading-color: var(--ava-paper);
+  --bs-tertiary-bg: var(--ava-surface);
+  --bs-secondary-bg: var(--ava-surface-2);
+  --bs-focus-ring-color: color-mix(in srgb, var(--ava-gold) 45%, transparent);
+
+  --ava-radius: .75rem;
+  --ava-gutter: clamp(1rem, 3vw, 2rem);
+}
+
+html { scroll-padding-top: 5rem; }
+body { background: var(--ava-abyss); color: var(--ava-text); -webkit-font-smoothing: antialiased; }
+
+h1, h2, .h1, .h2 { font-weight: 800; letter-spacing: -.02em; }
+h3, h4, h5, h6, .h3, .h4 { font-weight: 600; letter-spacing: -.01em; }
+a { text-underline-offset: .2em; }
+a:hover { color: var(--ava-paper); }
+
+.container-xxl { padding-inline: var(--ava-gutter); }
+.skip-link { position: absolute; z-index: 2000; padding: .5rem 1rem; background: var(--ava-gold); color: var(--ava-abyss); }
+
+/* ---------- Header ----------------------------------------------------- */
+.ava-header {
+  background: color-mix(in srgb, var(--ava-abyss) 92%, transparent);
+  backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid var(--ava-ink);
+}
+.ava-header .navbar { padding-block: .6rem; }
+.ava-wordmark { display: flex; align-items: baseline; gap: .6rem; text-decoration: none; }
+.ava-wordmark__ava { font-weight: 800; font-size: 1.75rem; letter-spacing: .02em; color: var(--ava-gold); line-height: 1; }
+.ava-wordmark__sub { font-weight: 400; font-size: .85rem; color: var(--ava-muted); }
+.ava-header .nav-link { white-space: nowrap; font-weight: 600; color: var(--ava-muted); padding-inline: .9rem !important; border-radius: .5rem; }
+.ava-header .nav-link:hover { color: var(--ava-paper); background: color-mix(in srgb, var(--ava-sky) 22%, transparent); }
+.ava-header .nav-link.active { color: var(--ava-paper); box-shadow: inset 0 -2px 0 var(--ava-gold); border-radius: 0; }
+.navbar-toggler { border-color: var(--ava-ink); }
+.ava-inst-logos { display: flex; align-items: center; gap: 1.25rem; }
+.ava-inst-logos img { height: 30px; width: auto; opacity: .9; transition: opacity .15s; }
+.ava-inst-logos a:hover img { opacity: 1; }
+
+@media (max-width: 1199.98px) {
+  .ava-header .navbar-collapse { padding-block: .75rem; }
+  .ava-header .nav-link.active { box-shadow: inset 3px 0 0 var(--ava-gold); }
+  .ava-inst-logos { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--ava-ink); }
+}
+@media (max-width: 400px) { .ava-wordmark__sub { display: none; } }
+
+
+/* ---------- Sections --------------------------------------------------- */
+.ava-section { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+.ava-section + .ava-section { border-top: 1px solid var(--ava-ink); }
+.ava-section--alt { background: var(--ava-surface); }
+.ava-eyebrow { font-size: .78rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ava-gold); margin-bottom: .5rem; }
+.ava-lead { font-size: clamp(1.05rem, 1.6vw, 1.2rem); color: var(--ava-muted); max-width: 62ch; }
+.ava-prose { max-width: 72ch; }
+.ava-prose p, .ava-prose li { line-height: 1.7; }
+.ava-page-head { padding-block: clamp(2rem, 5vw, 3.5rem) 1.5rem; }
+.ava-page-head h1 { font-size: clamp(2rem, 4.5vw, 3rem); margin-bottom: .5rem; }
+
+/* ---------- Hero ------------------------------------------------------- */
+.ava-hero { padding-block: clamp(3rem, 9vw, 6.5rem) clamp(2.5rem, 6vw, 4rem); }
+.ava-hero h1 { font-size: clamp(2.4rem, 7vw, 4.75rem); line-height: 1.02; margin-bottom: 1.25rem; color: var(--ava-paper); }
+.ava-hero h1 .gold { color: var(--ava-gold); }
+.ava-hero .ava-lead { font-size: clamp(1.1rem, 2.2vw, 1.4rem); margin-bottom: 2rem; }
+
+.btn-ava { --bs-btn-font-weight: 600; --bs-btn-padding-x: 1.4rem; --bs-btn-padding-y: .75rem; --bs-btn-border-radius: .6rem; }
+.btn-ava-gold { --bs-btn-bg: var(--ava-gold); --bs-btn-border-color: var(--ava-gold); --bs-btn-color: var(--ava-abyss);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--ava-gold) 85%, var(--ava-paper)); --bs-btn-hover-border-color: var(--bs-btn-hover-bg); --bs-btn-hover-color: var(--ava-abyss);
+  --bs-btn-active-bg: var(--ava-gold); --bs-btn-active-color: var(--ava-abyss); }
+.btn-ava-outline { --bs-btn-color: var(--ava-paper); --bs-btn-border-color: var(--ava-sky);
+  --bs-btn-hover-bg: var(--ava-sky); --bs-btn-hover-border-color: var(--ava-sky); --bs-btn-hover-color: var(--ava-paper);
+  --bs-btn-active-bg: var(--ava-sky); --bs-btn-active-color: var(--ava-paper); }
+
+/* ---------- Stats strip ------------------------------------------------ */
+.ava-stats { display: grid; grid-template-columns: repeat(2, 1fr); border-block: 1px solid var(--ava-ink); background: var(--ava-surface); }
+@media (min-width: 768px) { .ava-stats { grid-template-columns: repeat(4, 1fr); } }
+.ava-stat { padding: 1.5rem var(--ava-gutter); border-right: 1px solid var(--ava-ink); }
+.ava-stat:nth-child(2n) { border-right: 0; }
+@media (max-width: 767.98px) { .ava-stat:nth-child(-n+2) { border-bottom: 1px solid var(--ava-ink); } }
+@media (min-width: 768px) { .ava-stat:nth-child(2n) { border-right: 1px solid var(--ava-ink); } .ava-stat:last-child { border-right: 0; } }
+.ava-stat__n { display: block; font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.6rem); color: var(--ava-gold); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ava-stat__l { color: var(--ava-muted); font-size: .9rem; }
+
+/* ---------- Feature tiles --------------------------------------------- */
+.ava-tile { height: 100%; padding: 1.5rem; border: 1px solid var(--ava-ink); border-radius: var(--ava-radius); background: var(--ava-surface); }
+.ava-tile h3 { font-size: 1.1rem; margin-bottom: .5rem; }
+.ava-tile p { color: var(--ava-muted); margin: 0; }
+.ava-tile__k { display: inline-block; font-weight: 800; color: var(--ava-gold); margin-bottom: .75rem; }
+
+/* ---------- Target cards ---------------------------------------------- */
+.ava-grid { display: grid; gap: clamp(.75rem, 2vw, 1.25rem); grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+@media (min-width: 1800px) { .ava-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+.ava-card { border: 1px solid var(--ava-ink); border-radius: var(--ava-radius); background: var(--ava-surface); overflow: hidden; transition: border-color .15s, transform .15s; }
+.ava-card:hover, .ava-card:focus-within { border-color: var(--ava-sky); transform: translateY(-2px); }
+.ava-card[hidden] { display: none; }
+.ava-card__link { display: block; color: inherit; text-decoration: none; }
+.ava-card__link:hover { color: inherit; }
+.ava-card__img { position: relative; aspect-ratio: 1; background: #000; }
+.ava-card__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ava-card__noimg { width: 100%; height: 100%; display: grid; place-items: center; text-align: center; padding: 1rem;
+  background: radial-gradient(circle at 50% 50%, var(--ava-ink), var(--ava-abyss) 70%); color: var(--ava-muted); font-weight: 600; }
+.ava-card__body { padding: .9rem 1rem 1rem; }
+.ava-card__title { font-size: 1.05rem; font-weight: 600; margin: 0 0 .5rem; color: var(--ava-paper); }
+.ava-card__meta { display: flex; gap: 1rem; margin: 0 0 .65rem; font-size: .82rem; }
+.ava-card__meta dt { font-weight: 400; color: var(--ava-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.ava-card__meta dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.ava-badge { position: absolute; top: .6rem; left: .6rem; font-size: .72rem; font-weight: 600; padding: .25rem .55rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--ava-abyss) 75%, transparent); border: 1px solid currentColor; backdrop-filter: blur(4px); }
+.ava-badge::before { content: ""; display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; margin-right: .35rem; vertical-align: .05em; }
+.ava-badge--active { color: var(--ava-aurora); }
+.ava-badge--archive { color: var(--ava-muted); }
+.ava-badge.static { position: static; }
+
+.ava-filters { display: flex; flex-wrap: wrap; gap: .3rem; list-style: none; padding: 0; margin: 0; }
+.ava-filters li { font-size: .72rem; font-weight: 600; min-width: 1.6rem; text-align: center; padding: .1rem .35rem; border-radius: .3rem;
+  color: var(--ava-paper); background: color-mix(in srgb, var(--c) 30%, transparent); border: 1px solid color-mix(in srgb, var(--c) 70%, transparent); }
+
+/* ---------- Toolbar (search/filter) ----------------------------------- */
+.ava-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1.5rem; }
+.ava-toolbar .form-control, .ava-toolbar .form-select { background-color: var(--ava-surface); border-color: var(--ava-ink); color: var(--ava-text); }
+.ava-toolbar .form-control:focus, .ava-toolbar .form-select:focus { border-color: var(--ava-gold); }
+.ava-toolbar .ava-search { flex: 1 1 240px; max-width: 420px; }
+.ava-toolbar .btn-group .btn { --bs-btn-color: var(--ava-muted); --bs-btn-border-color: var(--ava-ink); --bs-btn-hover-bg: var(--ava-surface-2); --bs-btn-hover-color: var(--ava-paper);
+  --bs-btn-active-bg: var(--ava-ink); --bs-btn-active-color: var(--ava-paper); --bs-btn-active-border-color: var(--ava-sky); }
+.ava-count { color: var(--ava-muted); font-size: .9rem; margin-left: auto; }
+
+/* ---------- Tables ----------------------------------------------------- */
+.ava-table-wrap { border: 1px solid var(--ava-ink); border-radius: var(--ava-radius); overflow: auto; max-height: 75vh; }
+.ava-table { --bs-table-bg: transparent; --bs-table-border-color: var(--ava-ink); --bs-table-hover-bg: var(--ava-surface-2);
+  margin: 0; font-size: .9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ava-table thead th { position: sticky; top: 0; z-index: 1; background: var(--ava-surface); color: var(--ava-paper); font-weight: 600; border-bottom: 2px solid var(--ava-ink); }
+.ava-table th[data-sort] { cursor: pointer; user-select: none; }
+.ava-table th[data-sort]::after { content: "↕"; opacity: .35; margin-left: .35rem; font-size: .8em; }
+.ava-table th[aria-sort="ascending"]::after { content: "↑"; opacity: 1; color: var(--ava-gold); }
+.ava-table th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--ava-gold); }
+.ava-table td.num, .ava-table th.num { text-align: right; }
+.ava-table tbody th { font-weight: 600; }
+
+/* ---------- Target page ------------------------------------------------ */
+.ava-target-img { border-radius: var(--ava-radius); border: 1px solid var(--ava-ink); width: 100%; height: auto; background: #000; }
+.ava-props { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); background: var(--ava-surface);
+  border: 1px solid var(--ava-ink); border-radius: var(--ava-radius); overflow: hidden; margin: 0; }
+.ava-props > div { padding: .8rem 1rem; box-shadow: 1px 0 0 var(--ava-ink), 0 1px 0 var(--ava-ink); }
+.ava-target-img.ava-card__noimg { background: radial-gradient(circle at 50% 50%, var(--ava-ink), var(--ava-abyss) 70%); }
+.ava-props dt { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ava-muted); }
+.ava-props dd { margin: .15rem 0 0; font-size: 1.05rem; font-variant-numeric: tabular-nums; color: var(--ava-paper); }
+.ava-bars { list-style: none; padding: 0; margin: 0; display: grid; gap: .45rem; }
+.ava-bars li { display: grid; grid-template-columns: 1.6rem 1fr 4.5rem; gap: .6rem; align-items: center; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.ava-bars .bar { height: .7rem; border-radius: 999px; background: var(--ava-surface-2); overflow: hidden; }
+.ava-bars .bar span { display: block; height: 100%; background: var(--c); border-radius: inherit; }
+.ava-bars .n { text-align: right; color: var(--ava-muted); }
+
+/* ---------- Publications / team --------------------------------------- */
+.ava-pubs { list-style: none; padding: 0; margin: 0; }
+.ava-pubs li { padding: 1rem 0; border-bottom: 1px solid var(--ava-ink); }
+.ava-pubs .title { font-weight: 600; color: var(--ava-paper); }
+.ava-pubs .ref { color: var(--ava-muted); font-size: .9rem; }
+.ava-year { font-weight: 800; color: var(--ava-gold); font-size: 1.25rem; margin: 2rem 0 0; }
+.ava-team { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .5rem 1.5rem; list-style: none; padding: 0; }
+.ava-team li { padding: .4rem 0; border-bottom: 1px solid var(--ava-ink); }
+.ava-pi { padding: 1.5rem; border: 1px solid var(--ava-gold); border-radius: var(--ava-radius); background: var(--ava-surface); }
+
+.ava-callout { padding: 1rem 1.25rem; border-left: 3px solid var(--ava-copper); background: color-mix(in srgb, var(--ava-copper) 10%, var(--ava-abyss)); border-radius: 0 .5rem .5rem 0; }
+.ava-callout--info { border-color: var(--ava-sky); background: color-mix(in srgb, var(--ava-sky) 12%, var(--ava-abyss)); }
+.ava-cite { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; white-space: pre-wrap; padding: 1rem; background: var(--ava-surface);
+  border: 1px solid var(--ava-ink); border-radius: .5rem; color: var(--ava-text); }
+pre.ava-code { font-size: .82rem; padding: 1rem; background: var(--ava-surface); border: 1px solid var(--ava-ink); border-radius: .5rem; color: var(--ava-text); }
+
+.form-control, .form-select { background-color: var(--ava-surface); border-color: var(--ava-ink); }
+.form-control:focus { border-color: var(--ava-gold); background-color: var(--ava-surface); }
+
+/* ---------- Footer ----------------------------------------------------- */
+.ava-footer { margin-top: 0; padding-block: 3rem 1.5rem; border-top: 1px solid var(--ava-ink); background: color-mix(in srgb, var(--ava-abyss) 80%, black); color: var(--ava-muted); }
+.ava-footer a { color: var(--ava-muted); text-decoration: none; }
+.ava-footer a:hover { color: var(--ava-paper); }
+.ava-footer__h { font-size: .78rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ava-paper); margin-bottom: .75rem; }
+.ava-wordmark--footer .ava-wordmark__ava { font-size: 1.4rem; }
+.ava-footer__base { display: flex; flex-wrap: wrap; gap: .5rem 2rem; justify-content: space-between; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--ava-ink); font-size: .82rem; }
+
+@media (prefers-reduced-motion: reduce) { .ava-card { transition: none; } .ava-card:hover { transform: none; } }
+
+/* ---------- Target page (classic information layout) ----------------- */
+.ava-target { padding-block: 1.5rem 3rem; }
+.ava-target__head { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; justify-content: space-between;
+  padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--ava-ink); }
+.ava-target__head h1 { font-size: clamp(1.7rem, 3.5vw, 2.4rem); display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.ava-links { display: flex; flex-wrap: wrap; gap: .25rem 1.1rem; font-weight: 600; font-size: .92rem; }
+.ava-h { font-size: 1.05rem; font-weight: 600; color: var(--ava-paper); margin: 1.5rem 0 .5rem;
+  padding-left: .6rem; border-left: 3px solid var(--ava-gold); }
+.ava-info { --bs-table-bg: transparent; --bs-table-border-color: var(--ava-ink); font-size: .9rem;
+  font-variant-numeric: tabular-nums; margin-bottom: .5rem; }
+.ava-info > :not(caption) > * > * { padding: .4rem .6rem; }
+.ava-info thead th { color: var(--ava-muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.ava-info tbody th { font-weight: 600; color: var(--ava-paper); white-space: nowrap; }
+.ava-info .num { text-align: right; }
+.ava-info .ref { text-align: right; font-size: .85rem; }
+.ava-info .mjd { display: block; font-size: .75rem; color: var(--ava-muted); }
+.ava-coords td { font-size: 1rem; color: var(--ava-paper); }
+.ava-breakdown th[style] { color: var(--ava-paper); }
+.ava-breakdown .fdot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--c); margin-right: .35rem; }
+.ava-cites { padding-left: 1.1rem; margin-bottom: .25rem; }
+
+.ava-plots { position: sticky; top: 5rem; }
+.ava-tabs { gap: .25rem; margin-bottom: .75rem; flex-wrap: wrap; }
+.nav-tabs.ava-tabs { --bs-nav-tabs-border-color: var(--ava-ink); --bs-nav-tabs-link-active-bg: var(--ava-surface);
+  --bs-nav-tabs-link-active-color: var(--ava-paper); --bs-nav-tabs-link-active-border-color: var(--ava-ink) var(--ava-ink) var(--ava-surface);
+  --bs-nav-link-color: var(--ava-muted); --bs-nav-link-hover-color: var(--ava-paper); font-weight: 600; }
+.nav-tabs.ava-tabs .nav-link.active { box-shadow: inset 0 2px 0 var(--ava-gold); }
+.nav-pills.ava-tabs { --bs-nav-pills-link-active-bg: var(--ava-ink); --bs-nav-pills-link-active-color: var(--ava-paper);
+  --bs-nav-link-color: var(--ava-muted); --bs-nav-link-hover-color: var(--ava-paper); --bs-nav-link-padding-y: .3rem; --bs-nav-link-padding-x: .75rem; font-size: .85rem; font-weight: 600; }
+.ava-plot { display: block; background: #fff; border-radius: .5rem; overflow: hidden; border: 1px solid var(--ava-ink); margin-bottom: .5rem; }
+.ava-plot img { display: block; width: 100%; height: auto; }
+.ava-noplots { padding: 2rem; text-align: center; color: var(--ava-muted); border: 1px dashed var(--ava-ink); border-radius: var(--ava-radius); }
+@media (max-width: 1199.98px) { .ava-plots { position: static; } }
+
+/* ---------- Targets: card / classic view toggle ----------------------- */
+html:not([data-view="classic"]) .ava-view-classic,
+html[data-view="classic"] .ava-view-modern { display: none !important; }
+.ava-classic tbody tr[hidden] { display: none; }
+.ava-classic td.filters { letter-spacing: .08em; font-weight: 600; }
+.ava-legend { color: var(--ava-muted); }
+.st-observing { color: var(--ava-aurora); font-weight: 600; }
+.st-archived { color: var(--ava-link); font-weight: 600; }
+.st-pending { color: var(--ava-copper); font-weight: 600; }
+.st-tba { color: var(--ava-muted); }
+.ava-usage img { max-height: 560px; width: auto; max-width: 100%; margin-inline: auto; }
