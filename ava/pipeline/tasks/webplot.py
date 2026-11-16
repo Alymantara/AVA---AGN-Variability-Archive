@@ -78,17 +78,21 @@ def spectroscopy_epochs(target: str) -> tuple[list[float], float | None]:
 
 @task(name="webplot", tags=["web"])
 def webplot(target: str) -> dict:
-    """Draw the website figures for ``target``."""
+    """Draw the website figures for ``target`` (skipped, not failed, when it has no photometry yet)."""
     from ava.photometry import store
     from ava.pipeline.tasks.calibrate import frame_db_path
     from ava.plots import webplots as wp
 
     logger = get_run_logger()
+    phot = cfg.phot_dir(target)
+    if not (phot / "agn_lightcurve.parquet").exists():      # e.g. a spectroscopy-only target
+        logger.info("%s: no photometry (%s missing); no light-curve plots", target, phot / "agn_lightcurve.parquet")
+        return {"target": target, "plots": [], "skipped": "no photometry"}
     pc = cfg.plots
     fd = wp.load_filter_dict(cfg._resolve(pc.filter_dict))
     out_dir = cfg.target_plots_dir(target)
     out_dir.mkdir(parents=True, exist_ok=True)
-    phot, db = cfg.phot_dir(target), frame_db_path()
+    db = frame_db_path()
     lc = pd.read_parquet(phot / "agn_lightcurve.parquet")
     fq = store.read_frame_qc(db, target)
     formats = list(pc.formats)

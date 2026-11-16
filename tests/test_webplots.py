@@ -64,3 +64,30 @@ def test_plot_lightcurves_options(tmp_path, kw):
     assert len(red) == 2
     # calendar axis on top of the first panel
     assert any(type(c).__name__ == "SecondaryAxis" for c in first.child_axes)
+
+
+def test_plots_from_parallel_threads(tmp_path):
+    """The pipeline draws targets in a thread pool: concurrent figures (with mathtext labels) must all succeed,
+    and one figure's style changes must not leak out (``wp.serialized``)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    import matplotlib.pyplot as plt
+
+    fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
+    size = plt.rcParams["font.size"]
+    with ThreadPoolExecutor(6) as ex:
+        outs = list(ex.map(lambda i: wp.plot_lightcurves(_lc(), fd, tmp_path / f"lc{i}", formats=["png"]), range(12)))
+    assert all(Path(o[0]).exists() for o in outs)
+    assert plt.rcParams["font.size"] == size
+
+
+def test_webplot_skips_target_without_photometry(tmp_path, monkeypatch):
+    """A spectroscopy-only target (no agn_lightcurve.parquet) is skipped, not failed."""
+    import importlib
+    import logging
+
+    task_mod = importlib.import_module("ava.pipeline.tasks.webplot")     # the package re-exports the task by name
+    monkeypatch.setattr(task_mod.cfg, "phot_dir", lambda t: tmp_path / t)
+    monkeypatch.setattr(task_mod, "get_run_logger", lambda: logging.getLogger("test"))
+    out = task_mod.webplot.fn("spec_only")
+    assert out == {"target": "spec_only", "plots": [], "skipped": "no photometry"}

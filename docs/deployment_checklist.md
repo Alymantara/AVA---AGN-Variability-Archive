@@ -72,6 +72,8 @@ Code defaults are only fallbacks that equal the documented config values.
 - **Fix:** every website plot function is wrapped by `ava.plots.webplots.serialized`. It holds one lock per figure,
   inside `plt.rc_context()`, on the Agg backend.
 - **Verified:** three parallel `-P` runs and a `-p -P` run are clean; `line_variability` is unchanged.
+- **Spectra-only targets:** `-p` (`webplot`) failed with `FileNotFoundError` when a target had no
+  `agn_lightcurve.parquet` (Fairall 9 and NGC 4151 in the test archive). It now logs the skip and returns no plots.
 
 ## Must be set per host (values, not code)
 
@@ -104,9 +106,6 @@ Code defaults are only fallbacks that equal the documented config values.
   `en05/en06/en12`. `db.CAMERA_TYPES` duplicates the instrument list.
 
 ### Robustness and performance
-
-- **Spectra-only targets:** `-p` (`webplot`) fails with `FileNotFoundError` when a target has no
-  `agn_lightcurve.parquet` (Fairall 9 and NGC 4151 in the test archive). It should skip them.
 
 - **API client:** `max_wait_s` 900, backoff `min(300, 3·2^n)` and Retry-After 60. The download client's timeout,
   retries and max wait have no config keys. `fetch` has a 600 s timeout.
