@@ -1,16 +1,16 @@
 """
-AVA Logo Generator — Fairall 9 multi-wavelength daisy-chain light curve.
+AVA Logo Generator — replays the extracted datapoints from the original banner.
 
-Design (matching the original AVA banner):
-  - All filters observe the SAME ~30-day epoch so variability is correlated
-  - Each filter is normalised independently to the same vertical range
-    so amplitude looks consistent but the SHAPE is the real light curve
-  - Filters plotted sequentially in wavelength order UV→NIR
-  - Each filter used exactly once; blocks sized by n_pts for uniform density
+The file banner_datapoints.csv was produced by scanning the original
+banner.png pixel-by-pixel and recording the centroid y-position and
+mean colour of each foreground column.  This module replays those
+coordinates at any target width × height, using the original colours
+(or optionally overriding with filter_dict colours for a dark background).
 
 Usage:
     from make_ava_logo import make_logo
     img = make_logo(width=2400, height=200, bg=(10,22,40))
+    img.save("ava_logo.png")
 """
 
 from pathlib import Path
@@ -18,17 +18,17 @@ from PIL import Image, ImageDraw
 import numpy as np
 import pandas as pd
 
-F9_CSV = Path("/mnt/user-data/uploads/AVA/docs/figures/F9_all_aper_v1.csv")
-FDICT  = Path("/mnt/user-data/uploads/AVA/data/reference/filter_dict.txt")
+# Extracted datapoints from the original banner
+DATAPOINTS = Path("/mnt/user-data/uploads/AVA/data/reference/banner_datapoints.csv")
+FDICT      = Path("/mnt/user-data/uploads/AVA/data/reference/filter_dict.txt")
 
-CSV_TO_FD = {
-    'W2': 'UVW2', 'M2': 'UVM2', 'W1': 'UVW1',
-    'US': 'Us',   'BS': 'Bs',   'VS': 'Vs',
-    'BL': 'B',    'VL': 'V',
-    'uL': 'u',    'gL': 'g',    'rL': 'r',    'iL': 'i',    'zL': 'z',
+# Map extracted filter names → filter_dict names for colour override on dark bg
+FILTER_TO_FD = {
+    'W2':   'UVW2', 'M2':   'UVM2', 'UVM2': 'UVM2', 'UVW1': 'UVW1',
+    'US':   'Us',   'BS':   'Bs',   'u':    'u',
+    'B':    'B',    'V':    'V',    'g':    'g',
+    'r':    'r',    'i':    'i',    'z':    'z',
 }
-
-FILTER_ORDER = ['W2', 'M2', 'W1', 'US', 'BS', 'BL', 'uL', 'VS', 'gL', 'VL', 'rL', 'iL', 'zL']
 
 def _hex_to_rgb(h):
     h = h.lstrip('#')
@@ -45,7 +45,7 @@ def _named_to_rgb(name):
     }
     return named.get(name.lower(), (200, 200, 200))
 
-def load_filter_colours():
+def _load_filter_colours():
     fd = pd.read_csv(FDICT)
     out = {}
     for _, row in fd.iterrows():
@@ -53,155 +53,76 @@ def load_filter_colours():
         out[row['Filter']] = _hex_to_rgb(c) if c.startswith('#') else _named_to_rgb(c)
     return out
 
-def _find_best_epoch(f9, present, window=30, min_pts_per_filter=15):
-    """Find the epoch where ALL filters have good coverage and variability."""
-    mjd_min = f9['MJD'].min()
-    mjd_max = f9['MJD'].max()
-    best_score, best_start = -1, mjd_min
-    for s in np.linspace(mjd_min, mjd_max - window, 100):
-        score = 0
-        all_ok = True
-        for filt in present:
-            sub = f9[f9['Filter'] == filt]
-            win = sub[(sub['MJD'] >= s) & (sub['MJD'] < s + window)]
-            if len(win) < min_pts_per_filter:
-                all_ok = False
-                break
-            amp = win['Flux'].max() - win['Flux'].min()
-            score += len(win) * amp / win['Flux'].mean()
-        if all_ok and score > best_score:
-            best_score = score
-            best_start = s
-    return best_start
-
 def make_logo(
-    width:         int   = 2400,
-    height:        int   = 220,
-    bg:            tuple = (10, 22, 40),
-    margin_x_frac: float = 0.008,
-    margin_y_frac: float = 0.10,
-    epoch_start:   float = None,   # MJD start; None = auto-detect best epoch
-    window_days:   float = 30.0,
-    amp_frac:      float = 0.72,   # fraction of plot height for peak-to-trough
+    width:          int   = 2400,
+    height:         int   = 220,
+    bg:             tuple = (10, 22, 40),
+    margin_x_frac:  float = 0.005,
+    margin_y_frac:  float = 0.05,
+    use_dict_colors: bool = True,   # True = use filter_dict colours (good on dark bg)
+                                    # False = use original bitmap colours (good on white)
 ) -> Image.Image:
     """
-    AVA daisy-chain logo using a single shared epoch for all filters.
+    Replay the original AVA banner at any size.
 
-    All filters show the same ~30-day window, normalised per-filter to
-    the same vertical amplitude. The curve shape is the REAL correlated
-    AGN variability, so it gently undulates rather than oscillating wildly.
-    Filters are stitched end-to-end: each segment is shifted vertically
-    so its first point continues from the last point of the previous filter.
+    The extracted datapoints (x_norm, y_norm) are scaled to the target
+    width × height.  Colours come from filter_dict.txt so they render
+    correctly on a dark background (the original was white-background).
+
+    Parameters
+    ----------
+    width, height : output dimensions in pixels
+    bg            : RGB background colour
+    use_dict_colors: if True, use filter_dict brand colours; if False,
+                    use the original RGB values from the bitmap
     """
-    f9      = pd.read_csv(F9_CSV)
-    colours = load_filter_colours()
+    df = pd.read_csv(DATAPOINTS)
 
-    def filt_col(csv_name):
-        return colours.get(CSV_TO_FD.get(csv_name, csv_name), (200, 200, 200))
-
-    present = [f for f in FILTER_ORDER if f in f9['Filter'].values]
+    if use_dict_colors:
+        fd_cols = _load_filter_colours()
+        def get_col(row):
+            fd_name = FILTER_TO_FD.get(row['filter'], row['filter'])
+            return fd_cols.get(fd_name, (200, 200, 200))
+    else:
+        def get_col(row):
+            return (int(row.r), int(row.g), int(row.b))
 
     mx = int(width  * margin_x_frac)
     my = int(height * margin_y_frac)
     plot_w = width  - 2 * mx
     plot_h = height - 2 * my
-    amp    = plot_h * amp_frac
-    centre = my + plot_h // 2
 
-    # --- Find shared epoch ---
-    if epoch_start is None:
-        epoch_start = None   # use full campaign
-
-    # --- Extract each filter's data: full campaign or specified epoch ---
-    excerpts = {}
-    for filt in present:
-        sub = f9[f9['Filter'] == filt].sort_values('MJD')
-        if epoch_start is not None:
-            win = sub[(sub['MJD'] >= epoch_start) & (sub['MJD'] < epoch_start + window_days)]
-            if len(win) < 5:
-                idx = (sub['MJD'] - epoch_start).abs().argsort()[:20]
-                win = sub.iloc[sorted(idx)].copy()
-        else:
-            win = sub   # full campaign
-        excerpts[filt] = win.reset_index(drop=True)
-
-    # --- Normalise each filter to [-0.5, +0.5] using its own range ---
-    # This makes all filters have the same visual amplitude while preserving
-    # the real variability shape (correlated across bands since same epoch)
-    normed = {}
-    for filt in present:
-        flux = excerpts[filt]['Flux'].values.astype(float)
-        err  = excerpts[filt]['Error'].values.astype(float)
-        lo   = np.percentile(flux, 5)
-        hi   = np.percentile(flux, 95)
-        rng  = hi - lo if hi > lo else flux.std() * 2 or 1.0
-        mid  = (lo + hi) / 2.0
-        normed[filt] = {
-            'n':   (flux - mid) / rng,    # in [-0.5, 0.5]
-            'e':    err / rng,
-        }
-
-    # --- Allocate x-pixels proportional to n_pts for uniform dot density ---
-    n_pts   = {f: len(excerpts[f]) for f in present}
-    total_n = sum(n_pts.values())
-    block_w = {f: max(4, int(plot_w * n_pts[f] / total_n)) for f in present}
-    used = sum(block_w.values())
-    block_w[present[-1]] += (plot_w - used)
-
-    # --- Build pixel coordinates, no stitching needed ---
-    # All filters use the same epoch so shapes are correlated; each is
-    # independently centred at plot midline. Gaps at joins are closed by
-    # extending each block by one dot-radius into the next.
-    filter_coords = {}
-    x_cursor = mx
-
-    for fi, filt in enumerate(present):
-        norm  = normed[filt]['n']
-        err_n = normed[filt]['e']
-        n     = len(norm)
-        bw    = block_w[filt]
-
-        spacing = bw / max(1, n - 1)
-        r_est   = max(2, min(int(spacing * 1.1), int(height * 0.13)))
-        extend  = r_est if fi < len(present) - 1 else 0
-
-        coords = []
-        for i in range(n):
-            px = int(x_cursor + i / max(1, n - 1) * (bw - 1 + extend))
-            py = int(centre - norm[i] * amp)
-            py = max(my + 2, min(my + plot_h - 2, py))
-            ep = max(0, min(int(err_n[i] * amp), int(amp * 0.15)))
-            coords.append((px, py, ep))
-
-        filter_coords[filt] = coords
-        x_cursor += bw
-
-    # --- Render ---
     img  = Image.new("RGB", (width, height), bg)
     draw = ImageDraw.Draw(img, "RGBA")
 
-    for fi, filt in enumerate(present):
-        col    = filt_col(filt)
-        coords = filter_coords[filt]
-        n      = len(coords)
-        bw     = block_w[filt]
-        col_a  = col + (235,)
+    # Dot radius: scale so it matches the original visual density
+    # Original: ~1203 points across 1322px → ~1pt spacing → r≈2px
+    # At target width: scale proportionally but keep minimum legible
+    orig_density = 1203 / 1322   # pts per pixel in original
+    target_spacing = 1.0 / orig_density * (plot_w / 1322) * (1322 / 1203)
+    r = max(2, min(int(target_spacing * 0.9 * (width / 1322)), int(height * 0.09)))
 
-        spacing = bw / max(1, n - 1)
-        r = max(2, min(int(spacing * 1.1), int(height * 0.13)))
+    # Group by filter for colour consistency, draw in wavelength order
+    filter_order = ['W2', 'M2', 'UVM2', 'UVW1', 'u', 'B', 'V', 'g', 'r', 'i', 'z']
+    # Adjust r per filter: leftmost (W2) have sparser points → slightly larger dots
+    for filt in filter_order:
+        sub = df[df['filter'] == filt].copy()
+        if len(sub) == 0:
+            continue
+        col   = get_col(sub.iloc[0])
+        col_a = col + (230,)
+        # Per-filter radius: inverse of local density
+        # Radius scales with output height.
+        # Original banner: 174px tall, dots ~4-5px radius → r ≈ height/38
+        # Scale up slightly for dark-bg visibility.
+        r_filt = max(3, int(height / 28))
 
-        # Error bars
-        for (px, py, ep) in coords:
-            if ep > 1:
-                lw  = max(1, r // 2)
-                cap = max(1, r // 2)
-                draw.line([(px, py-ep), (px, py+ep)], fill=col_a, width=lw)
-                draw.line([(px-cap, py-ep), (px+cap, py-ep)], fill=col_a, width=1)
-                draw.line([(px-cap, py+ep), (px+cap, py+ep)], fill=col_a, width=1)
-
-        # Dots
-        for (px, py, _) in coords:
-            draw.ellipse([px-r, py-r, px+r, py+r], fill=col_a)
+        for _, row in sub.iterrows():
+            px = int(mx + row.x_norm * plot_w)
+            py = int(my + (1.0 - row.y_norm) * plot_h)
+            px = max(mx, min(mx + plot_w - 1, px))
+            py = max(my, min(my + plot_h - 1, py))
+            draw.ellipse([px-r_filt, py-r_filt, px+r_filt, py+r_filt], fill=col_a)
 
     return img
 
@@ -212,7 +133,8 @@ if __name__ == "__main__":
     img.save(out)
     print(f"Saved {out}  {img.size}  ({out.stat().st_size//1024} KB)")
 
-    out_wide = Path("/home/claude/ava_logo_wide.png")
-    img_w = make_logo(width=4000, height=300, bg=(10, 22, 40))
-    img_w.save(out_wide)
-    print(f"Saved {out_wide}  {img_w.size}  ({out_wide.stat().st_size//1024} KB)")
+    # Also render on white to compare with original
+    out_white = Path("/home/claude/ava_logo_white.png")
+    img_w = make_logo(width=2400, height=220, bg=(255,255,255), use_dict_colors=False)
+    img_w.save(out_white)
+    print(f"Saved {out_white}  {img_w.size}  ({out_white.stat().st_size//1024} KB)")

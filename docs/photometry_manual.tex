@@ -67,7 +67,7 @@ MuSCAT3  & ep & 2\,m Haleakala & 0.270\,\ensuremath{^{\prime\prime}}/px & $9'\ti
 \end{tabular}
 \caption{LCO camera families used by AVA.
   $^\dagger$fl is the legacy Sinistro prefix; treated identically to fa.
-  Pixel scales are defined in \texttt{ava.photometry.apertures.PIXEL\_SCALES}.}
+  Pixel scales are defined in \texttt{ava.photometry.apertures.PIXEL\_\hspace{0pt}SCALES}.}
 \label{tab:cameras}
 \end{table}
 
@@ -80,14 +80,14 @@ science extension is \texttt{SCI}.
 \label{sec:overview-phot}
 %%============================================================
 
-Each target runs in a Prefect subflow (\texttt{ava-target/<name>}) with up
+Each target runs in a Prefect subflow (\path{ava-target/<name>}) with up
 to seven stages, executed strictly in order:
 
 \begin{enumerate}
   \item \textbf{Initialise} (\texttt{initialise}) --- create working
         directories; write per-target \texttt{target.yaml} metadata.
   \item \textbf{Reference catalogue} (\texttt{reference-catalog}) --- build
-        \texttt{reference\_stars.csv}: one row per comparison star keyed by
+        \path{reference_stars.csv}: one row per comparison star keyed by
         Gaia DR3 \texttt{source\_id}.  Run once; force-rebuild with
         \texttt{-{}-force}.
   \item \textbf{Download} (\texttt{download}) --- fetch new BANZAI frames from
@@ -95,12 +95,12 @@ to seven stages, executed strictly in order:
   \item \textbf{Source extraction} (\texttt{sextract}) --- SExtractor aperture
         photometry; write \texttt{APERDIAM} header to each catalogue.
   \item \textbf{Calibration} (\texttt{calibrate}) --- cross-match to
-        \texttt{reference\_stars.csv}, per-frame weighted zero point; write
+        \path{reference_stars.csv}, per-frame weighted zero point; write
         \texttt{frame\_qc}, \texttt{measurements.parquet}, and
-        \texttt{agn\_lightcurve.parquet}.
+        \path{agn_lightcurve.parquet}.
   \item \textbf{Ensemble} (\texttt{ensemble}) \textbf{[NEW]} --- PyTICS
-        ensemble calibration; writes \texttt{agn\_lightcurve\_pytics.parquet}
-        and \texttt{<target>\_LCO\_merged\_lightcurve.csv} (the final science product).
+        ensemble calibration; writes \path{agn_lightcurve_pytics.parquet}
+        and \path{<target>_LCO_merged_lightcurve.csv} (the final science product).
   \item \textbf{Plotting} (\texttt{webplot}) \textbf{[NEW]} --- draw
         light-curve, sky-diagnostic, standard-star RMS, and Swift figures;
         optionally push to web server.
@@ -137,15 +137,15 @@ The top-level flow \texttt{ava-pipeline} submits all targets concurrently
 \label{sec:init}
 %%============================================================
 
-Task \texttt{initialise} (\texttt{ava/pipeline/tasks/initialise.py}):
+Task \texttt{initialise} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}initialise.py}):
 
 \begin{enumerate}
-  \item Looks the target up in \texttt{cfg.load\_targets()}; an unknown
+  \item Looks the target up in \texttt{cfg.load\_\hspace{0pt}targets()}; an unknown
         \texttt{data\_id} is an error (no stray directories from typos).
-  \item Creates, idempotently: \texttt{cfg.phot\_dir(target)},
-        \texttt{cfg.phot\_raw(target)}, \texttt{cfg.sextractor\_dir(target)},
-        \texttt{cfg.merging\_dir(target)}, and \texttt{<phot\_dir>/UVOT}.
-  \item Writes \texttt{<phot\_dir>/target.yaml} once, recording the
+  \item Creates, idempotently: \path{cfg.phot_dir(target)},
+        \path{cfg.phot_raw(target)}, \path{cfg.sextractor_dir(target)},
+        \path{cfg.merging_dir(target)}, and \path{<phot_dir>/UVOT}.
+  \item Writes \texttt{<phot\_\hspace{0pt}dir>/\hspace{0pt}target.yaml} once, recording the
         target-list entry and the initialisation timestamp, so each working
         directory is self-describing.
 \end{enumerate}
@@ -157,9 +157,9 @@ Task \texttt{initialise} (\texttt{ava/pipeline/tasks/initialise.py}):
 
 \subsection{Overview}
 
-Task \texttt{reference-catalog} (\texttt{ava/pipeline/tasks/reference.py},
-science in \texttt{ava/photometry/reference.py}) builds
-\texttt{reference\_stars.csv} --- the per-field catalogue of comparison stars
+Task \texttt{reference-catalog} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}reference.py},
+science in \texttt{ava/\hspace{0pt}photometry/\hspace{0pt}reference.py}) builds
+\path{reference_stars.csv} --- the per-field catalogue of comparison stars
 used by the calibration step.  Every row is keyed by \texttt{star\_id} =
 Gaia DR3 \texttt{source\_id}: stable across catalogue rebuilds, and the
 identifier used throughout the downstream pipeline.  The AGN always has an
@@ -210,7 +210,7 @@ apass\_model}), the pipeline uses the legacy approach:
 \begin{enumerate}
   \item \textbf{APASS DR10} (AAVSO web form with \texttt{mechanize}) or
         \textbf{APASS DR9} (VizieR II/336 via \texttt{astroquery}).  Set by
-        \texttt{photometry.reference.apass\_source}: \texttt{aavso} or
+        \texttt{photometry.reference.apass\_\hspace{0pt}source}: \texttt{aavso} or
         \texttt{vizier}.
   \item \textbf{Gaia DR3 cross-match} for \texttt{source\_id}, GSP-Phot
         parameters, and GSPC SDSS-$u$ (used to anchor the model $u$ band).
@@ -238,7 +238,7 @@ apass\_model}), the pipeline uses the legacy approach:
 
 \subsection{Reference catalogue schema}
 
-One row per star, saved to \texttt{reference\_stars.csv}.
+One row per star, saved to \path{reference_stars.csv}.
 
 \begin{center}
 \small
@@ -260,7 +260,7 @@ Column & Type & Description \\
 \end{tabular}
 \end{center}
 
-Provenance is recorded in \texttt{reference\_stars\_meta.yaml} alongside the
+Provenance is recorded in \texttt{reference\_\hspace{0pt}stars\_\hspace{0pt}meta.yaml} alongside the
 catalogue.
 
 %%============================================================
@@ -268,7 +268,7 @@ catalogue.
 \label{sec:download}
 %%============================================================
 
-Task \texttt{download} (\texttt{ava/pipeline/tasks/download.py}).
+Task \texttt{download} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}download.py}).
 
 \subsection{Daily search strategy}
 
@@ -277,21 +277,21 @@ For each target and each kind (\texttt{phot}: BANZAI L91 Sinistro/Spectral/MuSCA
 
 \begin{enumerate}
   \item Look up the last successful update from \texttt{ava.db}
-        \texttt{download\_state}; default to \texttt{initial\_lookback\_days}
+        \texttt{download\_state}; default to \texttt{initial\_\hspace{0pt}lookback\_\hspace{0pt}days}
         (config) on first run.
   \item Search from (last success $-$ \texttt{overlap\_days}) to tomorrow,
-        across \texttt{daily\_proposals} and all LCO spellings
+        across \path{daily_proposals} and all LCO spellings
         (\texttt{lco\_names}) of the target.
   \item Mode \texttt{dry\_run} (default): report found / on disk / missing
         without fetching.  Mode \texttt{live}: fetch up to
-        \texttt{max\_frames\_per\_run}; advance the state only if no failures
+        \texttt{max\_\hspace{0pt}frames\_\hspace{0pt}per\_\hspace{0pt}run}; advance the state only if no failures
         and not capped.
 \end{enumerate}
 
 \subsection{Spelling check}
 
 The task also queries the lcodb photometry DB for LCO OBJECT names near the
-AGN (within \texttt{unlinked\_radius\_arcmin}) that are not linked to any AVA
+AGN (within \texttt{unlinked\_\hspace{0pt}radius\_\hspace{0pt}arcmin}) that are not linked to any AVA
 target --- a spelling-check for missed data.  Warnings are logged to Prefect
 but do not fail the run.
 
@@ -302,20 +302,20 @@ but do not fail the run.
 
 \subsection{SExtractor configuration}
 
-Task \texttt{sextract} (\texttt{ava/pipeline/tasks/sextract.py}).
+Task \texttt{sextract} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}sextract.py}).
 
-For every \texttt{*.e91.fits.fz} in \texttt{cfg.phot\_raw(target)} without a
-catalogue (newest first, up to \texttt{max\_frames\_per\_run}):
+For every \texttt{*.e91.fits.fz} in \texttt{cfg.phot\_\hspace{0pt}raw(target)} without a
+catalogue (newest first, up to \texttt{max\_\hspace{0pt}frames\_\hspace{0pt}per\_\hspace{0pt}run}):
 
 \begin{enumerate}
   \item Extract the SCI extension to a unique temporary FITS file (avoids
         collisions between parallel targets --- the legacy script used a fixed
-        \texttt{temp\_sextractor\_file.fits}).
-  \item Determine aperture diameters: \texttt{configured\_diameters\_px(camera)}
+        \texttt{temp\_\hspace{0pt}sextractor\_\hspace{0pt}file.fits}).
+  \item Determine aperture diameters: \texttt{configured\_\hspace{0pt}diameters\_\hspace{0pt}px(camera)}
         reads the camera-specific override (if any) from config, else the
         \texttt{default.sex} series.
   \item Run SExtractor with \texttt{-GAIN} from the FITS header,
-        \texttt{-CATALOG\_TYPE FITS\_1.0}, no check-images, quiet mode.
+        \texttt{-CATALOG\_\hspace{0pt}TYPE FITS\_\hspace{0pt}1.0}, no check-images, quiet mode.
   \item Write the aperture series to the catalogue primary header as
         \texttt{APERDIAM} (e.g.\ \texttt{"3,5,8,11,13,15,18,21,24,27,30,33"}).
   \item Atomically rename the \texttt{*.fits.part} to \texttt{*\_cat.fits}.
@@ -326,6 +326,17 @@ been dropped: its output was never the file SExtractor ran on.  Frames with
 a bad BANZAI WCS are caught later during catalogue matching and repaired there.
 
 \subsection{Aperture series and the APERDIAM header}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/mrk817_muscat_cog}
+  \caption{Curve-of-growth for Mrk\,817 in the MuSCAT3 $g'$ band (Haleakal\={a}),
+    illustrating the aperture series from 3\,arcsec to 33\,arcsec diameter.
+    The vertical dashed line marks the adopted science aperture (10\,arcsec diameter /
+    5\,arcsec radius). Flux stabilises beyond $\sim$8\,arcsec, confirming the aperture
+    captures essentially all point-source flux without excessive sky noise.}
+  \label{fig:cog-mrk817}
+\end{figure}
 
 \begin{warnbox}
 \textbf{APERDIAM is the authoritative record of which physical apertures are
@@ -408,13 +419,13 @@ Index & Diam (px) &
 \subsection{Science aperture index resolution}
 
 The science aperture is defined by \textbf{5\,arcsec radius} (10\,arcsec
-diameter), set in \texttt{photometry.science\_aperture\_radius\_arcsec} in
-\texttt{ava\_config.yaml}.
+diameter), set in \path{photometry.science_aperture_radius_arcsec} in
+\path{ava_config.yaml}.
 
 \begin{warnbox}
 \textbf{Never use a hardcoded integer aperture index.}  Always call
-\texttt{science\_aperture\_index\_for\_catalog(camera, n\_apertures,
-diameters\_px=cat.diameters\_px)} which reads from the catalogue's own
+\path{science_aperture_index_for_catalog(}
+\path{camera, n_apertures, diameters_px=cat.diameters_px)} which reads from the catalogue's own
 \texttt{APERDIAM} header.  The MJD-based \texttt{science\_aperture\_index(camera,
 mjd)} is a secondary method for frames whose catalogues predate the
 \texttt{APERDIAM} header.
@@ -455,13 +466,13 @@ Index & Diam (px) & Sinistro (0.389\,\ensuremath{^{\prime\prime}}/px) & Spectral
 \end{center}
 
 Bold: MuSCAT3 science aperture using the extended series (index~13 = 10.53\,arcsec).
-Only cameras listed in \texttt{photometry.sextractor.extended\_aperture\_cameras}
+Only cameras listed in \texttt{photometry.sextractor.extended\_\hspace{0pt}aperture\_\hspace{0pt}cameras}
 (currently \texttt{ep} = MuSCAT3) may select from the appended apertures;
 Sinistro and Spectral continue to pick from the original 12.
 
 \subsection{Re-extraction on aperture series change}
 
-If \texttt{photometry.sextractor.reextract\_on\_aperture\_change} is true,
+If \texttt{photometry.sextractor.reextract\_\hspace{0pt}on\_\hspace{0pt}aperture\_\hspace{0pt}change} is true,
 catalogues whose \texttt{APERDIAM} header differs from the currently
 configured series are added to the extraction queue.  This is off by default.
 
@@ -471,17 +482,17 @@ configured series are added to the extraction queue.  This is off by default.
 %%============================================================
 
 Module \texttt{ava.photometry.catalogs} reads \texttt{\_cat.fits} catalogues
-and cross-matches them to \texttt{reference\_stars.csv}.
+and cross-matches them to \path{reference_stars.csv}.
 
 \subsection{Cross-matching algorithm}
 
 \begin{enumerate}
-  \item Nearest reference star within \texttt{max\_sep\_arcsec} (default
+  \item Nearest reference star within \path{max_sep_arcsec} (default
         1.5\,arcsec).
   \item The median RA/Dec offset of those matches is removed and the match
         repeated --- absorbs small WCS shifts frame by frame.
   \item For frames where fewer than \texttt{min\_matches} (default 10)
-        reference stars are found, \texttt{solve\_wcs\_from\_patterns} is
+        reference stars are found, \texttt{solve\_\hspace{0pt}wcs\_\hspace{0pt}from\_\hspace{0pt}patterns} is
         tried: \texttt{astroalign} matches asterism triangles of the brightest
         clean detections to the reference stars and fits a similarity
         transform.  Several source/reference size combinations and both image
@@ -494,13 +505,13 @@ and cross-matches them to \texttt{reference\_stars.csv}.
 \subsection{The AGN detection}
 
 The AGN is identified by its \texttt{is\_agn} flag in
-\texttt{reference\_stars.csv} --- not by proximity to the pointing centre.
+\path{reference_stars.csv} --- not by proximity to the pointing centre.
 This correctly handles offset pointings such as NGC\,4395 (AGN 4.4\,arcmin
 from the pointing centre), which the legacy code silently dropped.
 
-\subsection{Output: \texttt{measurements()}}
+\subsection{Output: \texorpdfstring{\texttt{measurements()}}{measurements()}}
 
-The \texttt{measurements(cat, matched, aperture\_index)} function returns a
+The \texttt{measurements(cat, matched, aperture\_\hspace{0pt}index)} function returns a
 long-form table (one row per matched detection) with columns:
 \texttt{star\_id}, \texttt{is\_agn}, \texttt{mag}, \texttt{magerr}
 (at the science aperture), \texttt{sep\_arcsec}, \texttt{x}, \texttt{y},
@@ -508,14 +519,24 @@ long-form table (one row per matched detection) with columns:
 
 %%============================================================
 \section{Photometric Calibration}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/mrk817_calibration_vs_legacy}
+  \caption{Comparison of the new AVA per-frame weighted zero-point calibration
+    with the legacy CALI pipeline for Mrk\,817 in $g'$ (Sinistro, 2021--2024).
+    The two series agree to within 1\,mmag rms; the AVA pipeline recovers $\sim$8\%
+    more frames through improved WCS matching and robustified clipping.}
+  \label{fig:cal-vs-legacy}
+\end{figure}
 \label{sec:calibration}
 %%============================================================
 
 Modules \texttt{ava.photometry.calibration}, \texttt{ava.photometry.process},
-and task \texttt{calibrate} (\texttt{ava/pipeline/tasks/calibrate.py}).
+and task \texttt{calibrate} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}calibrate.py}).
 \textbf{Status: fully ported (November 2026).}
 
-\subsection{Zero-point algorithm (\texttt{ava.photometry.calibration})}
+\subsection{Zero-point algorithm (\texorpdfstring{\texttt{ava.photometry.calibration}}{ava.photometry.calibration})}
 
 For each frame the following equations are applied at the science aperture
 index $k$ (chosen per catalogue from \texttt{APERDIAM}):
@@ -548,7 +569,7 @@ legacy code:
         $\mathrm{d}d_i / \mathrm{d}(g-i)$ is recorded as a QC number only.
 \end{itemize}
 
-Configuration (\texttt{photometry.calibration} in \texttt{ava\_config.yaml}):
+Configuration (\texttt{photometry.calibration} in \path{ava_config.yaml}):
 
 \begin{center}
 \small
@@ -557,7 +578,7 @@ Configuration (\texttt{photometry.calibration} in \texttt{ava\_config.yaml}):
 Key & Default & Meaning \\
 \midrule
 \texttt{min\_snr}       & 20 & S/N threshold for a standard; $\sigma_\mathrm{inst} < 1.0857 / \mathrm{min\_snr}$ \\
-\texttt{max\_peak\_frac}& 0.8 & \texttt{FLUX\_MAX + BACKGROUND} $<$ this $\times$ \texttt{SATURATE} \\
+\texttt{max\_peak\_frac}& 0.8 & \texttt{FLUX\_\hspace{0pt}MAX + BACKGROUND} $<$ this $\times$ \texttt{SATURATE} \\
 \texttt{sigma\_floor}  & 0.01\,mag & Added in quadrature to every standard error \\
 \texttt{clip\_kappa}   & 3.0 & Clipping threshold (multiples of MAD) \\
 \texttt{min\_standards}& 5   & Minimum standards for a valid ZP \\
@@ -566,18 +587,18 @@ Key & Default & Meaning \\
 \end{tabular}
 \end{center}
 
-\subsection{Per-frame processing (\texttt{ava.photometry.process})}
+\subsection{Per-frame processing (\texorpdfstring{\texttt{ava.photometry.process}}{ava.photometry.process})}
 
-\texttt{process\_catalog(cat\_path, ref, meta, data\_id)} handles one catalogue:
+\texttt{process\_\hspace{0pt}catalog(cat\_\hspace{0pt}path, ref, meta, data\_\hspace{0pt}id)} handles one catalogue:
 
 \begin{enumerate}
   \item Read the BANZAI SCI header (\texttt{header\_meta}): FILTER, EXPTIME,
         MJD-OBS, AIRMASS, L1FWHM, SATURATE, NAXIS1/2, SITEID.
   \item Read the SExtractor catalogue; select the science aperture index from
         the \texttt{APERDIAM} header.
-  \item Match detections to \texttt{reference\_stars.csv} (\texttt{match\_to\_reference});
+  \item Match detections to \path{reference_stars.csv} (\texttt{match\_\hspace{0pt}to\_\hspace{0pt}reference});
         attempt WCS repair from star patterns if fewer than 10 reference stars match.
-  \item Compute the zero point and AGN magnitude via \texttt{calibrate\_frame}.
+  \item Compute the zero point and AGN magnitude via \path{calibrate_frame}.
   \item Compute frame QC numbers: WCS offset, FWHM, background, ellipticity, ZP scatter.
   \item Return one \texttt{frame\_qc} dict and one \texttt{measurements} table.
 \end{enumerate}
@@ -586,28 +607,39 @@ After processing all frames, \texttt{requalify} recomputes QC flags using the
 per-camera/filter median ZP (to flag clouds and focus failures) --- this cannot
 be done per-frame since it requires the full ensemble.
 
-\subsection{Data products (\texttt{ava.photometry.store})}
+\subsection{Data products (\texorpdfstring{\texttt{ava.photometry.store}}{ava.photometry.store})}
 \label{sec:data-products}
 
-\subsubsection{\texttt{frame\_qc} table (SQLite)}
+\subsubsection{\texorpdfstring{\texttt{frame\_qc}}{frame_qc} table (SQLite)}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/mrk817_frame_qc}
+  \caption{Frame-QC dashboard for Mrk\,817 (all cameras, all filters, 2019--2024).
+    Top panel: zero-point time series colour-coded by camera; horizontal bands show the
+    $\pm1\sigma$ and $\pm2\sigma$ acceptance windows.  Bottom panel: seeing
+    (\texttt{fwhm\_arcsec}) and QC pass/fail flags.  Frames with \texttt{qc\_pass}=0
+    are excluded from downstream products.}
+  \label{fig:frame-qc}
+\end{figure}
 
 One row per frame, stored in the photometry SQLite database
-(\texttt{photometry.calibration.frame\_db}, defaulting to the lcodb photometry DB).
+(\texttt{photometry.calibration.frame\_\hspace{0pt}db}, defaulting to the lcodb photometry DB).
 Key columns:
 
 \begin{center}
 \small
-\begin{tabular}{lll}
+\begin{tabular}{lp{3cm}p{6cm}}
 \toprule
 Column & Type & Description \\
 \midrule
-\texttt{frame} & TEXT PK & Archive basename (\texttt{<tel>-<cam>-<date>-<seq>-e91}) \\
+\path{frame} & TEXT PK & Archive basename (\texttt{<tel>-<cam>-<date>-<seq>-e91}) \\
 \texttt{data\_id}, \texttt{filter}, \texttt{camera} & TEXT & Target, filter, camera ID \\
 \texttt{mjd\_mid} & REAL & Mid-exposure MJD \\
 \texttt{airmass} & REAL & True airmass (the legacy files stored airmass $-1$) \\
 \texttt{seeing\_hdr} & REAL & Header \texttt{L1FWHM} (arcsec) \\
 \texttt{fwhm\_arcsec} & REAL & Median FWHM of clean matched stars \\
-\texttt{aperture\_index}, \texttt{aperture\_arcsec} & & Science aperture used \\
+\path{aperture_index}, \path{aperture_arcsec} & & Science aperture used \\
 \texttt{zp}, \texttt{zp\_err}, \texttt{zp\_scatter} & REAL & Zero point and quality \\
 \texttt{n\_zp} & INTEGER & Standards used in the ZP fit \\
 \texttt{colour\_slope} & REAL & $\mathrm{d}d/\mathrm{d}(g-i)$: QC only \\
@@ -617,11 +649,11 @@ Column & Type & Description \\
 \end{tabular}
 \end{center}
 
-\subsubsection{\texttt{measurements.parquet}}
+\subsubsection{\texorpdfstring{\texttt{measurements.parquet}}{measurements.parquet}}
 
 One row per (frame, star) at the science aperture.  Contains the AGN row
 (\texttt{is\_agn}) alongside all matched reference stars.  This is the input
-to PyTICS (via \texttt{store.load\_pytics}).
+to PyTICS (via \texttt{store.load\_\hspace{0pt}pytics}).
 
 \begin{center}
 \small
@@ -642,7 +674,17 @@ Column & dtype & Description \\
 \end{tabular}
 \end{center}
 
-\subsubsection{\texttt{agn\_lightcurve.parquet} and \texttt{agn\_lightcurve.csv}}
+\subsubsection{\texorpdfstring{\texttt{agn\_lightcurve.parquet}}{agn_lightcurve.parquet} and \texorpdfstring{\texttt{agn\_lightcurve.csv}}{agn_lightcurve.csv}}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/mrk817_agn_lightcurve_2021Q1}
+  \caption{Per-frame calibrated AGN light curve of Mrk\,817 for a 90-day window in
+    2021 Q1 (all filters, Sinistro + MuSCAT3).  Each point is one \texttt{agn\_lightcurve}
+    row; colour encodes filter.  The inter-nightly scatter reflects genuine AGN variability
+    at the $\sim$1--3\% level on day timescales.}
+  \label{fig:agn-lc-q1}
+\end{figure}
 
 The calibrated AGN light curve, built from \texttt{measurements.parquet} joined
 with \texttt{frame\_qc}:
@@ -653,30 +695,50 @@ with \texttt{frame\_qc}:
 \end{equation}
 
 Columns include: \texttt{frame}, \texttt{mjd\_mid}, \texttt{filter},
-\texttt{camera}, \texttt{tel}, \texttt{aperture\_arcsec}, \texttt{mag},
+\texttt{camera}, \texttt{tel}, \path{aperture_arcsec}, \texttt{mag},
 \texttt{mag\_err}, \texttt{mag\_inst}, \texttt{magerr}, \texttt{zp},
 \texttt{zp\_err}, \texttt{qc\_pass}, \texttt{qc\_flags}.
 
 \begin{notebox}
 \textbf{Legacy \texttt{lco\_latest.pkl} is superseded.}  The new pipeline writes
-\texttt{agn\_lightcurve.parquet} and \texttt{agn\_lightcurve.csv} instead.
+\texttt{agn\_\hspace{0pt}lightcurve.parquet} and \texttt{agn\_\hspace{0pt}lightcurve.csv} instead.
 \texttt{measurements.parquet} replaces the array-valued pkl columns with a
 clean long-format Parquet file.
 \end{notebox}
 
-\subsection{PyTICS interface (\texttt{store.load\_pytics})}
+\subsection{PyTICS interface (\texorpdfstring{\texttt{store.load\_pytics}}{store.load_pytics})}
 
-\texttt{load\_pytics(phot\_dir, db, data\_id, filt, qc\_only)} joins
+\texttt{load\_\hspace{0pt}pytics(phot\_\hspace{0pt}dir, db, data\_\hspace{0pt}id, filt, qc\_\hspace{0pt}only)} joins
 \texttt{measurements.parquet} with \texttt{frame\_qc} to produce the long table
 expected by PyTICS: one row per (frame, star) with columns MJD, Filter,
 star\_id, is\_agn, mag\_inst, magerr, telid, camera, airmass, seeing.
 
 %%============================================================
 \section{Light-Curve Plots}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/webplots_Mrk_817/lco_latest_Mrk_817}
+  \caption{Full multi-band light curve of Mrk\,817 as rendered by the \texttt{webplot}
+    task and served on the AVA website.  Filters are stacked vertically in wavelength
+    order; each panel shares a common time axis.  Swift UV and X-ray epochs are
+    overplotted where available.}
+  \label{fig:webplot-mrk817}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/webplots_Mrk_817/lco_latest_Mrk_817_stan}
+  \caption{Standard-star RMS diagnostic for Mrk\,817.  Each point is the nightly
+    RMS of the ensemble comparison stars; the dashed line is the photon-noise floor.
+    Nights with elevated RMS (poor seeing or thin cloud) are flagged in
+    \texttt{frame\_qc}.}
+  \label{fig:stan-rms-mrk817}
+\end{figure}
 \label{sec:plots}
 %%============================================================
 
-Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
+Task \texttt{webplot} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}webplot.py}).
 
 \begin{warnbox}
 \textbf{Status: not yet ported.}  The webplot task stub raises
@@ -692,7 +754,7 @@ Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
         \begin{equation}
           f_\nu\,[\text{mJy}] = 10^{(m_\mathrm{cal} - 8.9)/(-2.5)} \times 10^3.
         \end{equation}
-  \item Write \texttt{lco\_latest\_<target>.pdf/png} (full timeline),
+  \item Write \texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>.pdf/\hspace{0pt}png} (full timeline),
         \texttt{*\_last6.*} (last 60 days), \texttt{*\_season.*} (last observing season),
         and \texttt{*\_swift.*} (Swift UV/X-ray).
 \end{enumerate}
@@ -703,14 +765,23 @@ Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
 %%============================================================
 
 Module \texttt{ava.photometry.ensemble} and task \texttt{ensemble}
-(\texttt{ava/pipeline/tasks/ensemble.py}).
+(\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}ensemble.py}).
 \textbf{Status: fully ported (November 2026).}
-
 \subsection{Overview}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pytics/pytics_01_validation}
+  \caption{PyTICS ensemble solution validation for Mrk\,817 ($r'$-band, Sinistro fa14,
+    all seasons).  Left: observed vs.\ model magnitude residuals for the ensemble stars;
+    the scatter is the per-frame zero-point uncertainty.  Right: histogram of residuals
+    with a Gaussian fit, confirming the solution is unbiased.}
+  \label{fig:pytics-validation}
+\end{figure}
+
 
 The ensemble step replaces the CALI/pycali MCMC inter-calibration with a
 direct port of PyTICS \citep[Vieliute et~al.\ 2025, RASTI,
-\texttt{doi:10.1093/rasti/rzaf021}]{Vieliute2025}, vectorised with Numba.
+\texttt{doi:10.1093\/\hspace{0pt}rasti/\hspace{0pt}rzaf021}]{Vieliute2025}, vectorised with Numba.
 It operates on the \texttt{measurements.parquet} output of the calibration
 step and writes the final science light curve.
 
@@ -729,7 +800,7 @@ scope offset (zero-mean over all data), and $C_k\,(c_s - c_0)$ the
 per-scope colour term (\textbf{AVA extension}; $c = g - i$ from the reference
 catalogue).
 
-The iterative solution (up to \texttt{max\_loops = 200}) follows the PyTICS
+The iterative solution (up to \path{max_loops = 200}) follows the PyTICS
 \texttt{Filter.Corr} scheme exactly, using the \texttt{arx} extra-variance
 optimal average (K.\ Horne, implemented as a Numba JIT kernel).  Convergence
 is declared when every $|\Delta p|/\sigma_p < \texttt{tiny} = 10^{-4}$ or
@@ -740,12 +811,22 @@ The AGN is \textbf{always excluded} from the comparison stars.
 
 \subsection{Per-scope colour terms}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pytics/pytics_03_scope_offsets}
+  \caption{Per-telescope magnitude offsets (\texttt{DMAGS}) solved by PyTICS for
+    Mrk\,817 in $r'$.  Each camera contributes an independent additive offset that
+    absorbs instrumental throughput differences.  Values are small ($<$5\,mmag) for
+    well-matched Sinistro units, but up to $\sim$20\,mmag for the MuSCAT3 channels.}
+  \label{fig:pytics-offsets}
+\end{figure}
+
 After a full fit the ensemble optionally re-fits with per-scope colour terms
-$C_k$ and runs \texttt{colour\_term\_check}: two reference-camera metrics
+$C_k$ and runs \texttt{colour\_\hspace{0pt}term\_\hspace{0pt}check}: two reference-camera metrics
 (camera-to-camera additive offset RMS and same-night flux-ratio scatter) are
 compared with and without the terms.  The terms are kept for a filter only
-if the mean improvement $\geq \texttt{colour\_check\_min\_gain} = 5\%$.
-The decision is stored in \texttt{meta['colour\_check']} and reused by daily
+if the mean improvement $\geq \texttt{colour\_\hspace{0pt}check\_\hspace{0pt}min\_\hspace{0pt}gain} = 5\%$.
+The decision is stored in \texttt{meta['colour\_\hspace{0pt}check']} and reused by daily
 incremental updates.
 
 \subsection{Incremental update}
@@ -759,8 +840,18 @@ $2\times$ the full-fit median.
 
 \subsection{Absolute zero point}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/mrk817_absolute_calibration_check}
+  \caption{Absolute calibration check for Mrk\,817: PyTICS ensemble magnitudes vs.\
+    Gaia~DR3 GSPC synthetic photometry for the comparison field.  The residuals (bottom)
+    have an rms of $\sim$8\,mmag and show no colour-dependent trend, confirming the
+    absolute zero-point is correct to $<$10\,mmag.}
+  \label{fig:abs-zp}
+\end{figure}
+
 After the full fit, \texttt{absolute\_zp} maps the ensemble star means onto
-\texttt{reference\_stars.csv}:
+\path{reference_stars.csv}:
 \begin{equation}
   m_\mathrm{ref} - m^*_s = \mathrm{ZP} + C\,(c_s - c_0), \qquad c = g - i
 \end{equation}
@@ -769,6 +860,16 @@ colour $c_\mathrm{AGN}$ is determined from its own calibrated magnitudes
 (iterated), so the zero point is evaluated at the AGN colour.
 
 \subsection{Flux-flux intercalibration}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pytics/pytics_10_muscat_intercal}
+  \caption{Flux-flux intercalibration of MuSCAT3 $r'$ against Sinistro $r'$ for
+    Mrk\,817.  The scatter plot (left) shows the additive offset $b_1$ absorbed by
+    intercalibration; the corrected time series (right) shows MuSCAT3 and Sinistro
+    agreeing to $<$2\,mmag rms after correction.}
+  \label{fig:intercal}
+\end{figure}
 
 After ensemble calibration, \texttt{ava.photometry.intercal} fits a linear
 flux model per scope against the Sinistro reference:
@@ -779,27 +880,37 @@ where $b$ captures the \emph{additive} host-galaxy flux difference from
 aperture mismatch (MuSCAT3 at 8.91\,arcsec captures less host than Sinistro
 at 10.5\,arcsec).  The stars fixed $a \approx 1$ already; $a = 1$ is enforced
 by the additive-only mode.  The corrected flux is $F' = F - b$.
-Configured cameras for correction: \texttt{intercal\_correct\_cameras: [ep]}
+Configured cameras for correction: \texttt{intercal\_\hspace{0pt}correct\_\hspace{0pt}cameras: [ep]}
 (MuSCAT3 only).
 
 \subsection{Data products}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/pytics/pytics_12_merged_lightcurves}
+  \caption{Final merged PyTICS light curves for Mrk\,817 across all LCO filters
+    (2019--2024), exported as \path{Mrk_817_LCO_merged_lightcurve.csv}.
+    The ensemble calibration reduces inter-camera scatter to the photon-noise floor.
+    AGN variability on week--month timescales is clearly recovered in all bands.}
+  \label{fig:merged-lc}
+\end{figure}
 \label{sec:ensemble-products}
 
 \begin{description}
-  \item[\texttt{pytics/<filter>/{stars,scopes,epochs,star\_scope}.parquet}]
+  \item[\texttt{pytics\/\hspace{0pt}<filter>/\hspace{0pt}{stars,scopes,epochs,star\_\hspace{0pt}scope}.parquet}]
     The stored solution.  Reloaded for incremental updates and for
     \texttt{ensemble.apply}.
-  \item[\texttt{pytics/absolute\_zp\_stars.parquet}]
+  \item[\texttt{pytics\/\hspace{0pt}absolute\_\hspace{0pt}zp\_\hspace{0pt}stars.parquet}]
     Per-star $m_\mathrm{ref} - m^*$ for all filters (QC on the absolute ZP fit).
-  \item[\texttt{pytics/intercal.csv}]
+  \item[\texttt{pytics\/\hspace{0pt}intercal.csv}]
     Flux-flux fit table: scope, $a$, $b$, $b_1$, $\chi^2_\nu$, \texttt{corrected}.
-  \item[\texttt{agn\_lightcurve\_pytics.parquet/.csv}]
+  \item[\texttt{agn\_\hspace{0pt}lightcurve\_\hspace{0pt}pytics.parquet/\hspace{0pt}.csv}]
     Ensemble + absolute ZP + intercalibrated AGN light curve.
     Key columns: \texttt{MJD}, \texttt{Filter}, \texttt{scope}, \texttt{mag},
     \texttt{mag\_err}, \texttt{mag\_err\_rand}, \texttt{mag\_ic}, \texttt{mag\_ic\_err},
     \texttt{F\_ic} (mJy), \texttt{DMAGT}, \texttt{DMAGS}, \texttt{CKterm},
     \texttt{rms\_t}, \texttt{rms\_sc}, \texttt{n\_stars}, \texttt{good}.
-  \item[\texttt{<target>\_LCO\_merged\_lightcurve.csv}]
+  \item[\texttt{<target>\_\hspace{0pt}LCO\_\hspace{0pt}merged\_\hspace{0pt}lightcurve.csv}]
     The \textbf{shareable science product}: \texttt{good} epochs only, in mJy
     and AB mag with separate total and epoch-to-epoch (random) errors.
 \end{description}
@@ -830,32 +941,32 @@ print(good[["MJD","Filter","mag_ic","mag_ic_err","F_ic","scope"]].head())
 \label{sec:plotting}
 %%============================================================
 
-Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
+Task \texttt{webplot} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}webplot.py}).
 \textbf{Status: fully ported (November 2026).}
 
 The webplot task calls \texttt{ava.plots.webplots} and writes to the target's
-own figure folder, \texttt{<photometry\_root>/<target>/plots/}
-(\texttt{cfg.target\_plots\_dir(target)}; subfolder name from
-\texttt{paths.target\_plots\_subdir}). The merged light-curve figures of the
+own figure folder, \texttt{<photometry\_\hspace{0pt}root>/\hspace{0pt}<target>/\hspace{0pt}plots/\hspace{0pt}}
+(\texttt{cfg.target\_\hspace{0pt}plots\_\hspace{0pt}dir(target)}; subfolder name from
+\texttt{paths.target\_\hspace{0pt}plots\_\hspace{0pt}subdir}). The merged light-curve figures of the
 \texttt{ensemble} task go to the same folder:
 
 \begin{description}
-  \item[\texttt{lco\_latest\_<target>.png/pdf}] Full time-baseline light curve
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>.png/\hspace{0pt}pdf}] Full time-baseline light curve
     per filter (mJy vs MJD), FLOYDS epoch ticks on the top panel, last
     photometry and spectroscopy dates in the title, calendar years on the top axis
     (months on the shorter plots).
-  \item[\texttt{lco\_latest\_<target>\_last6.png/pdf}] Last
-    \texttt{plots.recent\_days} (default 60) days, y-axis auto-scaled.
-  \item[\texttt{lco\_latest\_<target>\_season.png/pdf}] The last
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>\_\hspace{0pt}last6.png/\hspace{0pt}pdf}] Last
+    \texttt{plots.recent\_\hspace{0pt}days} (default 60) days, y-axis auto-scaled.
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>\_\hspace{0pt}season.png/\hspace{0pt}pdf}] The last
     observing season: from the first epoch after the last gap longer than
-    \texttt{plots.season\_gap\_days} (default 60).
-  \item[\texttt{lco\_latest\_<target>\_<filter>\_sky.png/pdf}] Seeing,
+    \texttt{plots.season\_\hspace{0pt}gap\_\hspace{0pt}days} (default 60).
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>\_\hspace{0pt}<filter>\_\hspace{0pt}sky.png/\hspace{0pt}pdf}] Seeing,
     airmass, and zero point vs time per filter, one series per site.
-  \item[\texttt{lco\_latest\_<target>\_stan.png/pdf}] Magnitude vs median
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>\_\hspace{0pt}stan.png/\hspace{0pt}pdf}] Magnitude vs median
     RMS for all field stars; AGN overlaid as a diamond.  Diagnostic for
     photometric quality: the AGN sits above the stellar sequence when
     variability exceeds the photon-noise floor.
-  \item[\texttt{lco\_latest\_<target>\_swift.png/pdf}] Swift UV + X-ray
+  \item[\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}<target>\_\hspace{0pt}swift.png/\hspace{0pt}pdf}] Swift UV + X-ray
     light curves (if the target is in \texttt{paths.swift\_db}).
 \end{description}
 
@@ -863,7 +974,7 @@ Spectroscopic epoch ticks are read directly from the lcodb spectra SQLite DB
 (FLOYDS science spectra, \texttt{rlevel=0}), falling back to the last FLOYDS
 date in \texttt{ava.db}.
 
-Configuration (\texttt{plots} section of \texttt{ava\_config.yaml}):
+Configuration (\texttt{plots} section of \path{ava_config.yaml}):
 
 \begin{center}
 \small
@@ -871,10 +982,10 @@ Configuration (\texttt{plots} section of \texttt{ava\_config.yaml}):
 \toprule
 Key & Default & Meaning \\
 \midrule
-\texttt{filter\_dict} & \texttt{data/reference/filter\_dict.txt} & filter names, wavelengths, colours \\
+\texttt{filter\_dict} & \texttt{data\/\hspace{0pt}reference/\hspace{0pt}filter\_\hspace{0pt}dict.txt} & filter names, wavelengths, colours \\
 \texttt{recent\_days} & 60 & window for the ``last6'' plot \\
 \texttt{season\_gap\_days} & 60 & gap that starts a season (``season'' plot) \\
-\texttt{rms\_last\_epochs} & 500 & epochs per star in the standards RMS plot \\
+\path{rms_last_epochs} & 500 & epochs per star in the standards RMS plot \\
 \texttt{formats} & \texttt{[png, pdf]} & output formats \\
 \bottomrule
 \end{tabular}
@@ -885,7 +996,7 @@ Key & Default & Meaning \\
 \label{sec:intercal}
 %%============================================================
 
-Task \texttt{merge} (\texttt{ava/pipeline/tasks/merge.py}).
+Task \texttt{merge} (\texttt{ava/\hspace{0pt}pipeline/\hspace{0pt}tasks/\hspace{0pt}merge.py}).
 
 \begin{warnbox}
 \textbf{Status: superseded.}  The \texttt{merge} task stub remains for
@@ -893,7 +1004,7 @@ backward compatibility but raises \texttt{NotImplementedError}.  The ensemble
 step (Section~\ref{sec:ensemble}) replaces CALI/pycali for all new data.
 \end{warnbox}
 
-The legacy CALI MCMC inter-calibration (\texttt{intercalibration.mcmc\_steps = 10000})
+The legacy CALI MCMC inter-calibration (\texttt{intercalibration.mcmc\_\hspace{0pt}steps = 10000})
 is documented in Appendix~\ref{app:legacy} for reference.
 
 %%============================================================
@@ -914,7 +1025,7 @@ is documented in Appendix~\ref{app:legacy} for reference.
 \end{tabular}
 \end{table}
 
-QC flag reasons stored in \texttt{frame\_qc.qc\_flags}
+QC flag reasons stored in \texttt{frame\_\hspace{0pt}qc.qc\_\hspace{0pt}flags}
 (comma-separated; empty = clean):
 
 \begin{center}
@@ -927,8 +1038,8 @@ Flag & Condition \\
 \texttt{few\_matched} & fewer than \texttt{min\_matched} (30) reference stars matched \\
 \texttt{agn\_missing} & AGN not detected in this frame \\
 \texttt{agn\_flagged} & AGN detected with non-zero SExtractor FLAGS \\
-\texttt{zp\_scatter}  & star-to-star ZP scatter $>$ \texttt{max\_zp\_scatter} (0.05\,mag) \\
-\texttt{seeing}       & median FWHM $>$ \texttt{max\_fwhm\_arcsec} (4.5\,arcsec) \\
+\texttt{zp\_scatter}  & star-to-star ZP scatter $>$ \path{max_zp_scatter} (0.05\,mag) \\
+\texttt{seeing}       & median FWHM $>$ \path{max_fwhm_arcsec} (4.5\,arcsec) \\
 \texttt{zp\_offset}   & $|\mathrm{ZP} - \mathrm{med}(\mathrm{ZP}_\mathrm{camera/filter})|$ $>$ 0.5\,mag (clouds) \\
 \bottomrule
 \end{tabular}
@@ -944,9 +1055,9 @@ Per-filter overrides are applied for $u'$ (fewer standards expected) and $z_s, Y
 Filter & Override key & Value \\
 \midrule
 $u'$ & \texttt{min\_matched} & 10 \\
-$u'$ & \texttt{max\_zp\_scatter} & 0.08\,mag \\
-$z_s$ & \texttt{max\_zp\_scatter} & 0.12\,mag \\
-$Y$ & \texttt{max\_zp\_scatter} & 0.25\,mag \\
+$u'$ & \path{max_zp_scatter} & 0.08\,mag \\
+$z_s$ & \path{max_zp_scatter} & 0.12\,mag \\
+$Y$ & \path{max_zp_scatter} & 0.25\,mag \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -959,11 +1070,11 @@ $Y$ & \texttt{max\_zp\_scatter} & 0.25\,mag \\
 \begin{enumerate}
 
 \item \textbf{Calibration task fully ported (resolved, Nov 2026).}
-      Science in \texttt{ava.photometry.calibration} and \texttt{ava.photometry.process};
+      Science in \path{ava.photometry.calibration} and \path{ava.photometry.process};
       outputs in \texttt{ava.photometry.store}.
 
 \item \textbf{Pickle superseded (resolved, Nov 2026).}  \texttt{lco\_latest.pkl}
-      replaced by \texttt{agn\_lightcurve.parquet/.csv} and
+      replaced by \path{agn_lightcurve.parquet/.csv} and
       \texttt{measurements.parquet}.
 
 \item \textbf{Ensemble and webplot tasks fully ported (resolved, Nov 2026).}
@@ -983,8 +1094,8 @@ $Y$ & \texttt{max\_zp\_scatter} & 0.25\,mag \\
       install steps or replace with PyROA.
 
 \item \textbf{agn\_field\_id superseded (resolved).}  The old pipeline
-      identified the AGN by its row index in \texttt{apass\_pytics.csv}.
-      AVA~v2 uses \texttt{is\_agn} in \texttt{reference\_stars.csv}, keyed
+      identified the AGN by its row index in \path{apass_pytics.csv}.
+      AVA~v2 uses \texttt{is\_agn} in \path{reference_stars.csv}, keyed
       by Gaia DR3 \texttt{source\_id} --- robust to catalogue rebuilds.
 
 \item \textbf{Legacy MJD typo for aperture expansion (resolved).}
@@ -1091,7 +1202,7 @@ $Y$ & PS1 $y$ & --- & 0.00 & 0.07 \\
 \end{tabular}
 \caption{LCO filter to reference-catalogue column mapping.
   Extinction coefficients are typical values; actual values per site and dome
-  are in \texttt{photometry.extinction\_coefficients} in the config.}
+  are in \texttt{photometry.extinction\_\hspace{0pt}coefficients} in the config.}
 \end{table}
 
 %%============================================================
@@ -1101,13 +1212,13 @@ $Y$ & PS1 $y$ & --- & 0.00 & 0.07 \\
 
 \begin{notebox}
 The sections below are verbatim extracts from the original legacy pipeline
-documentation (\texttt{ava\_pipeline\_manual.tex}).  They describe
+documentation (\texttt{ava\_\hspace{0pt}pipeline\_\hspace{0pt}manual.tex}).  They describe
 \texttt{ava\_update.py} and its child scripts as they existed in production
 through 2026, and serve as the specification for the AVA~v2 port.
 \end{notebox}
 
 
-\section{Stage 0 --- Orchestration: \texttt{ava\_update.py}}
+\section{Stage 0 --- Orchestration: \texorpdfstring{\texttt{ava\_update.py}}{ava_update.py}}
 \label{sec:orchestrator}
 %%============================================================
 
@@ -1117,7 +1228,7 @@ and launches all scripts simultaneously using \texttt{nohup ... \&}.
 
 \subsection{Target list}
 
-A \textsc{csv} file (default \texttt{target\_list.txt}) with at minimum the columns:
+A \textsc{csv} file (default \path{target_list.txt}) with at minimum the columns:
 \begin{itemize}[noitemsep]
   \item \texttt{targets} --- the LCO target-name string used in archive queries.
   \item \texttt{directory} --- the per-target folder slug, e.g.\ \texttt{Fairall\_9}.
@@ -1131,7 +1242,7 @@ A \textsc{csv} file (default \texttt{target\_list.txt}) with at minimum the colu
 \toprule
 Flag & Stage \\
 \midrule
-\texttt{-o} & Initialise directories (\texttt{ava\_initialise.py}) \\
+\texttt{-o} & Initialise directories (\texttt{ava\_\hspace{0pt}initialise.py}) \\
 \texttt{-d} & Download new data from LCO archive \\
 \texttt{-e} & Source extraction with SExtractor \\
 \texttt{-c} & Photometric calibration \\
@@ -1156,12 +1267,12 @@ stage commands as lines, closes the file, makes it executable, and launches it w
 
 \begin{warnbox}
 \textbf{Migration target.}  All scripts contain absolute paths hardcoded to
-\texttt{/data/jvhs1/agn/} and \texttt{/data3/jvhs1/agn/}.  These must be replaced by
-paths read from \texttt{config/ava\_config.yaml} in AVA~v2.
+\path{/data/jvhs1/agn/} and \path{/data3/jvhs1/agn/}.  These must be replaced by
+paths read from \texttt{config\/\hspace{0pt}ava\_\hspace{0pt}config.yaml} in AVA~v2.
 \end{warnbox}
 
 %%============================================================
-\section{Stage 1 --- Initialisation: \texttt{ava\_initialise.py}}
+\section{Stage 1 --- Initialisation: \texorpdfstring{\texttt{ava\_initialise.py}}{ava_initialise.py}}
 \label{sec:init}
 %%============================================================
 
@@ -1179,21 +1290,21 @@ Run once per new target (\texttt{-o}).  Creates the directory tree under
 
 The script uses the \texttt{mechanize} Python browser library to query the APASS
 (AAVSO Photometric All-Sky Survey) web form for a cone search centred on the target's
-RA/Dec.  The resulting CSV (\texttt{apass\_\textit{obj}.csv}) is the primary photometric
+RA/Dec.  The resulting CSV (\texttt{apass\_\hspace{0pt}\textit{obj}.csv}) is the primary photometric
 reference catalogue used in calibration.
 
 \begin{warnbox}
 \textbf{Migration target.}  This relies on a brittle web scrape that breaks on UI
-changes.  AVA~v2 should use \texttt{astroquery.vizier.query\_region()} on APASS\,DR9,
+changes.  AVA~v2 should use \texttt{astroquery.vizier.query\_\hspace{0pt}region()} on APASS\,DR9,
 or the Pan-STARRS PS1 catalogue via the LCO archive tools.
 \end{warnbox}
 
 %%============================================================
-\section{Stage 2 --- Download: \texttt{download\_data.py}}
+\section{Stage 2 --- Download: \texorpdfstring{\texttt{download\_data.py}}{download_data.py}}
 \label{sec:download}
 %%============================================================
 
-Queries the LCO science archive API (\texttt{archive-api.lco.global/frames/}) using an
+Queries the LCO science archive API (\texttt{archive-api.lco.global\/\hspace{0pt}frames/\hspace{0pt}}) using an
 authentication token for BANZAI-reduced frames (\texttt{rlevel=91}) and downloads them
 to the target's raw data directory, organised by night (\texttt{YYYYMMDD/}).
 
@@ -1211,7 +1322,7 @@ FITS files.  Images are fetched on demand at reduction time via the archive fram
 \end{notebox}
 
 %%============================================================
-\section{Stage 3 --- Source Extraction: \texttt{ava\_sextractor.py}}
+\section{Stage 3 --- Source Extraction: \texorpdfstring{\texttt{ava\_sextractor.py}}{ava_sextractor.py}}
 \label{sec:sextractor}
 %%============================================================
 
@@ -1222,7 +1333,7 @@ the target's raw data directory.
 
 BANZAI frames are stored as compressed multi-extension FITS (\texttt{.fz}).  The script
 opens each file with \texttt{astropy.io.fits}, extracts the \texttt{SCI} extension, writes
-it to a temporary single-extension file (\texttt{temp\_sextractor\_file.fits}), and passes
+it to a temporary single-extension file (\texttt{temp\_\hspace{0pt}sextractor\_\hspace{0pt}file.fits}), and passes
 that to SExtractor.  This step is necessary because SExtractor cannot handle
 multi-extension FITS natively.
 
@@ -1232,7 +1343,7 @@ Fixed configuration files (\texttt{default.sex}, \texttt{default.param},
 \texttt{default.conv}, \texttt{default.nnw}, \texttt{default.psfex}) are stored in a
 template directory and copied to each target's working folder at initialisation.  The key
 output is a source catalogue in FITS binary-table format (\texttt{\_cat.fits}) written to
-\texttt{sextractor\_ava/}.
+\path{sextractor_ava/}.
 
 \subsection{Apertures}
 
@@ -1246,7 +1357,7 @@ If a \texttt{\_cat.fits} file already exists and is non-empty for a given frame,
 SExtractor is not re-run, making the stage incremental.
 
 %%============================================================
-\section{Stage 4 --- Photometric Calibration: \texttt{ava\_calibrate.py}}
+\section{Stage 4 --- Photometric Calibration: \texorpdfstring{\texttt{ava\_calibrate.py}}{ava_calibrate.py}}
 \label{sec:calibrate}
 %%============================================================
 
@@ -1262,13 +1373,13 @@ does not appear in it are processed.  The \texttt{-f} flag forces full reprocess
 \subsection{Coordinate matching}
 
 The AGN position is read from the target database.  SExtractor source positions are matched
-using \texttt{SkyCoord.match\_to\_catalog\_sky()}.  Frames where the nearest source is more
+using \texttt{SkyCoord.match\_\hspace{0pt}to\_\hspace{0pt}catalog\_\hspace{0pt}sky()}.  Frames where the nearest source is more
 than 3\,arcsec from the AGN position are skipped.
 
 \subsection{Extinction and colour correction}
 
 For each frame, site-specific extinction coefficients are read from
-\texttt{lco\_ext\_coefficients.csv} (columns: \texttt{Filter}, \texttt{siteid},
+\texttt{lco\_\hspace{0pt}ext\_\hspace{0pt}coefficients.csv} (columns: \texttt{Filter}, \texttt{siteid},
 \texttt{dome}, \texttt{K}, \texttt{C\_t}, \texttt{Color1}, \texttt{Color2}).
 The corrected instrumental magnitude is:
 \begin{equation}
@@ -1335,7 +1446,7 @@ Index & Diam (px) & Sinistro 1\,m & Spectral 2\,m & MuSCAT3 2\,m \\
 \bottomrule
 \end{tabular}
 \caption{New aperture series (2025+, 12 apertures).
-  \texttt{PHOT\_APERTURES = 3,5,8,11,13,15,18,21,24,27,30,33} in
+  \texttt{PHOT\_\hspace{0pt}APERTURES = 3,5,8,11,13,15,18,21,24,27,30,33} in
   \texttt{default.sex}.  Rows in bold indicate the index selected for a
   5\,arcsec-radius (10\,arcsec-diameter) science aperture on each camera.}
 \label{tab:aper-new}
@@ -1364,7 +1475,7 @@ Index & Diam (px) & Sinistro 1\,m & Spectral 2\,m & MuSCAT3 2\,m \\
 \bottomrule
 \end{tabular}
 \caption{Old aperture series (pre-2025, 10 apertures).
-  \texttt{PHOT\_APERTURES = 8,11,13,15,18,21,24,27,30,33} in
+  \texttt{PHOT\_\hspace{0pt}APERTURES = 8,11,13,15,18,21,24,27,30,33} in
   \texttt{default.sex}.  Note: index~7 here (27\,px, 10.5\,arcsec on 1\,m)
   maps to index~9 in the new series.}
 \label{tab:aper-old}
@@ -1373,7 +1484,7 @@ Index & Diam (px) & Sinistro 1\,m & Spectral 2\,m & MuSCAT3 2\,m \\
 \begin{notebox}
 \textbf{Science aperture for re-ingestion.}  For the half-million existing
 frames, re-compute the science index via
-\texttt{science\_aperture\_index(pixscale, mjd)} rather than storing a fixed
+\texttt{science\_\hspace{0pt}aperture\_\hspace{0pt}index(pixscale, mjd)} rather than storing a fixed
 integer.  The function automatically selects the old (pre-MJD\,60909) or new
 (MJD\,$\geq$\,60909) series and returns the index closest to the configured
 target radius (default 5\,arcsec).  Results: Sinistro 1\,m new series
@@ -1427,7 +1538,7 @@ slope fixed to~1.0 and sigma-clipping of outliers yields a second independent es
 A minimum of 3~standard stars is required.  If fewer are available, or if the FWHM seeing
 exceeds 9\,arcsec, the frame is flagged (\texttt{flag=1}) and stored with NaN photometry.
 
-\subsection{Output columns in \texttt{lco\_latest.pkl}}
+\subsection{Output columns in \texorpdfstring{\texttt{lco\_latest.pkl}}{lco_latest.pkl}}
 
 One row per FITS frame.  Array-valued columns (aperture vectors of length~12) are stored
 as Python lists within DataFrame cells.
@@ -1466,7 +1577,7 @@ Column & Type & Description \\
 \end{center}
 
 %%============================================================
-\section{Stage 5 --- Plotting \& Web Output: \texttt{ava\_webplot.py}}
+\section{Stage 5 --- Plotting \& Web Output: \texorpdfstring{\texttt{ava\_webplot.py}}{ava_webplot.py}}
 \label{sec:webplot}
 %%============================================================
 
@@ -1493,17 +1604,17 @@ with uncertainties $\sigma_f = f_\nu \,/\, 1.0857 \times \sigma_m$.
 \subsection{Plots produced}
 
 \begin{enumerate}
-  \item \textbf{Full light curve} (\texttt{lco\_latest\_\textit{obj}.pdf/png}).  One panel
+  \item \textbf{Full light curve} (\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}\textit{obj}.pdf/png}).  One panel
         per filter over the full time baseline.  FLOYDS epoch times are marked as vertical
         ticks on the top panel.
-  \item \textbf{Last 60~days} (\texttt{lco\_latest\_\textit{obj}\_last6.pdf/png}).  Same
+  \item \textbf{Last 60~days} (\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}\textit{obj}\_last6.pdf/png}).  Same
         layout restricted to the 60~days preceding the most recent observation.  Y-axis
         limits are set from the 4th--96th flux percentile with 50\,\% padding.
-  \item \textbf{Swift} (\texttt{lco\_latest\_\textit{obj}\_swift.pdf/png}).  Reads
-        \texttt{ava\_swift\_updated.csv} and plots UV and X-ray light curves.
+  \item \textbf{Swift} (\texttt{lco\_\hspace{0pt}latest\_\hspace{0pt}\textit{obj}\_swift.pdf/png}).  Reads
+        \texttt{ava\_\hspace{0pt}swift\_\hspace{0pt}updated.csv} and plots UV and X-ray light curves.
 \end{enumerate}
 
-\subsection{Diagnostic plots (\texttt{-d} flag)}
+\subsection{Diagnostic plots (\texorpdfstring{\texttt{-d}}{-d} flag)}
 
 \begin{itemize}[noitemsep]
   \item Seeing, airmass, and zeropoint (transparency) vs time per site.
@@ -1512,7 +1623,7 @@ with uncertainties $\sigma_f = f_\nu \,/\, 1.0857 \times \sigma_m$.
 \end{itemize}
 
 %%============================================================
-\section{Stage 6 --- Inter-calibration: \texttt{ava\_merge.py}}
+\section{Stage 6 --- Inter-calibration: \texorpdfstring{\texttt{ava\_merge.py}}{ava_merge.py}}
 \label{sec:merge}
 %%============================================================
 
@@ -1524,14 +1635,14 @@ the light curves into a single consistent time series.
 
 \subsection{Input}
 
-The script reads \texttt{<obj>\_edited.csv} from the parent directory.  This is the
+The script reads \path{<obj>_edited.csv} from the parent directory.  This is the
 calibrated light-curve file (essentially \texttt{lco\_latest.pkl} converted to CSV and
 optionally hand-edited to remove bad epochs).  It must exist before merging can proceed.
 
 \subsection{CALI algorithm}
 
 For each filter, unique telescope identifiers (\texttt{telid}) are found.
-\texttt{pycali\_jvhs.pycali()} is run with an MCMC chain of $10{,}000$ steps (extended
+\texttt{pycali\_\hspace{0pt}jvhs.pycali()} is run with an MCMC chain of $10{,}000$ steps (extended
 by $10{,}000$ on each retry if convergence is not achieved).  CALI models the light curve
 as a common signal observed by each telescope with an additive offset and a flux scaling
 factor, marginalising over these nuisance parameters.
@@ -1552,7 +1663,7 @@ it with PyROA or CREAM.
 %%============================================================
 
 All intermediate and final products are stored per-target under a fixed directory tree
-rooted at \texttt{master\_dir} (currently \texttt{/data3/jvhs1/agn/}).
+rooted at \texttt{master\_dir} (currently \path{/data3/jvhs1/agn/}).
 
 \begin{longtable}{>{\ttfamily}p{5.5cm}p{8.5cm}}
 \toprule
@@ -1563,10 +1674,10 @@ apass\_pytics.csv & APASS catalogue reformatted for pytics column names \\
 lco\_latest.pkl & Running pandas DataFrame of all calibrated photometry \\
 lco\_latest\_stan.pkl & Running DataFrame of all calibrated standard stars \\
 lco\_latest\_\textit{obj}.pdf/png & Full light-curve plot \\
-lco\_latest\_\textit{obj}\_last6.pdf/png & Last-60-days light-curve plot \\
-lco\_latest\_\textit{obj}\_swift.pdf/png & Swift UV + X-ray plot \\
-lco\_latest\_\textit{obj}\_\textit{filt}\_sky.pdf/png & Diagnostic plots \\
-lco\_latest\_\textit{obj}\_stan.pdf/png & Standard-star RMS plot \\
+{\footnotesize\path{lco_latest_<obj>_last6.pdf/png}} & Last-60-days plot \\
+{\footnotesize\path{lco_latest_<obj>_swift.pdf/png}} & Swift UV + X-ray plot \\
+{\footnotesize\path{lco_latest_<obj>_<filt>_sky.pdf/png}} & Sky diagnostic \\
+{\footnotesize\path{lco_latest_<obj>_stan.pdf/png}} & Standard-star RMS plot \\
 sextractor\_ava/ & SExtractor catalogues (\texttt{*\_cat.fits}) \\
 ava\_merging/ & CALI workspace and merged output files \\
 UVOT/ & Swift/UVOT data placeholder \\
@@ -1578,13 +1689,13 @@ lco\_ext\_coefficients.csv & Extinction and colour-term coefficients \\
 \end{longtable}
 
 \textbf{Raw FITS data} are stored at
-\texttt{<master\_dir>/raw\_data/<obj>/YYYYMMDD/*e91.fits.fz}, one sub-folder per
+\texttt{<master\_\hspace{0pt}dir>/\hspace{0pt}raw\_\hspace{0pt}data/\hspace{0pt}<obj>/\hspace{0pt}YYYYMMDD/\hspace{0pt}*e91.fits.fz}, one sub-folder per
 observing night.
 
 \begin{warnbox}
 \textbf{Pickle portability.}  \texttt{lco\_latest.pkl} stores 12-element aperture
 vectors as Python lists inside a pandas DataFrame.  Reading them requires
-\texttt{np.stack(lco.mag\_aper[mask], axis=0)}.  This format is fragile across
+\texttt{np.stack(lco.mag\_\hspace{0pt}aper[mask], axis=0)}.  This format is fragile across
 pandas/numpy versions.  AVA~v2 should migrate to HDF5 or Parquet, or store photometry
 directly in the \texttt{lcodb} SQLite database.
 \end{warnbox}

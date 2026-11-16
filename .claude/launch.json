@@ -9,6 +9,12 @@
         "PREFECT_HOME=/private/tmp/claude-501/-Users-juan--claude-spares-spare-DNDMft/d087e150-e9e7-4d86-b5db-76fe01e3690c/scratchpad/prefect_home exec /private/tmp/claude-501/-Users-juan--claude-spares-spare-DNDMft/d087e150-e9e7-4d86-b5db-76fe01e3690c/scratchpad/venv/bin/prefect server start --host 127.0.0.1 --port 4200"
       ],
       "port": 4200
+    },
+    {
+      "name": "ava-web",
+      "runtimeExecutable": "/opt/anaconda3/envs/ava-web/bin/php",
+      "runtimeArgs": ["-S", "127.0.0.1:8080", "-t", "web"],
+      "port": 8080
     }
   ]
 }

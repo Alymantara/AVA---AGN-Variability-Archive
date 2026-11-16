@@ -5,7 +5,7 @@ Register ``ava_pipeline`` as a Prefect deployment on a daily schedule.
 Schedule, deployment name and work pool come from ``pipeline.prefect`` in the
 AVA config (default: daily at 09:30 UTC).  Which steps the scheduled run
 performs is set with the same flags as ``run_pipeline.py``; the default is the
-nightly update ``-d -e -c -p``.
+nightly update ``-d -e -c -p -w`` (``-w``: publish to the website).
 
 Two modes:
 
@@ -41,6 +41,7 @@ _PREFECT = cfg.pipeline.prefect
 @click.option("-p", "--plot", is_flag=True, help="Include web plots.")
 @click.option("-m", "--merge", "merge_data", is_flag=True, help="Include CALI inter-calibration.")
 @click.option("-s", "--save", is_flag=True, help="Include saving CALI products.")
+@click.option("-w", "--web", "publish", is_flag=True, help="Include publishing to the website (web.data_dir).")
 @click.option("--name", default=_PREFECT.deployment_name, show_default=True,
               help="Deployment name.")
 @click.option("--work-pool", default=_PREFECT.work_pool, show_default=True,
@@ -51,7 +52,7 @@ _PREFECT = cfg.pipeline.prefect
               help="Timezone for the cron schedule.")
 @click.option("--serve", is_flag=True,
               help="Serve the deployment from this process instead of using a work pool.")
-def main(init, download_data, extract, calibrate_data, pytics, plot, merge_data, save,
+def main(init, download_data, extract, calibrate_data, pytics, plot, merge_data, save, publish,
          name, work_pool, cron, tz, serve):
     """Deploy the AVA pipeline with a daily schedule."""
     from prefect.client.schemas.schedules import CronSchedule
@@ -67,10 +68,11 @@ def main(init, download_data, extract, calibrate_data, pytics, plot, merge_data,
         plot=plot,
         merge_data=merge_data,
         save=save,
+        publish=publish,
     )
     if not any(steps.values()):
-        # Default nightly update, equivalent to `ava_update.py -d -e -c -p`.
-        steps.update(download_data=True, extract=True, calibrate_data=True, plot=True)
+        # Default nightly update, equivalent to `ava_update.py -d -e -c -p`, then publish to the website.
+        steps.update(download_data=True, extract=True, calibrate_data=True, plot=True, publish=True)
 
     schedule = CronSchedule(cron=cron, timezone=tz)
     enabled = ", ".join(k for k, v in steps.items() if v)

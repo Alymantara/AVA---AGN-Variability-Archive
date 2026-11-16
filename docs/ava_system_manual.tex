@@ -138,7 +138,7 @@ be safely migrated to a new machine or handed to a new user.
 \begin{enumerate}
 
 \item \textbf{Hardcoded absolute paths.}  Every script contains literal paths to
-      \texttt{/data/jvhs1/agn/} or \texttt{/data3/jvhs1/agn/}.  These are the single
+      \path{/data/jvhs1/agn/} or \path{/data3/jvhs1/agn/}.  These are the single
       largest portability blocker.  AVA~v2 must replace all of them with paths read from
       \texttt{config/ava\_config.yaml}.
 
@@ -289,16 +289,16 @@ be set are listed in Table~\ref{tab:paths}.
 \toprule
 Key & Description & Production value \\
 \midrule
-paths.photometry\_root   & Root of photometry data tree & \texttt{/data3/jvhs1/agn} \\
+paths.photometry\_root   & Root of photometry data tree & \path{/data3/jvhs1/agn} \\
 paths.photometry\_raw    & Raw frames subfolder         & \texttt{raw\_data} \\
-paths.spectra\_root      & Root of spectroscopy data tree & \texttt{/data2/jvhs1/agn} \\
+paths.spectra\_root      & Root of spectroscopy data tree & \path{/data2/jvhs1/agn} \\
 paths.spectra\_raw       & Raw FLOYDS frames subfolder  & \texttt{raw\_data} \\
 paths.target\_plots\_subdir & Per-target figure folder   & \texttt{plots} (in \texttt{<target>/}) \\
-paths.swift\_db          & Swift/UVOT merged CSV        & \texttt{/data3/jvhs1/agn/ava\_swift\_updated.csv} \\
-paths.template\_dir      & SExtractor config templates  & \texttt{/data3/jvhs1/agn/template\_pipeline} \\
-paths.floyds\_pipeline   & banzai-floyds working copy   & \texttt{\$BASE/floyds/banzai-floyds} \\
+paths.swift\_db          & Swift/UVOT merged CSV        & \path{/data3/jvhs1/agn/ava_swift_updated.csv} \\
+paths.template\_dir      & SExtractor config templates  & \path{/data3/jvhs1/agn/template_pipeline} \\
+paths.floyds\_pipeline   & banzai-floyds working copy   & \path{$BASE/floyds/banzai-floyds} \\
 paths.database           & AVA SQLite master DB         & \texttt{data/ava.db} \\
-paths.ava\_csv           & AVA master CSV               & \texttt{data/ava/ava.csv} \\
+paths.ava\_csv           & AVA master CSV               & \path{data/ava/ava.csv} \\
 \bottomrule
 \end{tabular}
 \caption{Path keys that must be set for each machine.  Relative paths are
