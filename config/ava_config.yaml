@@ -394,6 +394,10 @@ ensemble:
   intercal_season_gap_days: 60.0     # a gap longer than this starts a new season
   # --- shareable product ---------------------------------------------------------
   export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv: mJy and AB mag
+  # Per-band fractional variability of the merged light curve (ava.photometry.variability)
+  # → AVA DB table photometry_variability + legacy agn.frac_<band>.
+  fvar_error: "total"     # errors in the excess variance: "total" (conservative) | "random"
+  fvar_min_epochs: 10     # bands with fewer good epochs are not measured
 
   # --- AGN error model (ava.photometry.errors; UNDER VERIFICATION) ---
   # Always fitted and written (pytics/error_model.csv, columns mag_err_model[_rand],
@@ -462,6 +466,11 @@ plots:
 #  WEBSITE
 # ============================================================
 web:
+  # Published copy the website reads (ava.web.publish; pipeline step -w/--web).
+  # Relative paths are from ava_root. The site's AVA_WEB_DATA must point here.
+  data_dir: "web/data"
+  usage_src: null          # folder with lco_usage_<semester>.png (null = skip)
+  prune: false             # remove published plots the pipeline no longer makes
   host: "0.0.0.0"
   port: 5000
   debug: false

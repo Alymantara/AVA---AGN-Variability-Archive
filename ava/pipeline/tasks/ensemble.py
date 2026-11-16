@@ -113,6 +113,26 @@ def export_merged_csv(lc: pd.DataFrame, path: Path, target: str, error_model: st
     return out
 
 
+def _record_fvar(target: str, lc: pd.DataFrame, merged: pd.DataFrame | None, error_model: str, ec, logger) -> dict:
+    """Per-band F_var of the merged light curve → ``photometry_variability`` + ``agn.frac_<band>``
+    (ava.photometry.variability).  Settings: ``ensemble.fvar_error`` ("total" | "random"),
+    ``ensemble.fvar_min_epochs``.  A failure here is logged, never fatal to the ensemble step."""
+    from ava.photometry import variability as PV
+
+    try:
+        if merged is None:      # CSV export disabled: same good-epoch table, not written to disk
+            merged = export_merged_csv(lc, Path("/dev/null"), target, error_model=error_model)
+        error = str(ec.get("fvar_error", "total"))
+        bv = PV.band_variability(merged, error=error, min_epochs=int(ec.get("fvar_min_epochs", 10)))
+        out = PV.record_band_variability(cfg.db_path, target, bv, f"{error_model}/{error}")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("%s: F_var not recorded (%s: %s)", target, type(exc).__name__, exc)
+        return {}
+    logger.info("%s: F_var %s", target, ", ".join(
+        f"{b} {100 * f:.1f}%" if f == f else f"{b} n/a" for b, f in out.items()) or "no band with enough epochs")
+    return out
+
+
 @task(name="ensemble", tags=["pytics"])
 def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
     """PyTICS calibration of ``target`` (full on demand, incremental daily); all settings from
@@ -140,10 +160,13 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         rms_err_floor=float(ec.get("rms_err_floor", 1e-3)), atol=float(ec.get("atol", 1e-5)))
     lc = intercal_lightcurve(phot, ec)
     files = []
+    error_model = str(ec.get("error_model", "pytics"))
+    merged_csv = None
     if ec.get("export_csv", True):
         csv = phot / f"{target}_LCO_merged_lightcurve.csv"
-        export_merged_csv(lc, csv, target, error_model=str(ec.get("error_model", "pytics")))
+        merged_csv = export_merged_csv(lc, csv, target, error_model=error_model)
         files.append(str(csv))
+    fvar = _record_fvar(target, lc, merged_csv, error_model, ec, logger)
     if plot:
         from ava.pipeline.tasks.webplot import spectroscopy_epochs
         from ava.plots import webplots as wp
@@ -161,4 +184,4 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         files += wp.plot_lightcurves(merged, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last,
                                      recent_days=float(cfg.plots.recent_days), formats=list(cfg.plots.formats))
     logger.info("%s: ensemble %s", target, {f: (r["mode"], r["n_epochs"], r.get("colour_terms")) for f, r in report.items()})
-    return {"target": target, "filters": report, "plots": files}
+    return {"target": target, "filters": report, "plots": files, "fvar": fvar}
