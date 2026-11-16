@@ -9,12 +9,14 @@ colours and wavelengths from ``plots.filter_dict``.
 Outputs (``cfg.target_plots_dir(target)`` = ``<phot>/<target>/plots/``, legacy names):
   lco_latest_<obj>.png/.pdf          full light curves (flux, mJy)
   lco_latest_<obj>_last6.png/.pdf    last ``plots.recent_days`` days
+  lco_latest_<obj>_season.png/.pdf   last observing season (after the last gap > ``plots.season_gap_days``, 60)
   lco_latest_<obj>_<filter>_sky      seeing / airmass / zero point per filter
   lco_latest_<obj>_stan              field-star magnitude vs RMS, AGN marked
   lco_latest_<obj>_swift             Swift (if the target is in ``paths.swift_db``)
 
 Spectroscopic epochs: raw FLOYDS science spectra in the lcodb spectra DB
-(red ticks); without it, only the last FLOYDS date from ``ava.db``.
+(red ticks); without it, only the last FLOYDS date from ``ava.db`` (and a
+warning in the log: the plots then have no ticks).
 """
 
 from __future__ import annotations
@@ -29,8 +31,20 @@ from prefect import get_run_logger, task
 from ava.config import cfg
 
 
+def _warn(msg: str, *args) -> None:
+    try:
+        get_run_logger().warning(msg, *args)
+    except Exception:  # noqa: BLE001 — outside a Prefect run
+        import logging
+
+        logging.getLogger(__name__).warning(msg, *args)
+
+
 def spectroscopy_epochs(target: str) -> tuple[list[float], float | None]:
-    """(MJDs of FLOYDS science spectra, last spectrum MJD)."""
+    """(MJDs of FLOYDS science spectra, last spectrum MJD).
+
+    Logs a warning when the lcodb spectra DB cannot be read or has no spectra for
+    ``target`` (the light-curve plots then carry no spectroscopic ticks)."""
     from astropy.time import Time
 
     mjds = []
@@ -38,13 +52,20 @@ def spectroscopy_epochs(target: str) -> tuple[list[float], float | None]:
         from ava.lcodb.config import load_config
 
         db = load_config(cfg.lcodb_config_path).db_path("spectra")
-        if db.exists():
-            with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True)) as con:
-                mjds = [r[0] for r in con.execute(
-                    "SELECT DISTINCT mjd_obs FROM frames WHERE ava_data_id = ? AND rlevel = 0 "
-                    "AND obstype = 'SPECTRUM' AND is_standard = 0", (target,))]
-    except Exception:  # noqa: BLE001
+        if not db.exists():
+            raise FileNotFoundError(db)
+        with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True)) as con:
+            mjds = [r[0] for r in con.execute(
+                "SELECT DISTINCT mjd_obs FROM frames WHERE ava_data_id = ? AND rlevel = 0 "
+                "AND obstype = 'SPECTRUM' AND is_standard = 0", (target,))]
+    except Exception as exc:  # noqa: BLE001
+        _warn("%s: spectroscopic epochs not read from the lcodb spectra DB (%s: %s); "
+              "plots will have no spectroscopy ticks", target, type(exc).__name__, exc)
         mjds = []
+    else:
+        if not mjds:
+            _warn("%s: no FLOYDS science spectra in the lcodb spectra DB; plots will have no "
+                  "spectroscopy ticks", target)
     last = max(mjds) if mjds else None
     if last is None:
         from ava.database import query
@@ -76,6 +97,9 @@ def webplot(target: str) -> dict:
     files = wp.plot_lightcurves(lc, fd, base, spec_mjd=spec, last_spec_mjd=last_spec, formats=formats)
     files += wp.plot_lightcurves(lc, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last_spec,
                                  recent_days=float(pc.recent_days), formats=formats)
+    files += wp.plot_lightcurves(lc, fd, Path(f"{base}_season"), spec_mjd=spec, last_spec_mjd=last_spec,
+                                 last_season=True, season_gap_days=float(pc.get("season_gap_days", 60.0)),
+                                 formats=formats)
     files += wp.plot_diagnostics(fq, fd, base, formats=formats)
     meas = pd.read_parquet(phot / "measurements.parquet", columns=["frame", "star_id", "is_agn", "mag_inst"])
     files += wp.plot_standards_rms(meas, fq, fd, Path(f"{base}_stan"), last_epochs=int(pc.rms_last_epochs),

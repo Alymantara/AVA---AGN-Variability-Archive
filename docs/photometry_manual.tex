@@ -693,7 +693,8 @@ Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
           f_\nu\,[\text{mJy}] = 10^{(m_\mathrm{cal} - 8.9)/(-2.5)} \times 10^3.
         \end{equation}
   \item Write \texttt{lco\_latest\_<target>.pdf/png} (full timeline),
-        \texttt{*\_last6.*} (last 60 days), and \texttt{*\_swift.*} (Swift UV/X-ray).
+        \texttt{*\_last6.*} (last 60 days), \texttt{*\_season.*} (last observing season),
+        and \texttt{*\_swift.*} (Swift UV/X-ray).
 \end{enumerate}
 
 %%============================================================
@@ -841,9 +842,13 @@ own figure folder, \texttt{<photometry\_root>/<target>/plots/}
 \begin{description}
   \item[\texttt{lco\_latest\_<target>.png/pdf}] Full time-baseline light curve
     per filter (mJy vs MJD), FLOYDS epoch ticks on the top panel, last
-    photometry and spectroscopy dates in the title.
+    photometry and spectroscopy dates in the title, calendar years on the top axis
+    (months on the shorter plots).
   \item[\texttt{lco\_latest\_<target>\_last6.png/pdf}] Last
     \texttt{plots.recent\_days} (default 60) days, y-axis auto-scaled.
+  \item[\texttt{lco\_latest\_<target>\_season.png/pdf}] The last
+    observing season: from the first epoch after the last gap longer than
+    \texttt{plots.season\_gap\_days} (default 60).
   \item[\texttt{lco\_latest\_<target>\_<filter>\_sky.png/pdf}] Seeing,
     airmass, and zero point vs time per filter, one series per site.
   \item[\texttt{lco\_latest\_<target>\_stan.png/pdf}] Magnitude vs median
@@ -868,6 +873,7 @@ Key & Default & Meaning \\
 \midrule
 \texttt{filter\_dict} & \texttt{data/reference/filter\_dict.txt} & filter names, wavelengths, colours \\
 \texttt{recent\_days} & 60 & window for the ``last6'' plot \\
+\texttt{season\_gap\_days} & 60 & gap that starts a season (``season'' plot) \\
 \texttt{rms\_last\_epochs} & 500 & epochs per star in the standards RMS plot \\
 \texttt{formats} & \texttt{[png, pdf]} & output formats \\
 \bottomrule

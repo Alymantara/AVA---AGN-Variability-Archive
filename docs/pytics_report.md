@@ -38,7 +38,7 @@
 | Ensemble solver | `ava/photometry/ensemble.py` | `fit` (full PyTICS), `update` (new epochs), `apply` (AGN), `absolute_zp`, `agn_zero_points`, `run_target` |
 | Stored solution | `<phot>/pytics/<filter>/` | `stars`, `scopes`, `epochs` and `star_scope` Parquet files, plus `meta.json` (includes ZP and colour-term fit) |
 | Intercalibration | `ava/photometry/intercal.py` | flux-flux fit F_scope = a·F_ref + b per camera; `apply_intercal` |
-| Prefect task | `ava/pipeline/tasks/ensemble.py` | runs the above, writes `agn_lightcurve_pytics.parquet/.csv` and the merged web plots `lco_latest_<obj>_merged[_last6]` |
+| Prefect task | `ava/pipeline/tasks/ensemble.py` | runs the above, writes `agn_lightcurve_pytics.parquet/.csv` and the merged web plots `lco_latest_<obj>_merged[_last6|_season]` |
 | Flow and CLI | `flows.py`, `scripts/run_pipeline.py`, `scripts/deploy.py` | new stage `ensemble` (tags photometry, calibration, pytics); `-t` (incremental), `--pytics-full` |
 | Config | `config/ava_config.yaml → ensemble:` | filters, mode, loops, damping, star selection, bad flags, absolute/colour term, cameras to correct |
 | Tests | `tests/test_ensemble.py` (6 tests, offline) | recovers injected offsets and per-camera colour terms, update ≡ refit, flag cut, save/load, intercal |

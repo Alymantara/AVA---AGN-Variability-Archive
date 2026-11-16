@@ -6,8 +6,10 @@ Same figures as the legacy script, drawn from the new products
 
 * :func:`plot_lightcurves` — one panel per filter, flux in mJy (AB), colours
   and wavelengths from ``filter_dict.txt``; spectroscopic epochs as red ticks;
-  title "Last Photo | Last Spec".  ``recent_days`` gives the "last 60 days"
-  version.  (legacy ``lco_latest_<obj>`` / ``_last6``)
+  title "Last Photo | Last Spec"; calendar years (or months, for short windows)
+  on the top axis.  ``recent_days`` gives the "last 60 days" version and
+  ``last_season`` the last observing season; ``label`` prefixes the title
+  (e.g. "Merged by PyTICS").  (legacy ``lco_latest_<obj>`` / ``_last6``; new ``_season``)
 * :func:`plot_swift` — Swift/UVOT + XRT light curves (legacy ``_swift``).
 * :func:`plot_diagnostics` — per filter: seeing, airmass, zero point
   (transparency) vs MJD, per site (legacy ``_<filter>_sky``).
@@ -83,9 +85,69 @@ def _save(fig, out_base: Path, formats) -> list[str]:
     return out
 
 
+def last_season_start(mjd, gap_days: float = 60.0) -> float:
+    """MJD of the first observation after the last gap longer than ``gap_days``."""
+    t = np.sort(np.asarray(mjd, float))
+    t = t[np.isfinite(t)]
+    if len(t) == 0:
+        return np.nan
+    gaps = np.flatnonzero(np.diff(t) > gap_days)
+    return float(t[gaps[-1] + 1]) if len(gaps) else float(t[0])
+
+
+def _mjd_to_year(mjd):
+    return 2000.0 + (np.asarray(mjd, float) - 51544.5) / 365.25
+
+
+def _year_to_mjd(year):
+    return 51544.5 + (np.asarray(year, float) - 2000.0) * 365.25
+
+
+def _year_axis(ax, x0: float, x1: float):
+    """Calendar axis on top of ``ax``: years for long windows, months for short ones."""
+    from datetime import datetime
+
+    from astropy.time import Time
+    from matplotlib.ticker import FixedLocator, NullLocator
+
+    ax.tick_params(axis="x", which="both", top=False)          # the calendar axis takes the top edge
+    top = ax.secondary_xaxis("top", functions=(_mjd_to_year, _year_to_mjd))
+    top.tick_params(axis="x", which="both", direction="in", labelsize=10)
+    span_yr = (x1 - x0) / 365.25
+    if span_yr > 1.5:
+        y0, y1 = int(np.floor(_mjd_to_year(x0))), int(np.ceil(_mjd_to_year(x1)))
+        ticks = [Time(datetime(y, 1, 1)).mjd for y in range(y0, y1 + 1)]
+        top.xaxis.set_major_locator(FixedLocator(_mjd_to_year(ticks)))
+        top.set_xticklabels([str(y) for y in range(y0, y1 + 1)])
+        top.xaxis.set_minor_locator(FixedLocator(_mjd_to_year(
+            [Time(datetime(y, m, 1)).mjd for y in range(y0, y1 + 1) for m in (4, 7, 10)])))
+    else:
+        step = 1 if span_yr < 0.8 else 2
+        d0, d1 = Time(x0, format="mjd").datetime, Time(x1, format="mjd").datetime
+        months, y, m = [], d0.year, d0.month
+        while (y, m) <= (d1.year, d1.month):
+            months.append(datetime(y, m, 1))
+            m += 1
+            if m > 12:
+                y, m = y + 1, 1
+        # only months inside the window, so the first label (with its year) is visible
+        major = [d for d in months if (d.month - 1) % step == 0 and x0 <= Time(d).mjd <= x1]
+        top.xaxis.set_major_locator(FixedLocator(_mjd_to_year([Time(d).mjd for d in major])))
+        top.set_xticklabels([d.strftime("%b %Y") if (i == 0 or d.month == 1) else d.strftime("%b")
+                             for i, d in enumerate(major)])
+        top.xaxis.set_minor_locator(NullLocator())
+    return top
+
+
 def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec_mjd=(), last_spec_mjd=None,
-                     recent_days: float | None = None, formats=("png",)) -> list[str]:
-    """Legacy ``lco_latest_<obj>`` plot (``recent_days``: the last-N-days version).
+                     recent_days: float | None = None, last_season: bool = False, season_gap_days: float = 60.0,
+                     label: str | None = None, formats=("png",)) -> list[str]:
+    """Legacy ``lco_latest_<obj>`` plot.
+
+    ``recent_days``: the last-N-days version; ``last_season``: from the start of the last
+    observing season (after the last gap > ``season_gap_days``); ``label``: prefix for the
+    title (e.g. "Merged by PyTICS").  The first panel carries the spectroscopic epochs as
+    red ticks and a calendar axis on top.
 
     ``lc``: agn_lightcurve (mjd_mid, filter, mag, mag_err, qc_pass)."""
     import matplotlib.pyplot as plt
@@ -95,7 +157,10 @@ def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec
     rows = lco_filters(fd, lc["filter"].unique())
     n = max(len(rows), 1)
     xmin, xmax = lc["mjd_mid"].min(), lc["mjd_mid"].max()
-    x0 = xmax - recent_days if recent_days else xmin
+    if last_season:
+        x0 = last_season_start(lc["mjd_mid"], season_gap_days)
+    else:
+        x0 = xmax - recent_days if recent_days else xmin
     fig, axs = plt.subplots(nrows=n, ncols=1, figsize=(10, 2 * max(n, 2)), sharex=True, squeeze=False)
     axs = axs[:, 0]
     for i, (ax, r) in enumerate(zip(axs, rows.itertuples())):
@@ -116,8 +181,15 @@ def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec
                 if x0 - 5 <= t <= xmax + 5:
                     ax.plot([t, t], [y0 + 0.9 * (y1 - y0), y1], color="r", lw=1)
             ax.set_ylim(y0, y1)
-            last = f"Last {recent_days:.0f} days from: {_iso(xmax)}" if recent_days else f"Last Photo: {_iso(xmax)}"
-            ax.set_title(f"Flux in mJy | {last} | Last Spec: {_iso(last_spec_mjd)}")
+            if last_season:
+                last = f"Last season: {_iso(x0)} to {_iso(xmax)}"
+            elif recent_days:
+                last = f"Last {recent_days:.0f} days from: {_iso(xmax)}"
+            else:
+                last = f"Last Photo: {_iso(xmax)}"
+            head = f"{label} | Flux in mJy" if label else "Flux in mJy"
+            ax.set_title(f"{head} | {last} | Last Spec: {_iso(last_spec_mjd)}", pad=22)
+            _year_axis(ax, x0 - 5.0, xmax + 5.0)
     axs[-1].set_xlim(x0 - 5.0, xmax + 5.0)
     axs[-1].set_xlabel("MJD")
     fig.tight_layout()

@@ -16,7 +16,7 @@ writes, in ``cfg.phot_dir(target)``:
 21k frames, 8 filters); ``mode="auto"`` (daily) adds only the new frames to
 the stored solution (tens of ms per filter) and refits when the update says
 so.  Merged light-curve figures go to ``cfg.target_plots_dir(target)`` as
-``lco_latest_<obj>_merged[_last6]``.
+``lco_latest_<obj>_merged[_last6|_season]``.
 """
 
 from __future__ import annotations
@@ -179,9 +179,10 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         plot_dir = cfg.target_plots_dir(target)
         plot_dir.mkdir(parents=True, exist_ok=True)
         base = plot_dir / f"lco_latest_{target}_merged"
-        files += wp.plot_lightcurves(merged, fd, base, spec_mjd=spec, last_spec_mjd=last,
-                                     formats=list(cfg.plots.formats))
-        files += wp.plot_lightcurves(merged, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last,
-                                     recent_days=float(cfg.plots.recent_days), formats=list(cfg.plots.formats))
+        kw = dict(spec_mjd=spec, last_spec_mjd=last, label="Merged by PyTICS", formats=list(cfg.plots.formats))
+        files += wp.plot_lightcurves(merged, fd, base, **kw)
+        files += wp.plot_lightcurves(merged, fd, Path(f"{base}_last6"), recent_days=float(cfg.plots.recent_days), **kw)
+        files += wp.plot_lightcurves(merged, fd, Path(f"{base}_season"), last_season=True,
+                                     season_gap_days=float(cfg.plots.get("season_gap_days", 60.0)), **kw)
     logger.info("%s: ensemble %s", target, {f: (r["mode"], r["n_epochs"], r.get("colour_terms")) for f, r in report.items()})
     return {"target": target, "filters": report, "plots": files, "fvar": fvar}
