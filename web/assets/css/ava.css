@@ -253,8 +253,8 @@ pre.ava-code { font-size: .82rem; padding: 1rem; background: var(--ava-surface);
 @media (max-width: 1199.98px) { .ava-plots { position: static; } }
 
 /* ---------- Targets: card / classic view toggle ----------------------- */
-html:not([data-view="classic"]) .ava-view-classic,
-html[data-view="classic"] .ava-view-modern { display: none !important; }
+html[data-view="modern"] .ava-view-classic,
+html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 .ava-classic tbody tr[hidden] { display: none; }
 .ava-classic td.filters { letter-spacing: .08em; font-weight: 600; }
 .ava-legend { color: var(--ava-muted); }

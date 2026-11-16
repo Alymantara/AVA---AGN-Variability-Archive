@@ -150,3 +150,61 @@ function ava_norm(string $s): string
 {
     return strtolower(preg_replace('/[^A-Za-z0-9+\-]/', '', $s));
 }
+
+/** True if the (published) database has this table — newer pipeline tables may be missing. */
+function ava_has_table(string $name): bool
+{
+    static $cache = [];
+    if (!isset($cache[$name])) {
+        $st = ava_db()->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?");
+        $st->execute([$name]);
+        $cache[$name] = (bool) $st->fetchColumn();
+    }
+    return $cache[$name];
+}
+
+/**
+ * Spectroscopic line variability (ava.spectroscopy.products → line_variability),
+ * keyed by quantity ("flux", "cont5100") for one target and line.
+ */
+function ava_line_variability(string $dataId, string $line = 'Hbeta_broad'): array
+{
+    if (!ava_has_table('line_variability')) {
+        return [];
+    }
+    $st = ava_db()->prepare('SELECT * FROM line_variability WHERE data_id = ? AND line = ?');
+    $st->execute([$dataId, $line]);
+    $out = [];
+    foreach ($st as $r) {
+        $out[$r['quantity']] = $r;
+    }
+    return $out;
+}
+
+/** data_id => Hβ broad-line flux variability row, for every target that has one. */
+function ava_hbeta_all(): array
+{
+    if (!ava_has_table('line_variability')) {
+        return [];
+    }
+    $out = [];
+    foreach (ava_db()->query("SELECT * FROM line_variability WHERE line='Hbeta_broad' AND quantity='flux'") as $r) {
+        $out[$r['data_id']] = $r;
+    }
+    return $out;
+}
+
+/** Per-band F_var of the merged light curve (ava.photometry.variability), keyed by band. */
+function ava_band_variability(string $dataId): array
+{
+    if (!ava_has_table('photometry_variability')) {
+        return [];
+    }
+    $st = ava_db()->prepare('SELECT * FROM photometry_variability WHERE data_id = ?');
+    $st->execute([$dataId]);
+    $out = [];
+    foreach ($st as $r) {
+        $out[$r['filter']] = $r;
+    }
+    return $out;
+}

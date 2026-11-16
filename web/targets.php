@@ -19,6 +19,7 @@ function classic_state(array $t): array
 
 // Classic table: observing status first (Observing, Archived, to be processed, tba), then name.
 $classic = $targets;
+$hbeta = ava_hbeta_all();   // data_id => Hβ variability (spectroscopy products)
 usort($classic, fn($a, $b) => ((int) ($b['ava'] ?? -1) <=> (int) ($a['ava'] ?? -1))
     ?: strnatcasecmp((string) $a['name'], (string) $b['name']));
 
@@ -28,7 +29,7 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
   // Apply the saved view before the content paints (no flash).
   (function () {
     var v = <?= json_encode($view) ?>;
-    try { if (!v) v = localStorage.getItem('ava-view') || 'modern'; } catch (e) { v = v || 'modern'; }
+    try { if (!v) v = localStorage.getItem('ava-view') || 'classic'; } catch (e) { v = v || 'classic'; }
     document.documentElement.dataset.view = v;
   })();
 </script>
@@ -43,10 +44,10 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
 <div class="container-xxl pb-5">
   <form class="ava-toolbar" role="search" onsubmit="return false">
     <div class="btn-group" role="group" aria-label="View">
-      <input type="radio" class="btn-check" name="view" id="v-modern" value="modern">
-      <label class="btn btn-sm" for="v-modern">Cards</label>
       <input type="radio" class="btn-check" name="view" id="v-classic" value="classic">
       <label class="btn btn-sm" for="v-classic">Classic table</label>
+      <input type="radio" class="btn-check" name="view" id="v-modern" value="modern">
+      <label class="btn btn-sm" for="v-modern">Cards</label>
     </div>
     <label class="visually-hidden" for="q">Search targets</label>
     <input class="form-control form-control-sm ava-search" id="q" type="search" placeholder="Search by name…" autocomplete="off">
@@ -99,6 +100,7 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
             <th data-sort="num" class="num">Photo<br>⟨Δt⟩/d</th>
             <th data-sort="num" class="num">Spec<br>⟨Δt⟩/d</th>
             <th data-sort="num" class="num">Spec<br>epochs</th>
+            <th data-sort="num" class="num">H&beta;<br>F<sub>var</sub></th>
             <th data-sort="num">Status</th>
           </tr>
         </thead>
@@ -122,6 +124,10 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
               <td class="num"><?= $pcad > 0 ? number_format($pcad, 2) : '—' ?></td>
               <td class="num"><?= $scad > 0 ? number_format($scad, 1) : '—' ?></td>
               <td class="num"><?= fmt_int($t['db_floyds_epochs'] ?: null) ?></td>
+              <?php $hb = $hbeta[$t['data_id']] ?? null; ?>
+              <td class="num" data-v="<?= $hb && is_numeric($hb['fvar']) ? (float) $hb['fvar'] : '' ?>"
+                  <?= $hb ? 'title="' . (int) $hb['n_nights'] . ' nights, F_max/F_min ' . number_format((float) $hb['rmax'], 2) . '"' : '' ?>><?=
+                  $hb && is_numeric($hb['fvar']) ? number_format(100 * (float) $hb['fvar'], 1) . '%' : '—' ?></td>
               <td data-v="<?= (int) $t['ava'] ?>"><span class="st-<?= $sk ?>"><?= h($sl) ?></span></td>
             </tr>
           <?php endforeach; ?>

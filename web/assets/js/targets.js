@@ -22,7 +22,7 @@
       history.replaceState(null, '', u);
     }
   };
-  setView(root.dataset.view === 'classic' ? 'classic' : 'modern', false);
+  setView(root.dataset.view === 'modern' ? 'modern' : 'classic', false);
   document.querySelectorAll('input[name=view]').forEach((r) =>
     r.addEventListener('change', () => setView(r.value, true)));
 

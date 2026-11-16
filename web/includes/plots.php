@@ -18,7 +18,10 @@ const AVA_PLOT_KINDS = [
     'swift' => ['_swift', 'Swift'],
     'zoom' => ['_zoom', 'Image'],
     'stan' => ['_stan', 'Variability plot'],
-    'spec_avg' => ['_spec_avg', 'Spectroscopy'],
+    'spec' => ['_spec', 'Latest spectrum'],
+    'hbeta' => ['_hbeta', 'H&beta; light curve'],
+    'hbeta_fit' => ['_hbeta_fit', 'H&beta; fit'],
+    'spec_avg' => ['_spec_avg', 'Mean spectrum'],
 ];
 
 /** Sky diagnostics: site filter label => LCO filter code used in the file name. */

@@ -76,11 +76,21 @@ $cites = array_values(array_filter(array_map(null,
     explode('|', (string) $t['cite_name']), explode('|', (string) $t['cite_url'])), fn($c) => trim((string) $c[0]) !== ''));
 
 /* Plot tabs: only the ones that have been published. */
+// Photometry: the merged (intercalibrated) light curves when they exist — merged full
+// light curve first, so it is the default view; the per-telescope LCO plots only otherwise.
 $photoTabs = [];
-foreach (['lco', 'last6', 'merged', 'merged_pytics', 'merged_last6', 'swift'] as $k) {
-    if ($u = ava_plot_url($t, $k)) {
-        $photoTabs[$k] = [AVA_PLOT_KINDS[$k][1], $u];
+foreach ([['merged', 'merged_last6', 'merged_pytics'], ['lco', 'last6']] as $group) {
+    foreach ($group as $k) {
+        if ($u = ava_plot_url($t, $k)) {
+            $photoTabs[$k] = [AVA_PLOT_KINDS[$k][1], $u];
+        }
     }
+    if ($photoTabs) {
+        break;
+    }
+}
+if ($u = ava_plot_url($t, 'swift')) {
+    $photoTabs['swift'] = [AVA_PLOT_KINDS['swift'][1], $u];
 }
 $skyTabs = [];
 foreach (array_keys(AVA_SKY_FILTERS) as $f) {
@@ -90,8 +100,40 @@ foreach (array_keys(AVA_SKY_FILTERS) as $f) {
 }
 $zoom = ava_plot_url($t, 'zoom');
 $stan = ava_plot_url($t, 'stan');
-$spec = ava_plot_url($t, 'spec_avg');
+$specTabs = [];
+foreach (['spec', 'hbeta', 'hbeta_fit', 'spec_avg'] as $k) {
+    if ($u = ava_plot_url($t, $k)) {
+        $specTabs[$k] = [AVA_PLOT_KINDS[$k][1], $u];
+    }
+}
+$lineVar = ava_line_variability((string) $t['data_id']);
+$bandVar = ava_band_variability((string) $t['data_id']);
 $plotsUpdated = ava_plots_updated($t);
+
+/** "6.17 ± 0.12 × 10⁻¹³" with a shared exponent. */
+function sci(mixed $v, mixed $e = null, int $dp = 2): string
+{
+    if (!is_numeric($v) || (float) $v == 0.0) {
+        return '—';
+    }
+    $x = (int) floor(log10(abs((float) $v)));
+    $m = (float) $v / 10 ** $x;
+    $s = number_format($m, $dp);
+    if (is_numeric($e) && (float) $e > 0) {
+        $s .= ' ± ' . number_format((float) $e / 10 ** $x, $dp);
+    }
+    $sup = strtr((string) $x, ['-' => '⁻', '0' => '⁰', '1' => '¹', '2' => '²', '3' => '³', '4' => '⁴',
+        '5' => '⁵', '6' => '⁶', '7' => '⁷', '8' => '⁸', '9' => '⁹']);
+    return $s . ' × 10' . $sup;
+}
+
+function pct(mixed $v, mixed $e = null): string
+{
+    if (!is_numeric($v)) {
+        return '—';
+    }
+    return number_format(100 * (float) $v, 1) . (is_numeric($e) ? ' ± ' . number_format(100 * (float) $e, 1) : '') . ' %';
+}
 
 $breakdownCols = ['B', 'V', 'u', 'g', 'r', 'i', 'z'];   // legacy column order
 
@@ -230,6 +272,35 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       <?php endif; ?>
       <?php endif; ?>
 
+      <?php if ($lineVar):
+          $any = reset($lineVar);
+          $rows = ['flux' => ['Broad H&beta;', 'erg s⁻¹ cm⁻²'], 'cont5100' => ['Continuum 5100 Å', 'erg s⁻¹ cm⁻² Å⁻¹']]; ?>
+      <h2 class="ava-h">H&beta; variability</h2>
+      <div class="table-responsive">
+      <table class="table ava-info">
+        <thead><tr><th></th><th class="num">Mean</th><th class="num"><abbr title="Fractional variability: rms variation in excess of the measurement errors, as a fraction of the mean flux">F<sub>var</sub></abbr></th><th class="num"><abbr title="Ratio of the highest to the lowest nightly flux (not corrected for errors)">F<sub>max</sub>/F<sub>min</sub></abbr></th><th class="num">Median S/N</th></tr></thead>
+        <tbody>
+          <?php foreach ($rows as $q => [$label, $unit]): if (!isset($lineVar[$q])) { continue; } $r = $lineVar[$q]; ?>
+          <tr><th><?= $label ?><span class="mjd"><?= $unit ?></span></th>
+            <td class="num"><?= sci($r['mean'], $r['mean_err']) ?></td>
+            <td class="num"><?= pct($r['fvar'], $r['fvar_err']) ?></td>
+            <td class="num"><?= fmt_num($r['rmax'], 2) ?></td>
+            <td class="num"><?= fmt_num($r['snr_median'], 0) ?></td></tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      </div>
+      <p class="small text-secondary">
+        <?= fmt_int($any['n_spectra']) ?> spectra on <?= fmt_int($any['n_nights']) ?> nights
+        (MJD <?= fmt_num($any['mjd_first'], 1) ?>–<?= fmt_num($any['mjd_last'], 1) ?>)<?php if (is_pos($any['fwhm_kms_median'])): ?>;
+        median H&beta; FWHM <?= fmt_int(round((float) $any['fwhm_kms_median'])) ?> km s⁻¹<?php endif; ?>;
+        <?= (int) $any['oiii_calibrated'] ? '[O III]-calibrated' : 'not [O III]-calibrated' ?>;
+        fit <code><?= h($any['method']) ?></code>; updated <?= h(substr((string) $any['updated_utc'], 0, 10)) ?>.
+        F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean (Vaughan et al. 2003);
+        F<sub>max</sub>/F<sub>min</sub>: highest / lowest nightly flux (not corrected for errors).
+      </p>
+      <?php endif; ?>
+
       <h2 class="ava-h">Data citation</h2>
       <?php if ($cites): ?>
         <ul class="ava-cites">
@@ -262,19 +333,28 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
             }
             $top['image'] = ['Image', $html];
         }
-        if ($skyTabs) {
-            ob_start();
-            $panes = [];
-            foreach ($skyTabs as $f => $u) {
-                $panes[$f] = [h($f), plot_img($u, "$f-band seeing, airmass and zero point")];
-            }
-            tabs('sky', $panes, 'pills');
-            $top['sky'] = ['Sky', ob_get_clean()];
+        // QC: the variability plot, then the sky conditions per filter.
+        $qc = [];
+        if ($stan) {
+            $qc['stan'] = ['Variability plot', plot_img($stan, 'Variability plot: field-star magnitude vs RMS, AGN marked')];
         }
-        if ($stan) { $top['stan'] = ['Variability plot', plot_img($stan, 'Variability plot: field-star magnitude vs RMS, AGN marked')]; }
-        if ($spec) { $top['spec'] = ['Spectroscopy', plot_img($spec, 'Mean FLOYDS spectrum')]; }
+        foreach ($skyTabs as $f => $u) {
+            $qc["sky_$f"] = ['Sky ' . h($f), plot_img($u, "$f-band seeing, airmass and zero point")];
+        }
+        if ($qc) {
+            ob_start();
+            tabs('qc', $qc, 'pills');
+            $top['qc'] = ['QC', ob_get_clean()];
+        }
+        if ($specTabs) {
+            ob_start();
+            tabs('sp', array_map(fn($p) => [$p[0], plot_img($p[1], $t['name'] . ' FLOYDS ' . strip_tags($p[0]))], $specTabs), 'pills');
+            $top['spec'] = ['Spectroscopy', ob_get_clean()];
+        }
 
         if ($top) {
+            // Tab order: Photometry, Spectroscopy, then the diagnostics.
+            $top = array_filter(array_replace(array_fill_keys(['photo', 'spec', 'image', 'qc'], null), $top));
             tabs('pl', $top);
         } else {
             echo '<div class="ava-noplots">Light curves and diagnostics have not been published for this target yet.</div>';
@@ -297,12 +377,23 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       <tbody>
         <tr><th>#Epochs</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= fmt_int($lcoFrames($f)) ?></td><?php endforeach; ?></tr>
         <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_pos($t["avg_$f"]) ? fmt_num($t["avg_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
-        <?php if (is_pos($t['merged'])): ?>
+        <?php if ($bandVar): ?>
+        <tr><th>F<sub>var</sub> (merged)</th><?php foreach ($breakdownCols as $f): $r = $bandVar[$f] ?? null; ?>
+          <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs, F_max/F_min ' . fmt_num($r['rmax'], 2) . '"' : '' ?>><?=
+            $r && is_numeric($r['fvar']) ? number_format(100 * (float) $r['fvar'], 1) . '<span class="mjd">± '
+              . number_format(100 * (float) $r['fvar_err'], (float) $r['fvar_err'] < 0.001 ? 2 : 1) . ' %</span>' : '—' ?></td>
+        <?php endforeach; ?></tr>
+        <?php elseif (is_pos($t['merged'])): ?>
         <tr><th>Fractional variability</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_numeric($t["frac_$f"]) && (float) $t["frac_$f"] == 0 ? '—' : h((string) $t["frac_$f"]) ?></td><?php endforeach; ?></tr>
         <?php endif; ?>
       </tbody>
     </table>
   </div>
+  <?php if ($bandVar): $bv0 = reset($bandVar); ?>
+    <p class="small text-secondary">F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean flux, of the PyTICS-merged light curve
+      (errors: <?= h((string) $bv0['error_model']) ?>), MJD <?= fmt_num($bv0['mjd_first'], 0) ?>–<?= fmt_num($bv0['mjd_last'], 0) ?>;
+      updated <?= h(substr((string) $bv0['updated_utc'], 0, 10)) ?>.</p>
+  <?php endif; ?>
 
   <?php if (is_pos($t['lt_cadence'])): $lt = ['u', 'g', 'r', 'i', 'z']; ?>
   <div class="table-responsive">
