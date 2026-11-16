@@ -18,7 +18,7 @@ analytic Gaussian integrals; errors from the Jacobian covariance scaled by the r
 and flux-calibration errors (grey factor).  Hβ and the 5100 Å continuum are reported raw and scaled.
 
 Variability: fractional variability F_var (Rodríguez-Pascual et al. 1997) with its error (Vaughan et al. 2003),
-R_max, rms, mean.
+F_max/F_min, rms, mean (``ava.utils.variability``).
 """
 
 from __future__ import annotations
@@ -222,24 +222,11 @@ def nightly(t: pd.DataFrame, col: str, err: str) -> pd.DataFrame:
 
 
 def variability(f, e) -> dict:
-    """mean, rms, F_var ± err (excess variance; NaN when the scatter is below the errors), R_max, <σ>/mean."""
-    f, e = np.asarray(f, float), np.asarray(e, float)
-    ok = np.isfinite(f) & np.isfinite(e)
-    f, e = f[ok], e[ok]
-    n = len(f)
-    if n < 3:
-        return {"n": n}
-    mean, s2 = float(f.mean()), float(f.var(ddof=1))
-    err2 = float(np.mean(e ** 2))
-    excess = s2 - err2
-    fvar = float(np.sqrt(excess) / mean) if excess > 0 else np.nan
-    fvar_err = np.nan
-    if np.isfinite(fvar):                   # Vaughan et al. (2003) eq. 11
-        fvar_err = float(np.sqrt((np.sqrt(1 / (2 * n)) * err2 / (mean ** 2 * fvar)) ** 2
-                                 + (np.sqrt(err2 / n) / mean) ** 2))
-    return {"n": n, "mean": mean, "rms": float(np.sqrt(s2)), "mean_err": float(np.sqrt(err2)),
-            "fvar": fvar, "fvar_err": fvar_err, "rmax": float(f.max() / f.min()) if f.min() > 0 else np.nan,
-            "snr_median": float(np.median(f / e))}
+    """mean, rms, F_var ± err, F_max/F_min (key ``rmax``), median S/N: the shared ``ava.utils.variability``, so
+    the Hβ and photometric numbers are computed the same way."""
+    from ava.utils.variability import variability as _variability
+
+    return _variability(f, e)
 
 
 def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, window=None) -> float:
@@ -256,3 +243,36 @@ def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, 
     x = sp[(sp.w > window[0]) & (sp.w < window[1])]
     narrow = model(fit["params"], x.w.to_numpy(), s, "oiii") + model(fit["params"], x.w.to_numpy(), s, "hb_narrow")
     return float(np.trapezoid(x.f - (c0 + c1 * (x.w - 4930.0)) - narrow, x.w))
+
+
+def narrow_line_fluxes(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, half_window: float = 30.0) -> dict:
+    """Each [O III] line measured on its own, independent of the tied doublet ratio of the fit.
+
+    Around each line (±``half_window`` Å), the data minus the fitted continuum and broad Hβ are fitted by weighted
+    linear least squares with a straight local baseline (absorbing any local misfit of the broad line, e.g. Hβ's red
+    shoulder under 4959) plus the line with the fitted [O III] profile (core + wing, shape and position fixed) and a
+    free flux.  Returns oiii5007_int, oiii4959_int and their errors (NaN when the fit failed or the window is not
+    covered)."""
+    s = s or FitSettings()
+    out = {k: np.nan for k in ("oiii5007_int", "oiii5007_int_err", "oiii4959_int", "oiii4959_int_err")}
+    p = fit.get("params") or {}
+    if not p:
+        return out
+    fw = p.get("Fw", 0.0) / p["F5007"] if p.get("F5007", 0) > 0 else 0.0     # wing / core flux ratio
+    for lam, key in ((O3B, "oiii5007"), (O3A, "oiii4959")):
+        c = lam + p.get("dn", 0.0)
+        x = sp[(sp.w > c - half_window) & (sp.w < c + half_window)]
+        if len(x) < 10:
+            continue
+        w, e = x.w.to_numpy(), x.e.to_numpy()
+        r = x.f.to_numpy() - model(p, w, s, "cont") - model(p, w, s, "hb_broad")
+        prof = gauss(w, 1.0, c, p.get("sn", 4.0))
+        if s.oiii_wing and fw > 0:
+            prof = (prof + gauss(w, fw, lam + p.get("dw", 0.0), p.get("sw", 8.0))) / (1 + fw)
+        A = np.vstack([np.ones_like(w), (w - c) / half_window, prof]).T / e[:, None]
+        coef, *_ = np.linalg.lstsq(A, r / e, rcond=None)
+        cov = np.linalg.pinv(A.T @ A)
+        chi2 = float(np.sum((A @ coef - r / e) ** 2) / max(len(w) - 3, 1))
+        out[f"{key}_int"] = float(coef[2])
+        out[f"{key}_int_err"] = float(np.sqrt(cov[2, 2] * max(chi2, 1.0)))
+    return out

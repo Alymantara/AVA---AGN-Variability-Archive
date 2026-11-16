@@ -5,7 +5,7 @@ Variability statistics shared by photometry and spectroscopy.
 with the Vaughan et al. (2003, MNRAS 345, 1271; eq. 11) uncertainty, and the
 max/min flux ratio F_max/F_min (key and DB column ``rmax``; labelled F_max/F_min,
 not R_max, so it is not confused with a CCF peak coefficient r_max).
-Identical to ``ava.spectroscopy.lines.variability`` so the photometric and Hβ
+``ava.spectroscopy.lines.variability`` calls this, so the photometric and Hβ
 numbers are directly comparable.
 """
 
@@ -15,7 +15,7 @@ import numpy as np
 
 
 def variability(f, e) -> dict:
-    """mean, rms, F_var ± err (NaN when the scatter is below the errors), R_max, median S/N."""
+    """mean, rms, F_var ± err (NaN when the scatter is below the errors), F_max/F_min, median S/N."""
     f, e = np.asarray(f, float), np.asarray(e, float)
     ok = np.isfinite(f) & np.isfinite(e)
     f, e = f[ok], e[ok]

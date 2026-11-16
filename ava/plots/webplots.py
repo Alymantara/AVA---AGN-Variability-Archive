@@ -22,12 +22,36 @@ Flux: f[mJy] = 1000 * 10**(-0.4 (m_AB - 8.90)),  σ_f = f σ_m / 1.0857.
 
 from __future__ import annotations
 
+import functools
+import threading
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 AB_JY = 8.90           # m_AB = -2.5 log10(f / 1 Jy) + 8.90
+
+PLOT_LOCK = threading.RLock()
+
+
+def serialized(fn):
+    """Draw one figure at a time, with its style changes kept local to it.
+
+    Matplotlib is not thread-safe (pyplot state, ``rcParams``, the mathtext parser) and the pipeline runs targets
+    in a thread pool (``pipeline.n_cores``): concurrent figures fail with random mathtext ``ParseException``\ s, and
+    one module's ``rcParams`` (the bigger spectroscopy fonts) would leak into another's figure.  Every website plot
+    function holds ``PLOT_LOCK`` for the whole figure inside ``plt.rc_context()``, on the Agg backend (the macOS GUI
+    backend refuses to create figures off the main thread).
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        with PLOT_LOCK, plt.rc_context():
+            return fn(*args, **kwargs)
+    return wrapper
 
 
 def load_filter_dict(path: Path) -> pd.DataFrame:
@@ -139,6 +163,7 @@ def _year_axis(ax, x0: float, x1: float):
     return top
 
 
+@serialized
 def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec_mjd=(), last_spec_mjd=None,
                      recent_days: float | None = None, last_season: bool = False, season_gap_days: float = 60.0,
                      label: str | None = None, formats=("png",)) -> list[str]:
@@ -199,6 +224,7 @@ def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec
     return out
 
 
+@serialized
 def plot_swift(swift: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec_mjd=(), formats=("png",)) -> list[str]:
     """Legacy ``_swift`` plot.  ``swift``: one target's rows of the Swift DB (Band, MJD, Flux, Error);
     UVOT fluxes in erg/s/cm²/Å are converted to mJy at the band wavelength; X-ray bands
@@ -236,6 +262,7 @@ def plot_swift(swift: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec_mj
     return out
 
 
+@serialized
 def plot_diagnostics(fq: pd.DataFrame, fd: pd.DataFrame, out_base: Path, formats=("png",)) -> list[str]:
     """Legacy ``_<filter>_sky`` plots: seeing, airmass, zero point vs MJD per site, one figure per filter.
     ``fq``: frame_qc rows (QC-passing frames are used, as in the legacy script)."""
@@ -268,6 +295,7 @@ def plot_diagnostics(fq: pd.DataFrame, fd: pd.DataFrame, out_base: Path, formats
     return out
 
 
+@serialized
 def plot_standards_rms(meas: pd.DataFrame, fq: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *,
                        last_epochs: int = 500, formats=("png",)) -> list[str]:
     """Legacy ``_stan`` plot: calibrated magnitude vs RMS for every star with > 10 epochs

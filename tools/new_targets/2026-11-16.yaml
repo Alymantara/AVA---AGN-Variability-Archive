@@ -1,0 +1,60 @@
+# AGN with LCO data that were missing from the AVA database (added 2026-11-16 with tools/add_ava_targets.py).
+# name: AVA display name; resolve: the name SIMBAD/NED know (default: name); data_id: folder name; lco_id: the
+# LCO OBJECT spelling with most frames (URL-encoded on the site). Literature values as supplied by J. V.
+# Hernández Santisteban (citations as given; ADS bibcodes to be added in *_url).
+targets:
+  - name: "3C 382"
+    data_id: "3C_382"
+    lco_id: "3c382"
+    l_5100: 44.20
+    l_5100_cite: "Fausnaugh et al. (2017)"
+    logm: 8.98
+    logm_cite: "Fausnaugh et al. (2017)"
+  - name: "Ark 564"
+    data_id: "Ark_564"
+    lco_id: "Ark 564"
+    logm: 6.36
+    logm_cite: "Lewin et al. (2022)"
+  - name: "1H 1934-063"
+    data_id: "1H_1934-063"
+    lco_id: "1H 1934-063"
+    logm: 6.48
+    logm_cite: "Rodríguez-Ardila et al. (2000)"
+  - name: "NGC 1566"
+    data_id: "NGC_1566"
+    lco_id: "NGC1566"
+    logl: 44.00
+    logl_cite: "Woo & Urry (2002)"
+    logm: 6.92
+    logm_cite: "Woo & Urry (2002)"
+  - name: "PHL 1811"
+    data_id: "PHL_1811"
+    lco_id: "PHL1811"
+    l_5100: 45.56
+    l_5100_cite: "Vestergaard & Peterson (2006)"
+    logm: 8.26
+    logm_cite: "Leighly et al. (2007)"
+  - name: "Mrk 1018"
+    data_id: "Mrk_1018"
+    lco_id: "Mrk1018"
+    l_5100: 43.79
+    l_5100_cite: "Bennert et al. (2011)"
+    logm: 8.15
+    logm_cite: "Bennert et al. (2011)"
+  - name: "Kaz 102"
+    data_id: "Kaz_102"
+    lco_id: "Kaz 102"
+  - name: "Kaz 163"
+    data_id: "Kaz_163"
+    lco_id: "Kaz 163"
+  - name: "RX J1755.0+6519"
+    data_id: "RXJ1755.0+6519"
+    lco_id: "RX J1755.0+6519"
+  - name: "IRAS 09149-6206"          # LCO frames are logged as "IRAS 09149-6202" (a typo; same position)
+    data_id: "IRAS_09149-6206"
+    lco_id: "IRAS 09149-6202"
+# Corrections to existing rows (matched by id): position, redshift and name from SIMBAD/Gaia.
+fix:
+  - id: 30
+    name: "RX J2219.8+0935"           # was "RX J22198-0935": the declination is +09 35 (LCO frames, SIMBAD)
+    resolve: "RX J2219.8+0935"

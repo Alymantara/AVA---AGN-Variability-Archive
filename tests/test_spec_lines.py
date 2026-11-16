@@ -77,3 +77,14 @@ def test_export_prepspec(tmp_path):
     assert hjd == ["T_20260813_ogg_0005_blue.dat", "61266.00500", "T_20260915_ogg_0002_blue.dat", "61299.00500"]
     d = np.loadtxt(out / "T_20260915_ogg_0002_red.dat")
     assert d.shape[1] == 3 and d[:, 0].min() >= 5300 and np.allclose(d[:, 1], 1e-15)
+
+
+def test_oiii_lines_measured_independently():
+    """Each [O III] line on its own recovers the injected doublet (5007/4959 = 2.98), also under a broad Hβ."""
+    sp = synth(o3=3e-13, noise=0.005)
+    r = L.fit_hbeta(sp)
+    n = L.narrow_line_fluxes(sp, r)
+    assert abs(n["oiii5007_int"] / 3e-13 - 1) < 0.05
+    assert abs(n["oiii4959_int"] / (3e-13 / L.O3_RATIO) - 1) < 0.08
+    assert n["oiii5007_int_err"] > 0 and n["oiii4959_int_err"] > 0
+    assert np.isnan(L.narrow_line_fluxes(sp, {})["oiii5007_int"])        # no fit: nothing measured

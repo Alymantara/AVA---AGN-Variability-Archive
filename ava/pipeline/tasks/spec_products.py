@@ -105,7 +105,7 @@ def spec_products(target: str) -> dict:
                                            plot_dir / f"lco_latest_{target}_hbeta", formats, g_colour=gcol)
         out["g_band_nights"] = len(g)
     v = summ["flux"]
-    logger.info("%s: %d spectra (%d good) on %d nights, [O III]-calibrated %s; Hβ mean %.3g, F_var %s, R_max %s",
+    logger.info("%s: %d spectra (%d good) on %d nights, [O III]-calibrated %s; Hβ mean %.3g, F_var %s, F_max/F_min %s",
                 target, meta["n_spectra"], meta.get("n_good", 0), meta.get("n_nights", 0), meta.get("oiii_calibrated"),
                 v.get("mean", float("nan")), f"{100 * v['fvar']:.1f}%" if v.get("fvar") == v.get("fvar") and "fvar" in v
                 else "n/a", f"{v.get('rmax', float('nan')):.2f}")

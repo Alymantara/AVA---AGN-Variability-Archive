@@ -57,7 +57,7 @@ def fit_key(s: L.FitSettings, z: float) -> str:
     """Identifies the fit settings (and redshift) a cached fit was made with."""
     from dataclasses import asdict
 
-    return json.dumps({**asdict(s), "z": round(float(z), 7)}, sort_keys=True, default=list)
+    return json.dumps({**asdict(s), "z": round(float(z), 7), "measures": 4}, sort_keys=True, default=list)   # 4: + the [O III] lines
 
 
 def _file_stamp(f) -> tuple[int, int]:
@@ -98,6 +98,7 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
                "night": Path(f).name.split("-")[2],          # LCO DAY-OBS (site-aware observing night)
                "qc": h["L1QFLAGS"], **{k: v for k, v in r.items() if k != "params"}}
         row["hb_integrated"] = L.integrated_hbeta(sp, r, s) if r.get("ok") else np.nan
+        row.update(L.narrow_line_fluxes(sp, r, s) if r.get("ok") else L.narrow_line_fluxes(sp, {}, s))
         row["params_json"] = json.dumps({k: float(v) for k, v in r.get("params", {}).items()})
         row.update(file_size=size, file_mtime=mtime, fit_key=key)
         rows.append(row)
@@ -124,6 +125,11 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
     if len(night):
         night = night.merge(cont.rename(columns={cont.columns[2]: "cont5100", cont.columns[3]: "cont5100_err"})
                             [["night", "cont5100", "cont5100_err"]], on="night", how="left")
+    for key in ("oiii5007_int", "oiii4959_int"):       # [O III] lines as measured (not calibrated: they set it)
+        if key in t and len(night):
+            o = L.nightly(t.assign(**{f"{key}_err": t[f"{key}_err"].where(t[f"{key}_err"] > 0)}), key, f"{key}_err")
+            if len(o):
+                night = night.merge(o[["night", key, f"{key}_err"]], on="night", how="left")
     meta = {**ref, "oiii_calibrated": cal, "n_spectra": len(t), "n_good": int(t["good"].sum()),
             "n_nights": len(night), "n_fitted": n_fit, "n_cached": len(t) - n_fit}
     return t, night, meta

@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ava.plots.webplots import serialized
 from ava.spectroscopy import lines as L
 
 WIDTH = 9.0                      # inches; every spectroscopy web figure. The website shows plots ~650 px wide, so
@@ -73,6 +74,7 @@ def _ylim(f, top_pad=0.18):
     return min(0.0, lo) - 0.03 * (hi - lo), hi + top_pad * (hi - lo)
 
 
+@serialized
 def latest_spectrum(arms: dict, hdr: dict, target_name: str, z: float, out_base: Path, formats=("png",),
                     red_range=(5300.0, 9050.0), unit=1e-15) -> list[str]:
     """Two panels: blue arm, red arm (``red_range`` observed Å).  Lines marked at the redshift; tellurics shaded."""
@@ -117,6 +119,7 @@ def latest_spectrum(arms: dict, hdr: dict, target_name: str, z: float, out_base:
     return files
 
 
+@serialized
 def latest_hbeta_fit(sp: pd.DataFrame, fit: dict, settings: L.FitSettings, hdr: dict, target_name: str, z: float,
                      out_base: Path, formats=("png",), window=(4720.0, 5130.0), unit=1e-15) -> list[str]:
     """The Hβ-region fit of the latest spectrum (blue arm, rest frame): data, model components, residuals."""
@@ -194,13 +197,16 @@ def _year_axis(ax):
     top.tick_params(direction="in", which="both", length=6)
 
 
+@serialized
 def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: str, gband: pd.DataFrame,
                      out_base: Path, formats=("png",), g_colour="#008000") -> list[str]:
-    """Broad Hβ ([O III]-calibrated), 5100 Å continuum and — when its dates overlap — the g band, shared time axis."""
+    """Broad Hβ ([O III]-calibrated), both [O III] lines as measured (before the calibration they set), 5100 Å
+    continuum and — when its dates overlap — the g band, on one time axis."""
     plt = _setup()
     has_g = len(gband) > 0
-    rows = (["g"] if has_g else []) + ["hb", "cont"]
-    heights = {"g": 1.0, "hb": 1.25, "cont": 1.05}
+    has_o3 = "oiii5007_int" in night and night["oiii5007_int"].notna().any()
+    rows = (["g"] if has_g else []) + ["hb"] + (["oiii"] if has_o3 else []) + ["cont"]
+    heights = {"g": 1.0, "hb": 1.25, "oiii": 1.05, "cont": 1.05}
     fig, ax = plt.subplots(len(rows), 1, figsize=(WIDTH, 2.1 * sum(heights[r] for r in rows) + 1.4), sharex=True,
                            gridspec_kw=dict(height_ratios=[heights[r] for r in rows]), squeeze=False)
     ax = dict(zip(rows, ax[:, 0]))
@@ -224,6 +230,23 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
           if np.isfinite(var.get("fvar", np.nan)) else "F$_{\\rm var}$ not detected")
     cal = "[O III]-calibrated" if meta.get("oiii_calibrated") else "not [O III]-calibrated"
     label(a, h, f"broad Hβ · {fv} · F$_{{\\rm max}}$/F$_{{\\rm min}}$ = {var.get('rmax', np.nan):.2f}")
+    if has_o3:
+        a = ax["oiii"]
+        hs, ls = [], []
+        for key, mult, col, mk, lab in (("oiii5007_int", 1.0, GREEN, "o", "[O III] 5007"),
+                                        ("oiii4959_int", 2.98, "#CC79A7", "D", "[O III] 4959 × 2.98")):
+            if key not in night or night[key].notna().sum() == 0:
+                continue
+            y, e = mult * night[key] / 1e-13, mult * night[f"{key}_err"] / 1e-13
+            h = a.errorbar(night.MJD, y, e, fmt=mk, ms=6, color=col, mec="white", mew=0.7, elinewidth=1.2,
+                           capsize=0, alpha=0.9)
+            ok = np.isfinite(y)
+            rms = 100 * np.nanstd(y[ok], ddof=1) / np.nanmean(y[ok]) if ok.sum() > 1 else np.nan
+            hs.append(h)
+            ls.append(f"{lab} (rms {rms:.1f} %)" if np.isfinite(rms) else lab)
+        a.set_ylabel(r"[O III] ($10^{-13}$ cgs)")
+        leg = a.legend(hs, ls, loc="best", fontsize=11, handletextpad=0.4, borderaxespad=0.4)
+        leg.set_title("as measured, before the [O III] calibration", prop={"size": 10})
     a = ax["cont"]
     h = a.errorbar(night.MJD, night.cont5100 / 1e-15, night.cont5100_err / 1e-15, fmt="s", ms=7, color=BLUE,
                    mec="white", mew=0.8, elinewidth=1.4, capsize=0)
@@ -247,6 +270,7 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
     return files
 
 
+@serialized
 def mean_rms_spectrum(mr: dict, target_name: str, z: float, out_base: Path, formats=("png",), unit=1e-15,
                       date_range: str = "") -> list[str]:
     """[O III]-calibrated mean spectrum and RMS spectrum (rest frame, both arms).  With one night the RMS

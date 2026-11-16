@@ -235,7 +235,7 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 **Fit choices:**
 - **One broad Gaussian.** Same-night exposure pairs were used to compare methods. A free 2-Gaussian broad component trades flux with the continuum: 12–19 % pair scatter for Mrk 817, 9 % rms for NGC 4151. One Gaussian gives 0.5 / 1.5 / 4 % for Mrk 817 / NGC 4151 / Fairall 9.
 - **Cross-check.** The flux integrated above the continuum is stored as `flux_integrated`.
-- **[O III] calibration.** Each spectrum is scaled to the median [O III] 5007 of the QC-OK spectra. It removes the grey factors: the raw Hβ of Fairall 9 has F_var 18 % and R_max 4.4; calibrated, 2.2 % and 1.26.
+- **[O III] calibration.** Each spectrum is scaled to the median [O III] 5007 of the QC-OK spectra. It removes the grey factors: the raw Hβ of Fairall 9 has F_var 18 % and F_max/F_min 4.4; calibrated, 2.2 % and 1.26.
 - **Nights** are grouped by LCO DAY-OBS. At COJ, MJD − 0.5 splits the night.
 
 **Results:**
@@ -275,3 +275,19 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - `-R` with no nights reduces only nights with unreduced science frames.
 - `-P` keeps `<spec_dir>/hbeta_fits.parquet` (per-spectrum fits; refit only new or changed files, or on new settings) and `spec_offsets.csv` + `spec_align_template.npz` (one cross-correlation per new spectrum).
 - A fully cached `-P` for Fairall 9 (100 spectra) takes 14 s.
+
+## AVA target table additions (16 Nov 2026, `tools/add_ava_targets.py`, `tools/new_targets/2026-11-16.yaml`)
+
+**Added (ids 72–81):** 3C 382, Ark 564, 1H 1934-063, NGC 1566, PHL 1811, Mrk 1018, Kaz 102, Kaz 163, RX J1755.0+6519 and IRAS 09149-6206.
+- Positions come from SIMBAD via Sesame (SIMBAD's TAP service and astroquery 0.4.6 both fail) and are replaced by the Gaia DR3 nucleus within 2″.
+- Redshifts come from SIMBAD, or NED for Kaz 102/163. E(B−V) is SF11 from IRSA. The literature values are as supplied.
+
+**Corrected:** id 30 is RX J2219.8**+**0935, not "RX J22198-0935": the declination is +09°35′ (SIMBAD, LCO frames). Its data_id `J22198-0935` is kept.
+
+**LCO spellings:** all are linked by `lcodb link`, including 3C 382/3c382, Ark 564/Ark564, NGC 1566/NGC1566, PHL 1811/PHL1811, Mrk 1018/Mrk1018, RX J1755+65/RX J1755.0+6519, and "IRAS 09149-6202" (an LCO typo for 09149-6206).
+
+**To do:**
+- **Kaz 163** (a galaxy pair) has no Gaia source within 2″ of NED's position. The nearest is G = 20.3 at 2.8″, which coincides with the LCO pointing. Check which nucleus is the AGN before setting `agn_gaia_dr3_id`.
+- **Redshift disagreements, SIMBAD vs NED:** 3C 382 0.0579 vs 0.0556; RX J1755 0.0785 vs 0.0806; PHL 1811 0.192 vs 0.194.
+- **ADS bibcodes:** add them in `*_url` for the new literature values (only the citation names were supplied).
+- **Vmag** is not maintained by the pipeline: only the original import set it. After the merge (PyTICS / intercalibration), the photometry package should update `agn.Vmag` (or a g-band equivalent) from the merged light curve.
