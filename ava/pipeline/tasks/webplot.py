@@ -15,13 +15,11 @@ Outputs (``cfg.plots_dir``, legacy names):
 
 Spectroscopic epochs: raw FLOYDS science spectra in the lcodb spectra DB
 (red ticks); without it, only the last FLOYDS date from ``ava.db``.
-If ``paths.web_server_host`` is set the PNGs are copied there with scp.
 """
 
 from __future__ import annotations
 
 import sqlite3
-import subprocess
 from contextlib import closing
 from pathlib import Path
 
@@ -58,8 +56,8 @@ def spectroscopy_epochs(target: str) -> tuple[list[float], float | None]:
 
 
 @task(name="webplot", tags=["web"])
-def webplot(target: str, publish: bool = True) -> dict:
-    """Draw (and optionally publish) the website figures for ``target``."""
+def webplot(target: str) -> dict:
+    """Draw the website figures for ``target``."""
     from ava.photometry import store
     from ava.pipeline.tasks.calibrate import frame_db_path
     from ava.plots import webplots as wp
@@ -88,14 +86,4 @@ def webplot(target: str, publish: bool = True) -> dict:
         if len(sw):
             files += wp.plot_swift(sw, fd, Path(f"{base}_swift"), spec_mjd=spec, formats=formats)
     logger.info("%s: %d figure files in %s", target, len(files), out_dir)
-
-    published = False
-    host = cfg.paths.get("web_server_host")
-    if publish and host:
-        pngs = [f for f in files if f.endswith(".png")]
-        dest = f"{cfg.paths.web_server_user}@{host}:{cfg.paths.web_server_path}/"
-        r = subprocess.run(["scp", "-q", "-o", "BatchMode=yes", *pngs, dest], capture_output=True, text=True)
-        published = r.returncode == 0
-        if not published:
-            logger.warning("scp to %s failed: %s", host, r.stderr.strip()[-300:])
-    return {"target": target, "plots": files, "published": published}
+    return {"target": target, "plots": files}

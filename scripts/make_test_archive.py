@@ -89,7 +89,6 @@ def main(targets, dest, apass_source, reset):
         plots_dir=str(dest / "plots"),
         logs=str(dest / "logs"),
         database=str(db_copy),
-        web_server_host="",
     )
     raw["photometry"].setdefault("calibration", {})["frame_db"] = str(dest / "frame_qc.sqlite")
     raw["pipeline"]["target_source"] = "database"

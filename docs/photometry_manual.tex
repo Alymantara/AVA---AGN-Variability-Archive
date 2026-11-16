@@ -694,8 +694,6 @@ Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
         \end{equation}
   \item Write \texttt{lco\_latest\_<target>.pdf/png} (full timeline),
         \texttt{*\_last6.*} (last 60 days), and \texttt{*\_swift.*} (Swift UV/X-ray).
-  \item If \texttt{paths.web\_server\_host} is set, copy PNGs over scp
-        (key-based auth only).
 \end{enumerate}
 
 %%============================================================
@@ -856,8 +854,7 @@ The webplot task calls \texttt{ava.plots.webplots} and writes to
 
 Spectroscopic epoch ticks are read directly from the lcodb spectra SQLite DB
 (FLOYDS science spectra, \texttt{rlevel=0}), falling back to the last FLOYDS
-date in \texttt{ava.db}.  If \texttt{paths.web\_server\_host} is set, the
-PNGs are pushed to the web server via scp (key-based auth only).
+date in \texttt{ava.db}.
 
 Configuration (\texttt{plots} section of \texttt{ava\_config.yaml}):
 
@@ -1505,12 +1502,6 @@ with uncertainties $\sigma_f = f_\nu \,/\, 1.0857 \times \sigma_m$.
   \item Standard-star magnitude vs photometric RMS, with the AGN overlaid.  This is the
         primary internal photometric quality diagnostic.
 \end{itemize}
-
-\subsection{Remote delivery}
-
-Plots are \texttt{scp}\textquotesingle d to the web server
-(\texttt{ringworld.st-andrews.ac.uk:/polaris2/jvhs1/halpha\_survey/ava\_latest/}) by the
-generated shell script.
 
 %%============================================================
 \section{Stage 6 --- Inter-calibration: \texttt{ava\_merge.py}}

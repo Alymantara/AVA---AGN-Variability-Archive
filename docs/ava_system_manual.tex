@@ -201,8 +201,7 @@ installation begins:
         On macOS: \texttt{brew install sextractor}.
         On Linux: \texttt{sudo apt install sextractor} or compile from source.
   \item \textbf{SSH access} to the LCO data storage machine (if working
-        remotely), and to the web server \texttt{ringworld.st-andrews.ac.uk}
-        (for plot delivery).
+        remotely).
 \end{itemize}
 
 \subsection{Step 1 --- Clone the repositories}
@@ -300,10 +299,6 @@ paths.template\_dir      & SExtractor config templates  & \texttt{/data3/jvhs1/a
 paths.floyds\_pipeline   & banzai-floyds working copy   & \texttt{\$BASE/floyds/banzai-floyds} \\
 paths.database           & AVA SQLite master DB         & \texttt{data/ava.db} \\
 paths.ava\_csv           & AVA master CSV               & \texttt{data/ava/ava.csv} \\
-\midrule
-paths.web\_server\_host  & Web server hostname          & \texttt{ringworld.st-andrews.ac.uk} \\
-paths.web\_server\_path  & Remote plot destination      & \texttt{/polaris2/.../ava\_latest} \\
-paths.web\_server\_user  & SSH user on web server       & \texttt{jvhs1} \\
 \bottomrule
 \end{tabular}
 \caption{Path keys that must be set for each machine.  Relative paths are
@@ -408,7 +403,7 @@ pytest tests/ -v
 \subsection{Data directory structure on the production machine}
 
 For reference, the expected layout on the production machine
-(\texttt{ringworld} / \texttt{data2--3}) is:
+(\texttt{/data2}, \texttt{/data3}) is:
 
 \begin{lstlisting}[style=shell]
 # Photometry  (--  /data3/jvhs1/agn/ --)

@@ -93,13 +93,6 @@ paths:
   # (built by scripts/make_test_archive.py; never production data).
   test_archive: "data/test_archive"
 
-  # ---- Web server delivery --------------------------------
-  # Remote server and path for scp-based plot delivery.
-  # Set to "" to disable remote copy.
-  # (ringworld.st-andrews.ac.uk is retired — remote copy disabled.)
-  web_server_host: ""
-  web_server_path: ""
-  web_server_user: ""
 
 
 # ============================================================
