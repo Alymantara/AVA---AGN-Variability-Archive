@@ -53,12 +53,44 @@ def _header(path) -> dict:
     return {k: h.get(k) for k in keys}
 
 
+def fit_key(s: L.FitSettings, z: float) -> str:
+    """Identifies the fit settings (and redshift) a cached fit was made with."""
+    from dataclasses import asdict
+
+    return json.dumps({**asdict(s), "z": round(float(z), 7)}, sort_keys=True, default=list)
+
+
+def _file_stamp(f) -> tuple[int, int]:
+    st = Path(f).stat()
+    return int(st.st_size), int(st.st_mtime)
+
+
 def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good=("OK",),
-                 min_series: int = 3, scale_limits=(0.2, 5.0)) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Per-exposure fits (+ [O III] calibration) and the nightly light curve."""
+                 min_series: int = 3, scale_limits=(0.2, 5.0),
+                 cache: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Per-exposure fits (+ [O III] calibration) and the nightly light curve.
+
+    ``cache``: a per-target table (parquet) of the per-spectrum fits (fluxes, [O III] flux and wavelength
+    offset, parameters).  A spectrum whose file (size, mtime) and fit settings are unchanged is taken from it;
+    only new or changed spectra are fitted, so a daily update costs one fit per new spectrum.  The [O III]
+    reference, scale factors and nightly light curve are always recomputed from the whole series."""
     s = settings or L.FitSettings()
-    rows = []
+    key = fit_key(s, z)
+    cached = {}
+    if cache is not None and Path(cache).exists():
+        try:
+            c = pd.read_parquet(cache)
+            cached = {r["path"]: r for r in c.to_dict("records") if r.get("fit_key") == key}
+        except Exception:  # noqa: BLE001 — an unreadable cache is rebuilt
+            cached = {}
+    rows, n_fit = [], 0
     for f in files:
+        size, mtime = _file_stamp(f)
+        hit = cached.get(str(f))
+        if hit is not None and hit.get("file_size") == size and hit.get("file_mtime") == mtime:
+            rows.append(hit)
+            continue
+        n_fit += 1
         h = _header(f)
         sp = L.blue_arm(f, z)
         r = L.fit_hbeta(sp, s)
@@ -67,8 +99,16 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
                "qc": h["L1QFLAGS"], **{k: v for k, v in r.items() if k != "params"}}
         row["hb_integrated"] = L.integrated_hbeta(sp, r, s) if r.get("ok") else np.nan
         row["params_json"] = json.dumps({k: float(v) for k, v in r.get("params", {}).items()})
+        row.update(file_size=size, file_mtime=mtime, fit_key=key)
         rows.append(row)
     t = pd.DataFrame(rows)
+    if cache is not None and len(t):
+        keep = [c for c in t.columns if not c.startswith(("oiii_scale", "hb_broad_cal", "cont5100_cal", "good",
+                                                             "oiii_calibrated"))]
+        Path(cache).parent.mkdir(parents=True, exist_ok=True)
+        t[keep].to_parquet(cache, index=False)
+    t = t[[c for c in t.columns if not c.startswith(("oiii_scale", "hb_broad_cal", "cont5100_cal", "good",
+                                                     "oiii_calibrated"))]]
     if t.empty:
         return t, pd.DataFrame(), {"n_spectra": 0}
     for c in ("hb_broad", "hb_broad_err", "oiii5007", "oiii5007_err", "cont5100", "cont5100_err"):
@@ -85,7 +125,7 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
         night = night.merge(cont.rename(columns={cont.columns[2]: "cont5100", cont.columns[3]: "cont5100_err"})
                             [["night", "cont5100", "cont5100_err"]], on="night", how="left")
     meta = {**ref, "oiii_calibrated": cal, "n_spectra": len(t), "n_good": int(t["good"].sum()),
-            "n_nights": len(night)}
+            "n_nights": len(night), "n_fitted": n_fit, "n_cached": len(t) - n_fit}
     return t, night, meta
 
 
@@ -231,3 +271,193 @@ def export_prepspec(files, target: str, out_dir: Path, *, red_min_wavelength: fl
         p.unlink()
     return {"dir": str(out_dir), "blue": len(entries["blue"]), "red": len(entries["red"]),
             "skipped": skipped, "removed": len(stale)}
+
+
+# ---------------------------------------------------------------------------
+# Per-arm wavelength offsets (cached) and [O III]-calibrated mean and RMS spectra
+# ---------------------------------------------------------------------------
+
+#: rest-frame windows with narrow lines used to align each arm ([O III]; [O I] 6300 and [S II] 6716/6731), and
+#: ranges masked inside them: the Hα + [N II] complex (strong, variable, sometimes clipped; Hα–[N II] 6583 is
+#: 20.5 Å, an alias the correlation otherwise locks onto)
+ALIGN_WINDOWS = {"blue": (4900.0, 5050.0), "red": (6250.0, 6800.0)}
+ALIGN_MASK = {"blue": (), "red": ((6450.0, 6650.0),)}
+
+
+def _highpass(f, k):
+    from scipy.ndimage import median_filter
+
+    return f - median_filter(f, k, mode="nearest")
+
+
+def _xshift(ref, f, step, max_shift=6.0, weight=None):
+    """Shift (Å) that best aligns ``f`` to ``ref`` (both on one grid of bin ``step``), searched within
+    ±``max_shift``; ``weight`` (0/1 per bin) masks ranges.  Correlation at whole-pixel lags (no interpolation:
+    shifting by fractions of a pixel with linear interpolation smooths the spectrum and biases the peak towards
+    whole pixels) with a parabola through the peak for the sub-pixel part.
+    aligned(λ) = f(λ + shift), i.e. correct wavelengths as λ − shift."""
+    n = len(ref)
+    wt = np.ones(n) if weight is None else np.asarray(weight, float)
+    max_pix = max(int(np.ceil(max_shift / step)), 1)
+    lags = np.arange(-max_pix, max_pix + 1)
+    cc = []
+    for lag in lags:          # sum_i ref[i] * f[i + lag] over the overlap
+        if lag >= 0:
+            cc.append(np.sum((wt * ref)[: n - lag] * f[lag:]))
+        else:
+            cc.append(np.sum((wt * ref)[-lag:] * f[: n + lag]))
+    cc = np.asarray(cc)
+    i = int(np.argmax(cc))
+    d = 0.0
+    if 0 < i < len(cc) - 1:
+        den = cc[i - 1] - 2 * cc[i] + cc[i + 1]
+        d = 0.5 * (cc[i - 1] - cc[i + 1]) / den if den != 0 else 0.0
+    return float((lags[i] + d) * step)
+
+
+def _align_weight(w, arm):
+    wt = np.ones(len(w))
+    for lo, hi in ALIGN_MASK[arm]:
+        wt[(w > lo) & (w < hi)] = 0.0
+    return wt
+
+
+def _arm_on_grid(path, arm, z, grid, red_min_observed=5300.0, red_max_observed=9050.0):
+    s = arms(path)[arm]
+    if arm == "red":
+        s = s[(s.w >= red_min_observed) & (s.w <= red_max_observed)]
+    w = s.w.to_numpy() / (1 + z)
+    if len(w) < 20 or w.min() > grid[0] or w.max() < grid[-1]:
+        return None, None
+    return np.interp(grid, w, s.f.to_numpy()), np.interp(grid, w, s.e.to_numpy())
+
+
+def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.0, rebuild: bool = False) -> pd.DataFrame:
+    """Wavelength offset of every spectrum in each arm (Å, rest frame), by cross-correlating the high-passed
+    narrow-line window (``ALIGN_WINDOWS``) with a stored reference template.
+
+    Files in ``spec_dir``: ``spec_align_template.npz`` (the template: median of the aligned spectra, built once
+    from the series, or again with ``rebuild``) and ``spec_offsets.csv`` (one row per spectrum: shift_blue_A,
+    shift_red_A, file size/mtime).  A new spectrum costs one cross-correlation; unchanged ones are read back.
+    |shift| > ``max_shift`` → NaN (that arm of that spectrum is left out of the mean/RMS)."""
+    spec_dir = Path(spec_dir)
+    tpl_f, off_f = spec_dir / "spec_align_template.npz", spec_dir / "spec_offsets.csv"
+    tpl = None
+    if tpl_f.exists() and not rebuild:
+        d = np.load(tpl_f)
+        tpl = {k: d[k] for k in d.files}
+        if abs(float(tpl.get("z", z)) - z) > 1e-6:
+            tpl = None
+    grids, steps = {}, {}
+    for arm, (lo, hi) in ALIGN_WINDOWS.items():
+        steps[arm] = (1.72 if arm == "blue" else 3.48) / (1 + z)
+        grids[arm] = np.arange(lo - 60, hi + 60, steps[arm])
+    if tpl is None:                                   # build the template: median, aligned twice
+        tpl = {"z": np.array(z)}
+        for arm, g in grids.items():
+            k = max(int(60 / steps[arm]) | 1, 5)
+            H = [_highpass(f, k) for f, _ in (_arm_on_grid(p, arm, z, g) for p in t["path"]) if f is not None]
+            if len(H) == 0:
+                continue
+            H = np.array(H)
+            m = (g > ALIGN_WINDOWS[arm][0]) & (g < ALIGN_WINDOWS[arm][1])
+            wt = _align_weight(g[m], arm)
+            ref = np.median(H, axis=0)
+            for _ in range(2):
+                sh = np.array([_xshift(ref[m], h[m], steps[arm], max_shift, wt) for h in H])
+                sh = np.where(np.abs(sh) >= max_shift - steps[arm] / 4, 0.0, sh)
+                ref = np.median([np.interp(g, g - x, h) for h, x in zip(H, sh)], axis=0)
+            tpl[f"grid_{arm}"], tpl[f"ref_{arm}"] = g, ref
+        spec_dir.mkdir(parents=True, exist_ok=True)
+        np.savez(tpl_f, **tpl)
+        old = pd.DataFrame()
+    else:
+        old = pd.read_csv(off_f) if off_f.exists() else pd.DataFrame()
+    known = {r["path"]: r for r in old.to_dict("records")} if len(old) else {}
+    rows = []
+    for p in t["path"]:
+        size, mtime = _file_stamp(p)
+        k = known.get(str(p))
+        if k is not None and k.get("file_size") == size and k.get("file_mtime") == mtime:
+            rows.append(k)
+            continue
+        row = {"basename": Path(p).name.split("-e91")[0] + "-e00", "path": str(p), "file_size": size, "file_mtime": mtime}
+        for arm in ("blue", "red"):
+            g = tpl.get(f"grid_{arm}")
+            f = None if g is None else _arm_on_grid(p, arm, z, g)[0]
+            if f is None:
+                row[f"shift_{arm}_A"] = np.nan
+                continue
+            st = float(np.median(np.diff(g)))
+            m = (g > ALIGN_WINDOWS[arm][0]) & (g < ALIGN_WINDOWS[arm][1])
+            x = _xshift(tpl[f"ref_{arm}"][m], _highpass(f, max(int(60 / st) | 1, 5))[m], st, max_shift,
+                        _align_weight(g[m], arm))
+            row[f"shift_{arm}_A"] = x if abs(x) < max_shift - st / 4 else np.nan   # at the search edge: no match
+        rows.append(row)
+    off = pd.DataFrame(rows)
+    off.to_csv(off_f, index=False, float_format="%.4f")
+    return off
+
+
+def mean_rms(t: pd.DataFrame, z: float, red_max_observed: float = 9050.0, red_min_observed: float = 5300.0,
+             offsets: pd.DataFrame | None = None, match_resolution: bool = True,
+             resolution_percentile: float = 90.0) -> dict:
+    """Mean and RMS spectra (rest frame) per arm from the series ``t`` of :func:`hbeta_series`.
+
+    Each good spectrum is scaled by its [O III] factor (``oiii_scale``; 1 when the series is not calibrated),
+    shifted by its arm offset (``offsets`` from :func:`arm_offsets`; else the blue arm by the fitted [O III]
+    shift) and, with ``match_resolution``, smoothed to a common line width: the ``resolution_percentile`` of the
+    fitted [O III] widths (σ) — in a 6\" slit the seeing sets the width, which otherwise leaves the narrow lines in
+    the RMS; the red arm gets the same spatial width (scaled by its dispersion).  Spectra are resampled onto one
+    grid per arm, averaged per night (DAY-OBS) and over the nights: mean, RMS = standard deviation (ddof 1;
+    Peterson 2004), noise = typical nightly error.  Any number of nights: with one, ``rms`` is None."""
+    from scipy.ndimage import gaussian_filter1d
+
+    use = t[t["good"]] if "good" in t and t["good"].any() else t[t.get("ok", True)]
+    out = {"calibrated": bool(use.get("oiii_calibrated", pd.Series([False])).any()), "n_spectra": len(use)}
+    if use.empty:
+        return out
+    off = offsets.set_index("path") if offsets is not None and len(offsets) else None
+    sig = pd.to_numeric(use.get("oiii_sigma_A", pd.Series(dtype=float)), errors="coerce")
+    target_sig = float(np.nanpercentile(sig, resolution_percentile)) if match_resolution and sig.notna().any() else None
+    out["resolution_sigma_A"] = target_sig
+    for arm in ("blue", "red"):
+        specs = []
+        for r in use.itertuples():
+            s = arms(r.path)[arm]
+            if arm == "red":
+                s = s[(s.w >= red_min_observed) & (s.w <= red_max_observed)]
+            if len(s) < 50:
+                continue
+            w = s.w.to_numpy() / (1 + z)
+            if off is not None and r.path in off.index:
+                x = off.loc[r.path, f"shift_{arm}_A"]
+                if not np.isfinite(x):
+                    continue                                   # implausible offset: left out of this arm
+                w = w - float(x)
+            elif arm == "blue" and np.isfinite(getattr(r, "oiii_shift_A", np.nan)):
+                w = w - float(r.oiii_shift_A)
+            k = float(getattr(r, "oiii_scale", 1.0)) if out["calibrated"] else 1.0
+            sg = float(getattr(r, "oiii_sigma_A", np.nan))
+            specs.append((str(r.night), w, k * s.f.to_numpy(), k * s.e.to_numpy(), sg))
+        if not specs:
+            continue
+        lo, hi = max(x[1].min() for x in specs), min(x[1].max() for x in specs)
+        step = float(np.median([np.median(np.diff(x[1])) for x in specs]))
+        if hi - lo < 20 * step:
+            continue
+        grid = np.arange(lo, hi, step)
+        disp = (step / (1.72 / (1 + z))) if arm == "red" else 1.0   # red arm: ~2x the Å per spatial pixel
+        nights: dict[str, list] = {}
+        for n, w, f, e, sg in specs:
+            fi = np.interp(grid, w, f)
+            if target_sig and np.isfinite(sg) and target_sig > sg:
+                fi = gaussian_filter1d(fi, disp * np.sqrt(target_sig ** 2 - sg ** 2) / step)
+            nights.setdefault(n, []).append((fi, np.interp(grid, w, e)))
+        nf = np.array([np.mean([x[0] for x in v], axis=0) for v in nights.values()])
+        ne = np.array([np.sqrt(np.sum([x[1] ** 2 for x in v], axis=0)) / len(v) for v in nights.values()])
+        n = len(nf)
+        out[arm] = {"w": grid, "mean": nf.mean(axis=0), "rms": nf.std(axis=0, ddof=1) if n > 1 else None,
+                    "noise": np.sqrt(np.mean(ne ** 2, axis=0)), "n_nights": n,
+                    "n_spectra": sum(len(v) for v in nights.values())}
+    return out

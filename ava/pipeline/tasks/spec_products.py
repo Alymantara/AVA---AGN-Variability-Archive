@@ -3,6 +3,7 @@ Spectroscopy products task — website products of a target's reduced FLOYDS spe
 
 1. ``lco_latest_<target>_spec``: the latest spectrum, blue and red arm panels (red to ``red_range``);
    ``lco_latest_<target>_hbeta_fit``: the Hβ-region fit of that spectrum (reference);
+   ``lco_latest_<target>_spec_avg``: [O III]-calibrated mean and RMS spectrum (one night: mean only);
 2. ``lco_latest_<target>_hbeta``: broad-Hβ light curve (Gaussian fit, [O III]-calibrated when there is a
    series), 5100 Å continuum, and the g-band light curve over the same dates when one exists;
 3. records: per-exposure fits → ``spec_lines`` (lcodb spectra DB); flux and variability → ``line_variability``
@@ -51,7 +52,10 @@ def spec_products(target: str) -> dict:
                       oiii_wing=bool(hb.get("oiii_wing", True)))
     t, night, meta = P.hbeta_series(files, z, s, qc_good=tuple(hb.get("oiii_reference_qc", ["OK"])),
                                     min_series=int(hb.get("min_series", 3)),
-                                    scale_limits=tuple(hb.get("scale_limits", (0.2, 5.0))))
+                                    scale_limits=tuple(hb.get("scale_limits", (0.2, 5.0))),
+                                    cache=cfg.spec_dir(target) / "hbeta_fits.parquet")
+    logger.info("%s: Hβ fits: %d new, %d from the cache (%s)", target, meta.get("n_fitted", 0),
+                meta.get("n_cached", 0), cfg.spec_dir(target) / "hbeta_fits.parquet")
     method = f"gauss{s.broad_components}b+oiii{'w' if s.oiii_wing else ''}"
     # 1. latest spectrum (two arms) and its Hβ fit (reference)
     lp = pc.get("latest_spectrum", {}) or {}
@@ -64,6 +68,28 @@ def spec_products(target: str) -> dict:
     fit = L.fit_hbeta(sp, s)
     out["plots"] += W.latest_hbeta_fit(sp, fit, s, hdr, entry["name"], z, plot_dir / f"lco_latest_{target}_hbeta_fit",
                                        formats)
+    # mean and RMS spectrum ([O III]-calibrated when there is a series; one spectrum is fine too)
+    if len(t):
+        mp = pc.get("mean_rms", {}) or {}
+        good = t[t["good"]] if t["good"].any() else t
+        off = P.arm_offsets(good, z, cfg.spec_dir(target), max_shift=float(mp.get("max_shift_A", 6.0)))
+        bad = off[off[["shift_blue_A", "shift_red_A"]].isna().any(axis=1)]
+        for r in bad.itertuples():
+            logger.warning("  %s: no plausible wavelength offset in some arm (left out of that arm's mean/RMS)",
+                           r.basename)
+        logger.info("%s: arm offsets (Å) blue median %+.2f σ %.2f, red median %+.2f σ %.2f → %s", target,
+                    off.shift_blue_A.median(), off.shift_blue_A.std(), off.shift_red_A.median(), off.shift_red_A.std(),
+                    cfg.spec_dir(target) / "spec_offsets.csv")
+        excl = tuple(mp.get("exclude_flags", ["CRLINE"]) or [])
+        tm = t[~t["qc"].astype(str).str.split(",").map(lambda f: any(x in excl for x in f))] if excl else t
+        if len(tm) < len(t):
+            logger.info("%s: mean/RMS without %d spectra flagged %s", target, len(t) - len(tm), list(excl))
+        mr = P.mean_rms(tm, z, red_max_observed=float(lp.get("red_range", (5300.0, 9050.0))[1]), offsets=off,
+                        match_resolution=bool(mp.get("match_resolution", True)),
+                        resolution_percentile=float(mp.get("resolution_percentile", 90.0)))
+        span = f"MJD {t.MJD.min():.0f}–{t.MJD.max():.0f}" if t.MJD.max() - t.MJD.min() > 0.5 else f"MJD {t.MJD.min():.1f}"
+        out["plots"] += W.mean_rms_spectrum(mr, entry["name"], z, plot_dir / f"lco_latest_{target}_spec_avg", formats,
+                                            date_range=span)
     csv = cfg.spec_dir(target) / f"{target}_FLOYDS_Hbeta_lightcurve.csv"
     summ = P.record(t, night, meta, target, lcodb_path("spec"), cfg.db_path, csv, method)
     if csv.exists():

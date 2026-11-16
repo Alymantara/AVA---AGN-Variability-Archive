@@ -245,3 +245,66 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
     files = _save(fig, out_base, formats)
     plt.close(fig)
     return files
+
+
+def mean_rms_spectrum(mr: dict, target_name: str, z: float, out_base: Path, formats=("png",), unit=1e-15,
+                      date_range: str = "") -> list[str]:
+    """[O III]-calibrated mean spectrum and RMS spectrum (rest frame, both arms).  With one night the RMS
+    panel says so instead of plotting."""
+    plt = _setup()
+    arms_ = [a for a in ("blue", "red") if a in mr]
+    if not arms_:
+        return []
+    n_n = max(mr[a]["n_nights"] for a in arms_)
+    has_rms = n_n > 1 and any(mr[a]["rms"] is not None for a in arms_)
+    fig, (am, ar) = plt.subplots(2, 1, figsize=(WIDTH, 7.4), sharex=True, gridspec_kw=dict(height_ratios=[1.2, 1]))
+    blue_max = mr["blue"]["w"].max() if "blue" in mr else -np.inf
+    ymax_m = ymax_r = 0.0
+    for arm, col in (("blue", BLUE), ("red", RED)):
+        if arm not in mr:
+            continue
+        d = mr[arm]
+        sel = d["w"] > blue_max if arm == "red" else np.ones(len(d["w"]), bool)   # red only beyond the blue arm
+        w = d["w"][sel]
+        m = d["mean"][sel] / unit
+        am.fill_between(w, 0, m, color=col, alpha=0.07, lw=0, step="mid")
+        am.plot(w, m, color=col, lw=1.4, drawstyle="steps-mid", label=f"{arm} arm")
+        ymax_m = max(ymax_m, _ylim(m)[1])
+        if has_rms and d["rms"] is not None:
+            rr = d["rms"][sel] / unit
+            ar.plot(w, rr, color=col, lw=1.4, drawstyle="steps-mid")
+            ar.plot(w, d["noise"][sel] / unit, color=GREY, lw=1.2, ls="--",
+                    label="noise level" if arm == "blue" else None)
+            ymax_r = max(ymax_r, _ylim(rr)[1])
+    lo = min(mr[a]["w"].min() for a in arms_)
+    hi = max(mr[a]["w"].max() for a in arms_)
+    ar.set_xlim(lo, hi)
+    for name, lam in LINES.items():
+        if lo + 20 < lam < hi - 20:
+            for a in (am, ar):
+                a.axvline(lam, color="0.8", lw=1.0, ls=(0, (2, 3)), zorder=0)
+            am.text(lam, 0.975, name, transform=am.get_xaxis_transform(), rotation=90, ha="right", va="top",
+                    fontsize=12, color=MUTED)
+    am.set_ylim(0, ymax_m)
+    am.set_ylabel(r"mean $F_\lambda$ ($10^{-15}$ cgs)")
+    am.legend(loc="center right", fontsize=11)
+    if has_rms:
+        ar.set_ylim(0, max(ymax_r, 1e-30))
+        ar.set_ylabel(r"RMS ($10^{-15}$ cgs)")
+        ar.legend(loc="upper right", fontsize=11)
+    else:
+        ar.set_yticks([])
+        ar.text(0.5, 0.5, f"RMS spectrum needs at least two nights ({n_n} so far)", transform=ar.transAxes,
+                ha="center", va="center", fontsize=14, color=MUTED)
+    ar.set_xlabel("rest wavelength (Å)")
+    cal = "[O III]-calibrated" if mr.get("calibrated") else "not [O III]-calibrated (series too short)"
+    top_ = _header(fig, f"{target_name} — mean and RMS spectrum",
+                   f"{mr.get('n_spectra', 0)} spectr{'a' if mr.get('n_spectra', 0) != 1 else 'um'} · "
+                   f"{n_n} night{'s' if n_n != 1 else ''}"
+                   + (f" · {date_range}" if date_range else "") + f" · {cal}", fig.get_figheight())
+    fig.tight_layout(rect=(0, 0.015, 1, top_))
+    fig.subplots_adjust(hspace=0.05)
+    _credit(fig)
+    files = _save(fig, out_base, formats)
+    plt.close(fig)
+    return files

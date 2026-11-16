@@ -2,7 +2,8 @@
 Spectroscopy reduce task — run the improved banzai-floyds on a target's downloaded nights.
 
 See :mod:`ava.spectroscopy.reduce`.  Settings: ``spectroscopy.reduction`` (environment, sky flats,
-workers).  Nights: those given, else every night of the target with raw science frames on disk.
+workers).  Nights: those given (re-reduced), else only the nights with raw science frames that have no reduced
+-1d yet — so the daily ``-D -R -P`` processes new spectra only.
 
 Outputs:
   <spec_root>/<target>/reduced/<YYYYMMDD>/*-e91-1d/-2d   our science products
@@ -33,6 +34,18 @@ def reduction_settings() -> dict:
                 cleanup=dict(r.get("cleanup") or {}))
 
 
+def pending_nights(target_raw: Path, reduced: Path) -> list[str]:
+    """Nights (YYYYMMDD) with at least one raw science frame (e00) without its reduced -1d in ``reduced``."""
+    out = []
+    for d in sorted(target_raw.glob("20??????")):
+        for f in d.glob("*-e00.fits*"):
+            stem = f.name.split(".fits")[0].replace("-e00", "-e91-1d")
+            if not any((reduced / d.name).glob(f"{stem}.fits*")):
+                out.append(d.name)
+                break
+    return out
+
+
 @task(name="spec-reduce", tags=["spectroscopy", "reduction", "banzai-floyds"])
 def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
     """Reduce ``target``'s downloaded FLOYDS nights with the improved banzai-floyds; QC → spectra DB."""
@@ -47,11 +60,11 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
     if entry is None:
         raise ValueError(f"{target!r} is not a known data_id")
     target_raw, std_raw = cfg.spec_raw(target), cfg.spec_raw(target).parent / "standards"
-    if not nights:
-        nights = sorted(p.name for p in target_raw.glob("20??????") if any(p.glob("*-e00.fits*")))
+    if not nights:   # incremental: only nights with raw science frames that have no reduced -1d yet
+        nights = pending_nights(target_raw, cfg.spec_dir(target) / "reduced")
     nights = [n.replace("-", "") for n in nights]
     if not nights:
-        logger.warning("%s: no downloaded nights in %s", target, target_raw)
+        logger.info("%s: nothing to reduce (every downloaded science frame in %s has a -1d)", target, target_raw)
         return {"target": target, "nights": [], "reduced": 0}
     work, db = s["work"], s["work"] / "floyds.db"
     processed, log = work / "processed", work / "logs" / f"{target}.log"

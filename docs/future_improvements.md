@@ -249,3 +249,29 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 **Still to do:**
 - Fe II is not modelled (fine for these three; Fe II-strong AGN will need a template).
 - The g band comes from the merged photometry CSV only (Mrk 817 in the test archive).
+
+## Mean / RMS spectrum and incremental spectroscopy products (16 Nov 2026)
+
+**New plot:** `lco_latest_<t>_spec_avg` (website "Mean spectrum" slot). It is the [O III]-calibrated mean and RMS of the nightly spectra, in the rest frame, both arms.
+- One night: mean only, with a note.
+- No spectra: no file (the site hides the tab).
+
+**Alignment:**
+- Each arm gets an offset by cross-correlation against a stored template. Blue arm: [O III]. Red arm: [O I] and [S II], with Hα + [N II] masked, because Hα–[N II] 6583 = 20.5 Å is an alias the correlation otherwise locks onto.
+- The correlation runs at whole-pixel lags with a parabolic peak. Quarter-pixel linear interpolation biased shifts ~4× low (pixel locking).
+- Then all nights are smoothed to the 90th-percentile [O III] width. With a 6″ slit the seeing sets the width.
+- Spectra flagged CRLINE are left out of the mean/RMS.
+
+**Narrow-line residual in the RMS** (RMS at the line / nearby continuum):
+
+| Line | Before | After |
+|---|---|---|
+| NGC 4151 [O III] | 14.7 | 6.6 (likely its extended NLR; mapspec-style kernels would do better) |
+| NGC 4151 Hα | 24 | 5.7 (now the real variability) |
+| Fairall 9 [O III] | 1.9 | 1.8 |
+| Fairall 9 Hα | 5.9 | 5.9 (real) |
+
+**Incremental updates:**
+- `-R` with no nights reduces only nights with unreduced science frames.
+- `-P` keeps `<spec_dir>/hbeta_fits.parquet` (per-spectrum fits; refit only new or changed files, or on new settings) and `spec_offsets.csv` + `spec_align_template.npz` (one cross-correlation per new spectrum).
+- A fully cached `-P` for Fairall 9 (100 spectra) takes 14 s.

@@ -388,6 +388,14 @@ spectroscopy:
       min_series: 3              # spectra needed to calibrate with [O III]
       oiii_reference_qc: ["OK"]  # L1QFLAGS of the spectra that set the reference [O III] flux
       scale_limits: [0.2, 5.0]   # [O III] scale factors outside this are not used
+    # mean and RMS spectrum (lco_latest_<t>_spec_avg): arm offsets by cross-correlation against a stored
+    # template (<spec_dir>/spec_align_template.npz, offsets in spec_offsets.csv, new spectra only), then all
+    # nights smoothed to a common narrow-line width (6" slit: the seeing sets it) before mean and RMS.
+    mean_rms:
+      match_resolution: true
+      resolution_percentile: 90.0  # target width: this percentile of the fitted [O III] sigmas
+      max_shift_A: 6.0             # larger offsets: that arm of that spectrum is left out
+      exclude_flags: ["CRLINE"]    # L1QFLAGS left out: clipped emission lines put spikes in the RMS
     # PrepSpec input (<spec_dir>/<folder>/): one 3-column file (wave, flux, err) per spectrum and arm,
     # <target>_blue.hjd / <target>_red.hjd listing "file MJD" (mid-exposure). Rewritten each run.
     prepspec:
