@@ -624,8 +624,7 @@ factor, marginalising over these nuisance parameters.
 
 \subsection{Output}
 
-Merged light-curve files and plots are written to the \texttt{ava\_merging/} subdirectory,
-then copied to \texttt{ava\_plots/} and \texttt{scp}\textquotesingle d to the web server.
+Merged light-curve files and plots are written to the \texttt{ava\_merging/} subdirectory.
 
 \begin{warnbox}
 \textbf{Migration target.}  \texttt{pycali\_jvhs} is a private package not on PyPI and
@@ -842,7 +841,7 @@ paths.photometry\_root   & Root of photometry data tree & \texttt{/data3/jvhs1/a
 paths.photometry\_raw    & Raw frames subfolder         & \texttt{raw\_data} \\
 paths.spectra\_root      & Root of spectroscopy data tree & \texttt{/data2/jvhs1/agn} \\
 paths.spectra\_raw       & Raw FLOYDS frames subfolder  & \texttt{raw\_data} \\
-paths.plots\_dir         & Shared plot output directory & \texttt{/data3/jvhs1/agn/ava\_plots} \\
+paths.target\_plots\_subdir & Per-target figure folder   & \texttt{plots} (in \texttt{<target>/}) \\
 paths.swift\_db          & Swift/UVOT merged CSV        & \texttt{/data3/jvhs1/agn/ava\_swift\_updated.csv} \\
 paths.template\_dir      & SExtractor config templates  & \texttt{/data3/jvhs1/agn/template\_pipeline} \\
 paths.floyds\_pipeline   & banzai-floyds working copy   & \texttt{\$BASE/floyds/banzai-floyds} \\
@@ -966,11 +965,11 @@ For reference, the expected layout on the production machine
     apass_pytics.csv        # Reformatted for pytics
     lco_latest.pkl          # Calibrated photometry (all epochs)
     lco_latest_stan.pkl     # Calibrated standard stars
-    lco_latest_*.pdf/png    # Light-curve plots
+    plots/                  # All pipeline figures for this target
+      lco_latest_*.pdf/png  # Light-curve and diagnostic plots
     sextractor_ava/
       *_cat.fits            # SExtractor catalogues
     ava_merging/            # CALI workspace
-  ava_plots/                # Plots copied here before web delivery
   ava_swift_updated.csv     # Swift/UVOT merged database
   template_pipeline/        # SExtractor config templates
 

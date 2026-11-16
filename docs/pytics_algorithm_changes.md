@@ -232,8 +232,8 @@ PyTICS makes the comparison *stars* agree between cameras. An extended AGN can s
 | AGN light curve (merged, absolute) | `<phot>/agn_lightcurve_pytics.parquet` / `.csv` | `run_target` + `intercal_lightcurve` |
 | Intercalibration table | `<phot>/pytics/intercal.csv` | `intercal_lightcurve` |
 | ZP star table | `<phot>/pytics/absolute_zp_stars.parquet` | `run_target` |
-| Web plots | `cfg.plots_dir/lco_latest_<obj>_merged[_last6].png/.pdf` | Prefect task `ensemble` |
-| **Shareable merged light curve** | `<phot>/<target>_LCO_merged_lightcurve.csv` (copied to `cfg.plots_dir`) | `export_merged_csv` |
+| Web plots | `<phot>/<target>/plots/lco_latest_<obj>_merged[_last6].png/.pdf` | Prefect task `ensemble` |
+| **Shareable merged light curve** | `<phot>/<target>_LCO_merged_lightcurve.csv` | `export_merged_csv` |
 
 Commands: `run_pipeline.py -t` (daily, incremental) and `--pytics-full` (on demand).
 

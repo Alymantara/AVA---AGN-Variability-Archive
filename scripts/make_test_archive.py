@@ -56,7 +56,7 @@ def main(targets, dest, apass_source, reset):
     dest = (dest or cfg._resolve(cfg.paths.test_archive)).resolve()
 
     # Guard: never let the sandbox overlap real data roots.
-    for real in (cfg.phot_root, cfg.spec_root, cfg.plots_dir):
+    for real in (cfg.phot_root, cfg.spec_root):
         if dest == real or real.is_relative_to(dest) or dest.is_relative_to(real):
             raise click.ClickException(f"Sandbox {dest} overlaps a data root ({real}).")
 
@@ -86,7 +86,6 @@ def main(targets, dest, apass_source, reset):
     raw["paths"].update(
         photometry_root=str(dest / "photometry"),
         spectra_root=str(dest / "spectroscopy"),
-        plots_dir=str(dest / "plots"),
         logs=str(dest / "logs"),
         database=str(db_copy),
     )

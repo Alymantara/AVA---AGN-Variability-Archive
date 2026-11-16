@@ -327,7 +327,7 @@ The comparison uses the same QC-pass frames.
 
 This is the final product: absolute AB fluxes in mJy, all 13 cameras merged, the MuSCAT host offset removed (black points), and flagged epochs removed.
 
-The pipeline task writes the website versions to `cfg.plots_dir`: `lco_latest_<obj>_merged` and `_merged_last6`. They use the `filter_dict` colours and the legacy layout.
+The pipeline task writes the website versions to the target's figure folder `<phot>/<target>/plots/` (`cfg.target_plots_dir`): `lco_latest_<obj>_merged` and `_merged_last6`. They use the `filter_dict` colours and the legacy layout.
 
 ![web merged](figures/pytics/pytics_13_webplot_merged.png)
 ![web last 60 d](figures/pytics/pytics_14_webplot_merged_last60d.png)

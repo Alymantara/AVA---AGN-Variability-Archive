@@ -6,7 +6,7 @@ are drawn by :mod:`ava.plots.webplots` from the calibrated products
 (``frame_qc``, ``measurements.parquet``, ``agn_lightcurve``), with filter
 colours and wavelengths from ``plots.filter_dict``.
 
-Outputs (``cfg.plots_dir``, legacy names):
+Outputs (``cfg.target_plots_dir(target)`` = ``<phot>/<target>/plots/``, legacy names):
   lco_latest_<obj>.png/.pdf          full light curves (flux, mJy)
   lco_latest_<obj>_last6.png/.pdf    last ``plots.recent_days`` days
   lco_latest_<obj>_<filter>_sky      seeing / airmass / zero point per filter
@@ -65,7 +65,7 @@ def webplot(target: str) -> dict:
     logger = get_run_logger()
     pc = cfg.plots
     fd = wp.load_filter_dict(cfg._resolve(pc.filter_dict))
-    out_dir = cfg.plots_dir
+    out_dir = cfg.target_plots_dir(target)
     out_dir.mkdir(parents=True, exist_ok=True)
     phot, db = cfg.phot_dir(target), frame_db_path()
     lc = pd.read_parquet(phot / "agn_lightcurve.parquet")

@@ -125,7 +125,7 @@ raw_data/<target>/YYYYMMDD/*.e91.fits.fz             (BANZAI L91 frames)
    +-> agn_lightcurve_pytics.parquet/.csv            (ensemble + absolute ZP)
    +-> <target>_LCO_merged_lightcurve.csv            (shareable science product)
    |
-   `-> ava_plots/lco_latest_<target>*.png/pdf        (web figures)
+   `-> plots/lco_latest_<target>*.png/pdf            (all figures, per target)
 \end{lstlisting}
 
 The top-level flow \texttt{ava-pipeline} submits all targets concurrently
@@ -801,7 +801,6 @@ Configured cameras for correction: \texttt{intercal\_correct\_cameras: [ep]}
   \item[\texttt{<target>\_LCO\_merged\_lightcurve.csv}]
     The \textbf{shareable science product}: \texttt{good} epochs only, in mJy
     and AB mag with separate total and epoch-to-epoch (random) errors.
-    Copied to \texttt{plots\_dir}.
 \end{description}
 
 \begin{notebox}
@@ -833,8 +832,11 @@ print(good[["MJD","Filter","mag_ic","mag_ic_err","F_ic","scope"]].head())
 Task \texttt{webplot} (\texttt{ava/pipeline/tasks/webplot.py}).
 \textbf{Status: fully ported (November 2026).}
 
-The webplot task calls \texttt{ava.plots.webplots} and writes to
-\texttt{cfg.plots\_dir}:
+The webplot task calls \texttt{ava.plots.webplots} and writes to the target's
+own figure folder, \texttt{<photometry\_root>/<target>/plots/}
+(\texttt{cfg.target\_plots\_dir(target)}; subfolder name from
+\texttt{paths.target\_plots\_subdir}). The merged light-curve figures of the
+\texttt{ensemble} task go to the same folder:
 
 \begin{description}
   \item[\texttt{lco\_latest\_<target>.png/pdf}] Full time-baseline light curve
@@ -1530,8 +1532,7 @@ factor, marginalising over these nuisance parameters.
 
 \subsection{Output}
 
-Merged light-curve files and plots are written to the \texttt{ava\_merging/} subdirectory,
-then copied to \texttt{ava\_plots/} and \texttt{scp}\textquotesingle d to the web server.
+Merged light-curve files and plots are written to the \texttt{ava\_merging/} subdirectory.
 
 \begin{warnbox}
 \textbf{Migration target.}  \texttt{pycali\_jvhs} is a private package not on PyPI and

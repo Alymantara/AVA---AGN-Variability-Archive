@@ -15,7 +15,7 @@ writes, in ``cfg.phot_dir(target)``:
 ``mode="full"`` refits the whole data set on demand (~1 min for Mrk 817,
 21k frames, 8 filters); ``mode="auto"`` (daily) adds only the new frames to
 the stored solution (tens of ms per filter) and refits when the update says
-so.  Merged light-curve figures go to ``cfg.plots_dir`` as
+so.  Merged light-curve figures go to ``cfg.target_plots_dir(target)`` as
 ``lco_latest_<obj>_merged[_last6]``.
 """
 
@@ -117,7 +117,6 @@ def export_merged_csv(lc: pd.DataFrame, path: Path, target: str, error_model: st
 def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
     """PyTICS calibration of ``target`` (full on demand, incremental daily); all settings from
     ``cfg.ensemble``."""
-    import shutil
 
     from ava.photometry import ensemble as E
     from ava.pipeline.tasks.calibrate import frame_db_path
@@ -145,8 +144,6 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         csv = phot / f"{target}_LCO_merged_lightcurve.csv"
         export_merged_csv(lc, csv, target, error_model=str(ec.get("error_model", "pytics")))
         files.append(str(csv))
-        cfg.plots_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(csv, cfg.plots_dir / csv.name)
     if plot:
         from ava.pipeline.tasks.webplot import spectroscopy_epochs
         from ava.plots import webplots as wp
@@ -156,8 +153,9 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
                                "mag_err": lc["mag_err_model" if ec.get("error_model", "pytics") == "fitted" else "mag_ic_err"],
                                "qc_pass": lc["good"].astype(int)})
         spec, last = spectroscopy_epochs(target)
-        cfg.plots_dir.mkdir(parents=True, exist_ok=True)
-        base = cfg.plots_dir / f"lco_latest_{target}_merged"
+        plot_dir = cfg.target_plots_dir(target)
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        base = plot_dir / f"lco_latest_{target}_merged"
         files += wp.plot_lightcurves(merged, fd, base, spec_mjd=spec, last_spec_mjd=last,
                                      formats=list(cfg.plots.formats))
         files += wp.plot_lightcurves(merged, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last,

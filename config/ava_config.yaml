@@ -59,10 +59,10 @@ paths:
   # Raw photometry frames (absolute, or relative to photometry_root)
   photometry_raw: "raw_data"
 
-  # ---- Shared / website -----------------------------------
-  # Plots are copied here before being pushed to the web server.
-  # On the production machine: /data3/jvhs1/agn/ava_plots/
-  plots_dir: "/data3/jvhs1/agn/ava_plots"
+  # ---- Figures -------------------------------------------
+  # Every figure the pipeline makes for a target goes to
+  #   <photometry_root>/<target>/<target_plots_subdir>/
+  target_plots_subdir: "plots"
 
   # Swift/UVOT merged database (absolute path to CSV).
   swift_db: "/data3/jvhs1/agn/ava_swift_updated.csv"
@@ -393,7 +393,7 @@ ensemble:
   intercal_per_season: false
   intercal_season_gap_days: 60.0     # a gap longer than this starts a new season
   # --- shareable product ---------------------------------------------------------
-  export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv (+ copy in plots_dir): mJy and AB mag
+  export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv: mJy and AB mag
 
   # --- AGN error model (ava.photometry.errors; UNDER VERIFICATION) ---
   # Always fitted and written (pytics/error_model.csv, columns mag_err_model[_rand],

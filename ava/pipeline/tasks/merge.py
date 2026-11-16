@@ -12,7 +12,7 @@ Planned behaviour
    (``cfg.intercalibration.mcmc_steps``; extend by
    ``cfg.intercalibration.mcmc_retry_steps`` until converged).
 3. ``save=True`` (``-s``): write the merged light curves and figures, copying
-   the figures to ``cfg.plots_dir`` (and the web server, as in
+   the figures to ``cfg.target_plots_dir(target)`` (and the web server, as in
    :mod:`ava.pipeline.tasks.webplot`).
 
 Inputs
@@ -31,7 +31,7 @@ dict
 
 Side effects
 ------------
-Writes into ``cfg.merging_dir(target)`` and ``cfg.plots_dir``.
+Writes into ``cfg.merging_dir(target)`` and ``cfg.target_plots_dir(target)``.
 """
 
 from __future__ import annotations

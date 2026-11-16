@@ -22,7 +22,7 @@ Usage
     cfg.phot_dir(target)       # Working directory for a target (photometry)
     cfg.spec_dir(target)       # Working directory for a target (spectroscopy)
     cfg.db_path                # Path to the AVA SQLite database
-    cfg.plots_dir              # Path to the shared plots output directory
+    cfg.target_plots_dir(t)    # Per-target plot folder: <photometry_root>/<target>/plots
     cfg.lco_token              # LCO API token (from file or env var)
     cfg.lco_headers()          # {"Authorization": "Token ..."} for LCO requests
     cfg.lco_username           # LCO account name (lco.username)
@@ -147,11 +147,6 @@ class AVAConfig:
         return self._resolve(self._path_key("paths", "spectra_root"))
 
     @property
-    def plots_dir(self) -> Path:
-        """Shared plots output directory."""
-        return self._resolve(self._path_key("paths", "plots_dir"))
-
-    @property
     def template_dir(self) -> Path:
         """Template directory (SExtractor configs etc.)."""
         return self._resolve(self._path_key("paths", "template_dir"))
@@ -171,6 +166,14 @@ class AVAConfig:
         Layout: <photometry_root>/<target>/
         """
         return self.phot_root / target
+
+    def target_plots_dir(self, target: str) -> Path:
+        """Folder for every figure the pipeline makes for one target.
+
+        Layout: <photometry_root>/<target>/<paths.target_plots_subdir> (default ``plots``).
+        """
+        sub = self._raw.get("paths", {}).get("target_plots_subdir") or "plots"
+        return self.phot_dir(target) / sub
 
     def phot_raw(self, target: str) -> Path:
         """Directory of raw photometric FITS frames for a target.
