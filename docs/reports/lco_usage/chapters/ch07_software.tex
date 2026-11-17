@@ -1,0 +1,12 @@
+\chapter{Software and maintenance}\label{sec:software}
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item \texttt{lco\_archive\_db/} -- the \lcodb{} package: \texttt{config.yaml} (proposals, instruments, levels,
+  standards, rates), \texttt{lcodb daily} for the update, \texttt{lcodb status} for a summary; offline tests in
+  \texttt{tests/}.
+\item \texttt{lco\_archive\_db/tools/header\_audit.py} -- header keyword coverage across years and cameras.
+\item \texttt{lco\_archive\_db/tools/cost\_estimate.py} -- hours and value per project and semester.
+\item \texttt{lco\_archive\_db/tools/ava\_crossmatch.py} -- AVA cross-match and refreshed table.
+\item \texttt{lco\_report/scripts/make\_report.py} -- all numbers, tables and figures of this report.
+\end{itemize}
+To refresh the report: \texttt{lcodb daily}; \texttt{python3 tools/ava\_crossmatch.py --ava ../AVA/ava\_testdb\_whead.csv
+--outdir ../AVA}; \texttt{python3 scripts/make\_report.py}; \texttt{latexmk -pdf lco\_usage\_report.tex}.

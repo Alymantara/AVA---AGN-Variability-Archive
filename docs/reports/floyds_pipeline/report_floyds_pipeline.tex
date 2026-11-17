@@ -1,0 +1,130 @@
+% AVA Internal Report — FLOYDS Pipeline Recalibration for Reverberation Mapping
+% Rebranded wrapper around floyds_rm_report source tree.
+% Content (chapters/, sections/, figures/) is unchanged from the original.
+\documentclass[10pt,a4paper,oneside]{report}
+\usepackage[T1]{fontenc}
+\usepackage{tgtermes}
+\usepackage{mathptmx}
+\usepackage[a4paper,top=2.3cm,bottom=2.5cm,left=2.4cm,right=2.4cm,headsep=0.6cm]{geometry}
+\usepackage{graphicx}
+\usepackage{pifont}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage[hyphens]{url}
+\usepackage[round,authoryear]{natbib}
+\usepackage[font=small,labelfont=bf,labelsep=period,justification=justified,singlelinecheck=false]{caption}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.misc,fit,calc}
+\usepackage[colorlinks=true,linkcolor={blue!60!black},citecolor={blue!60!black},urlcolor={blue!60!black}]{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+
+%% AVA brand colours
+\definecolor{avaInkBlue}{RGB}{26,58,92}
+\definecolor{avaAbyss}{RGB}{10,22,40}
+\definecolor{avaGold}{RGB}{212,160,23}
+\definecolor{avaMidBlue}{RGB}{14,44,80}
+
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{3em}
+\let\oldunderscore\_
+\renewcommand{\_}{\oldunderscore\allowbreak}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+
+\titleformat{\chapter}[block]{\normalfont\large\bfseries\color{avaInkBlue}}{\thechapter}{1em}{\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{0pt}{14pt}
+\titleformat{\section}{\normalfont\normalsize\bfseries}{\thesection}{1em}{\MakeUppercase}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}[runin]{\normalfont\normalsize\itshape}{\thesubsubsection}{0.6em}{}[.]
+\titlespacing*{\section}{0pt}{12pt}{5pt}
+\titlespacing*{\subsection}{0pt}{9pt}{3pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape\textcolor{avaInkBlue}{AGN Variability Archive}}
+\fancyhead[R]{\small\itshape\textcolor{avaInkBlue}{FLOYDS Pipeline Report}}
+\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{avaInkBlue!40}\hrule width\headwidth height\headrulewidth}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}\renewcommand{\headrulewidth}{0pt}}
+
+\newcommand{\banzai}{\textsc{banzai-floyds}}
+\newcommand{\kms}{km\,s$^{-1}$}
+
+\graphicspath{{figures/}}
+\input{sections/numbers}
+
+\begin{document}
+
+\begin{titlepage}
+\noindent
+\raisebox{-0.5\height}{\includegraphics[height=1.4cm]{../st_logo_horizontal}}%
+\hfill
+\raisebox{-0.5\height}{\includegraphics[height=1.0cm]{../../lco_logo}}
+\vspace*{0.8cm}
+{\color{avaInkBlue}\rule{\textwidth}{1.5pt}}\\[6pt]
+{\centering\includegraphics[width=\textwidth,height=1.4cm,keepaspectratio=false]{../../banner}\\[6pt]}
+{\LARGE\bfseries\color{avaAbyss} Wavelength, trace, fringe, extraction and flux recalibration of LCO FLOYDS spectra for reverberation mapping\par}
+\vspace{6pt}
+{\large\itshape\color{avaInkBlue} Diagnosis of \textsc{banzai-floyds}~1.0.1 and target-independent corrections\par}
+\noindent{\color{avaInkBlue}\rule{\textwidth}{1.5pt}}\\[12pt]
+{\large\bfseries Juan V.\ Hern\'andez Santisteban}\\[2pt]
+{\normalsize School of Physics and Astronomy, University of St Andrews, North Haugh, St Andrews, KY16~9SS, UK}\\[4pt]
+{\small\color{avaInkBlue!70} AVA Internal Report \#\,1 $\cdot$ November 2026}\\[22pt]
+\begin{minipage}{0.92\textwidth}
+\small\textbf{Abstract.} \input{sections/abstract}
+\end{minipage}
+\vfill
+{\small\color{avaInkBlue!70} Keywords: techniques: spectroscopic --- methods: data analysis --- instrumentation: spectrographs --- galaxies: Seyfert}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\input{chapters/ch00_executive}
+\input{chapters/ch00_summary}
+\input{chapters/ch01_intro}
+\input{chapters/ch02_diagnostics}
+\input{chapters/ch03_traces}
+\input{chapters/ch04_wavelength}
+\input{chapters/ch05_fringe}
+\input{chapters/ch06_flux}
+\input{chapters/ch07_raw}
+\input{chapters/ch10_sites}
+\input{chapters/ch11_cosmics}
+\input{chapters/ch08_recommendations}
+\input{chapters/ch09_software}
+\input{chapters/appendix_v1}
+\input{chapters/appendix_install}
+\input{chapters/appendix}
+
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+Based on observations obtained with the FLOYDS spectrograph on the Faulkes Telescope South
+(Las Cumbres Observatory). The EG\,21 reference fluxes are from the ESO/CTIO
+spectrophotometric standard library \citep{Hamuy1992,Hamuy1994}.
+
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{References}
+\bibitem[Alard \& Lupton(1998)]{Alard1998} Alard C., Lupton R.~H., 1998, ApJ, 503, 325
+\bibitem[Cappellari(2017)]{Cappellari2017} Cappellari M., 2017, MNRAS, 466, 798
+\bibitem[Fausnaugh(2017)]{Fausnaugh2017} Fausnaugh M.~M., 2017, PASP, 129, 024007
+\bibitem[Filippenko(1982)]{Filippenko1982} Filippenko A.~V., 1982, PASP, 94, 715
+\bibitem[Hamuy et~al.(1992)]{Hamuy1992} Hamuy M., Walker A.~R., Suntzeff N.~B., Gigoux P.,
+  Heathcote S.~R., Phillips M.~M., 1992, PASP, 104, 533
+\bibitem[Hamuy et~al.(1994)]{Hamuy1994} Hamuy M., Suntzeff N.~B., Heathcote S.~R., Walker
+  A.~R., Gigoux P., Phillips M.~M., 1994, PASP, 106, 566
+\bibitem[Horne(1986)]{Horne1986} Horne K., 1986, PASP, 98, 609
+\bibitem[Vieliute et~al.(2025)]{Vieliute2025} Vieliute R., et~al., 2025, RASTI, rzaf021
+\end{thebibliography}
+
+\end{document}

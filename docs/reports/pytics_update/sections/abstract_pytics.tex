@@ -1,0 +1,8 @@
+PyTICS is now integrated in the AVA pipeline as
+\texttt{ava/photometry/ensemble.py}.  It is a vectorised Numba port of \texttt{Filter.Corr} that
+gives bit-identical results to the published code and runs 40--70$\times$ faster.  A full
+8-filter calibration of the Mrk\,817 archive (19\,500 QC-pass frames) takes 24\,s; nightly
+incremental updates take 16--40\,ms per filter.  The model is extended with per-camera colour terms
+(active in u, B, g, V), which reduce camera-to-camera AGN offsets by 30--45\,\% in the blue bands.
+MuSCAT3 aperture offsets are corrected by flux-flux intercalibration, giving continuous merged light
+curves from 2019 to 2024.

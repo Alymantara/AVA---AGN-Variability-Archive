@@ -1,0 +1,54 @@
+\section{Line groups and telluric bands}
+\label{app:tables}
+
+\begin{table}
+\centering
+\caption{Arc line groups used for the refit (air wavelengths, \AA). Lines in one group share the shift $s_g$.
+$\delta_g$ is the extra systematic error of unresolved blends. ``New'': not used by \banzai{}~1.0.1.}
+\label{tab:groups}
+\begin{tabular}{llcc}
+\toprule
+Order & Lines & $\delta_g$ & New \\
+\midrule
+blue & Hg 3650.158, 3654.842, 3663.279 & 0.5 & \\
+blue & Hg 4046.565, 4077.837 & -- & \\
+blue & Hg 4339.223, 4347.500, 4358.335 & 0.3 & \\
+blue & Hg 4916.068 & -- & yes \\
+blue & Hg 5460.750 & -- & \\
+blue & Hg 5769.610, 5790.670 & -- & \\
+red & Hg 4916.068 & -- & yes \\
+red & Hg 5460.750 & -- & \\
+red & Hg 5769.610, 5790.670 & -- & \\
+red & Ar 6416.307 & -- & yes \\
+red & Ar 6677.282 & -- & yes \\
+red & Ar 6752.834, 6766.612 & -- & yes \\
+red & Ar 6871.289, 6937.664, 6965.431 & 0.5 & \\
+red & Ar 7067.218; 7147.042; 7272.936; 7383.980 & -- & \\
+red & Ar 7503.869, 7514.652 & 1.0 & \\
+red & Ar 7635.106; 7723.760+7724.207 (merged) & -- & \\
+red & Ar 7948.176, 8006.157, 8014.786 & 0.5 & \\
+red & Ar 8103.693, 8115.311 & 1.0 & \\
+red & Ar 8264.522 & -- & \\
+red & Ar 8408.210, 8424.647 & 1.0 & \\
+red & Ar 8521.442; 8667.944; 9122.967 & -- & \\
+red & Ar 9224.499; 9657.786; 9784.503 & -- & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Telluric bands used for the object zero point. $o_b$ is the band's offset relative to the A band
+(median of 18 EG\,21 spectra after the arc refit); $\omega_b$ its weight in eq.~(\ref{eq:tellcomb}).}
+\label{tab:bands}
+\begin{tabular}{lccc}
+\toprule
+Band & Window (\AA) & $o_b$ (\AA) & $\omega_b$ \\
+\midrule
+O$_2$ A & 7550--7720 & 0 & 1 \\
+H$_2$O & 7150--7350 & $+5.05$ & 0.5 \\
+O$_2$ B & 6840--6960 & $+0.56$ & 0.5 \\
+H$_2$O & 9250--9700 & $+0.53$ & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{table}

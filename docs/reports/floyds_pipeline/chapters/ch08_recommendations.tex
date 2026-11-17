@@ -1,0 +1,76 @@
+\chapter{Recommendations}
+\label{sec:recommendations}
+
+\textit{For observers and LCO operations.}
+\begin{enumerate}
+\item \textit{Flux standards throughout every campaign}, of stars in the \banzai{} catalogue, at least every few nights.
+The ensemble calibration needs standards on both sides of every science frame, and at OGG a throughput change of a
+factor 1.8 in 2025 April could only be bridged because standards outside the catalogue (Feige\,67, GD\,153) had been
+observed (Section~\ref{sec:sites_flux}). A 6\,arcsec standard now and then would allow a residual fringe template and
+a telluric transmission for the RM slit itself.
+\item \textit{Log and announce changes of the telescope throughput} (mirror recoating, cleaning, optics changes), so that the
+pipeline can be told not to combine standards across them.
+\item Check the Zn lamp: it is ``on'' in the headers but produces no lines. Zn\,4680, 4722, 4811 and 5182 would fill
+the blue-order gap at H$\beta$/[O\,{\sc iii}].
+\item Take narrow-slit arcs (or both) for the wavelength solution; with a 6\,arcsec slit the lines are 51\,\AA{}
+top-hats and blend.
+\item Same-block lamp flats are useful but not essential for the fringes: the detector pattern is stable over months
+and only its phase is used (Section~\ref{sec:fringe_harmonic}). A narrow-slit lamp flat would record the fringe
+shape with less smoothing.
+\item Keep a nightly standard of the same configuration as the science if absolute shapes below 3800\,\AA{} matter:
+a same-night standard gives 0.5 per cent there, versus 3--5.5 per cent from another night.
+\end{enumerate}
+
+\textit{For \banzai{}: done in improved v3} (branch \texttt{rm-improvements}, Chapter~\ref{sec:software}), proposed for
+the LCO code.
+\begin{enumerate}
+\item Hg\,4916 (both orders) and Ar\,6416, 6677, 6753/6767 (red) in the used arc lines (Section~\ref{sec:sites_arcs}).
+\item A per-exposure object zero point from the telluric bands, transferred to the blue order (Section~\ref{sec:wl_zp};
+stage \texttt{ObjectWavelengthCorrector}).
+\item No 2-d division by a lamp flat: the harmonic fringe model with the lamp phase only, fitted per exposure jointly
+with a telluric template, plus a residual template per slit (Chapter~\ref{sec:fringe}).
+\item The physical object-trace model with a template per site (Sections~\ref{sec:traces_model} and
+\ref{sec:sites_trace}).
+\item Telluric transmission applied only inside the absorption bands, from the nine nearest standards; the O$_2$ A band
+flagged in science spectra (Section~\ref{sec:flux_tell}).
+\item The flux calibration from the grey-normalised median of the nine nearest standards of any slit width
+(Section~\ref{sec:flux_ensemble}); Feige\,67 and GD\,153 added to the catalogue (Section~\ref{sec:sites_flux}).
+\item Archive-processed sky flats accepted as order solutions; offline reduction of a whole data set with one command
+(Appendix~\ref{sec:app_install}).
+\item Quality keywords and a flag bitmask in every science and standard product (Section~\ref{sec:qc}).
+\end{enumerate}
+
+\textit{For \banzai{}: in the code, verified on a sample, products not yet re-reduced} (Chapter~\ref{sec:cosmics}).
+\begin{enumerate}
+\item Give LA Cosmic a model of the object as well as the sky, so that the cores of bright stars are not flagged.
+\item Mask extracted bins that lose more than half of their profile weight to cosmic-ray flags instead of scaling
+them up (a clipped H$\alpha$ was 2.6 times too bright).
+\item Require sky lines to stand out from the noise of the first-pass sky, so that the sky spline does not follow the
+noise beside a wide object.
+\end{enumerate}
+
+\textit{For \banzai{}: still open.}
+\begin{enumerate}
+\item Add EG\,21 (and the other nightly standards of COJ and OGG) to the catalogue with references of adequate
+resolution; EG\,21 has only the 50\,\AA{} CTIO fluxes (Section~\ref{sec:flux_model}).
+\item Do not combine standards across a throughput change: an ensemble limited to one epoch, or a test of the grey
+levels of the standards in time order.
+\item Model the telluric absorption (a line-by-line transmission with a free water column) at each spectrum's
+resolution, which in a wide slit is set by the seeing. The night-to-night change of the water absorption
+($\approx3.5$ per cent in the band level) is not followed by a nine-standard median, and the O$_2$ A band can only be
+flagged.
+\item Anchor the flux and telluric calibration redward of 8900\,\AA, where there is no telluric-free continuum and
+both are extrapolated (Appendix~\ref{sec:app_v1}); until then, use the red end with care.
+\item Carry the fringe and telluric residuals in the error array, or document a systematic term: the uncertainties
+are right per pixel, but integrated quantities need $\approx20$--30 per cent more (Section~\ref{sec:raw_errors}).
+\item Provide per-order products; the combined spectrum mixes misaligned orders over 4540--5760\,\AA.
+\item Write lean 2-d products (or compress the \texttt{BINNED2D} table): a processed 2-d frame is 47\,MB, of which
+43\,MB is that table (Section~\ref{sec:sites_disk}).
+\item Reject cosmic rays by comparing the exposures of a visit (RM visits have two or more): a real line is in all of
+them, a cosmic ray in one. A single frame cannot tell a cosmic ray on the peak of a bright line from the line
+(Section~\ref{sec:cr_verify}).
+\item Add the warm pixel of the OGG camera at $(1465,409)$ to the bad-pixel mask.
+\item The archive products of \banzai{}~1.0.1 are not scaled by the exposure time, so 600\,s science frames calibrated
+with 300\,s standards are twice too bright (Section~\ref{sec:flux_banzai}); 1.1.0 is correct. Archive users should be
+told.
+\end{enumerate}

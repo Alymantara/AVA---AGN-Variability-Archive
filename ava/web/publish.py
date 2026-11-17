@@ -9,7 +9,7 @@ The website (``web/``) never reads pipeline paths. After each update the
   filter_dict.txt              filter names / wavelengths / colours
   plots/<data_id>/*.png        per-target figures (lco_latest_<data_id>*.png)
   usage/lco_usage_<sem>.png    LCO time-usage plots (when ``web.usage_src`` is set)
-  manuals/<name>.pdf           the AVA manuals (``web.manuals``, built from docs/*.tex)
+  manuals/<name>.pdf           the AVA manuals (``web.manuals``; PDFs in docs/manuals/, docs/reports/)
   filters/lco_<band>.txt       LCO filter transmission curves (photometry.reference.lco_filters),
   filters/ava_lco_filters.zip  all of them, and filters/filters.json (per-band summary + a
                                thinned curve for the Data & Access plot)
@@ -38,9 +38,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
 
-DEFAULT_MANUALS = ("docs/ava_system_manual.pdf", "docs/photometry_manual.pdf",
-                   "docs/spectroscopy_manual.pdf",
-                   "docs/reports/pytics_update/report_pytics_update.pdf")
+DEFAULT_MANUALS = ("docs/manuals/ava_system_manual.pdf", "docs/manuals/photometry_manual.pdf",
+                   "docs/manuals/spectroscopy_manual.pdf",
+                   "docs/reports/report_pytics_update.pdf")
 
 HTACCESS = """# Published data for the AVA website (written by ava.web.publish).
 # Plots are public; the database snapshot and text files are not.

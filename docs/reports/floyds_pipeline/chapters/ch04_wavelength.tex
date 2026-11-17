@@ -1,0 +1,156 @@
+\chapter{Wavelength calibration}
+\label{sec:wavelength}
+
+\section{How \banzai{} calibrates wavelengths}
+\label{sec:wl_banzai}
+For each arc, \banzai{} collapses each order along an assumed line tilt, finds and matches peaks, centroids bright
+isolated lines row by row with a Gauss--Hermite profile \citep{Cappellari2017}, fits blends with a fixed line-spread
+function, fits a straight line $x=a+b\,y_{\rm o}$ per line (the tilt), and finally fits
+$x(\lambda)$ as a Legendre series (degree 5 in the red order, 2 in the blue in the current code; the 1.0.1 products
+carry degree 4 and 2) and inverts it to $\lambda(x)$. The tilt is a constant ($\approx8.2^\circ$) at COJ. There is no
+outlier rejection in the final fit, and no per-exposure correction of the zero point (flexure or position in the
+slit): every science frame inherits the solution of its arc.
+
+\section{The arc line list leaves the RM lines unconstrained}
+\label{sec:wl_lines}
+Of the 68 catalogue lines, 33 are used. In the blue order the solution rests on Hg lines only: 3650/3663, 4047,
+4078, 4358 and then 5461, 5770, 5791\,\AA{}; there is no line between 4358 and 5461\,\AA{}, exactly where H$\beta$ and
+[O\,{\sc iii}] fall for $z\lesssim0.1$. The red order starts at $\approx4550$\,\AA{} but its first used line is
+5461\,\AA{}, so 4550--5461\,\AA{} is extrapolated, and it has no line between 5791 and 6965\,\AA{} (H$\alpha$ for
+$z\approx0.05$). The Zn lines that would fill the blue gap are flagged ``removed until we start turning on the Zn
+lamp again''.
+
+We collapsed all 64 raw arcs with the wavelength map of a science frame and aligned them by cross-correlation
+(night-to-night shifts 1.07\,\AA{} rms red, 0.49\,\AA{} blue). Three facts follow (Fig.~\ref{fig:arcs}):
+(i) Hg\,4916 is detected in every single 60\,s arc in both orders, and Ar\,6416, 6677 and 6753/6767 in the red, so
+stacking is not needed; (ii) although the Zn lamp is ``on'' in 63 of 64 headers, no Zn line is detected even in the
+stack of 64 arcs; (iii) with the 6\,arcsec slit all lines are $\approx51$\,\AA{} (red) and $\approx25$\,\AA{}
+(blue) top-hats, so many neighbours blend.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_arcs.pdf}
+\caption{Arc lines. Top and middle: one 60\,s arc (6\,arcsec slit) in the blue and red orders. Grey: lines used by
+\banzai; aqua: lines detected but not used (Hg\,4916, Ar\,6416, 6677, 6753); dashed orange: Zn lines (lamp ``on''
+in the headers, not detected); dotted: H$\beta$, [O\,{\sc iii}] and H$\alpha$ of Fairall~9. Bottom: shift $s_g$ of each
+line group (eq.~\ref{eq:arcgroup}) on the \banzai{} solution of 2026-10-08 (circles: used lines; open diamonds: added
+lines) and the fitted correction (eq.~\ref{eq:arccorr}). The red order's extrapolated end is off by $-8$\,\AA{} at
+Hg\,4916.}
+\label{fig:arcs}
+\end{figure}
+
+
+\section{Arc refit with the unused lines}
+\label{sec:wl_refit}
+Each raw arc is overscan-subtracted, trimmed and collapsed with the frame's own 2-d wavelength map (which contains
+the tilt) by averaging all pixels within 30 rows of the order centre in bins of half a pixel. Lines are measured in
+\emph{groups} $g$ of laboratory wavelengths $\lambda_{g,j}$ (Table~\ref{tab:groups}) with the forward model
+\begin{equation}
+M_g(\lambda) = c_0 + c_1\frac{\lambda-\bar\lambda_g}{100} + \sum_j A_j\,B(\lambda;\lambda_{g,j}+s_g,W,\sigma),
+\label{eq:arcgroup}
+\end{equation}
+\begin{equation}
+B(\lambda;\mu,W,\sigma)=\frac{1}{2}\left[\mathrm{erf}\!\left(\frac{\lambda-\mu+W/2}{\sqrt2\,\sigma}\right)
+ -\mathrm{erf}\!\left(\frac{\lambda-\mu-W/2}{\sqrt2\,\sigma}\right)\right],
+\label{eq:boxcar}
+\end{equation}
+i.e. a top-hat of the slit-image width $W$ convolved with a Gaussian of width $\sigma$, one per line at the
+laboratory separations, with a common shift $s_g$ (measured minus laboratory wavelength on the current solution)
+and free amplitudes $A_j\ge0$. The initial width is $W=8.5$\,\AA\,arcsec$^{-1}$ (red) or
+4.25\,\AA\,arcsec$^{-1}$ (blue) times the slit width. Pairs closer than $0.3W$ whose catalogue strengths are known
+are merged into one line at their strength-weighted mean wavelength (their amplitude ratio is otherwise degenerate
+with $s_g$); if a strength is unknown, the components are kept with free amplitudes. A group is accepted if the fit
+converged, $|s_g|<14.5$\,\AA{} and its peak exceeds 10 times the residual noise.
+
+The correction is a weighted Legendre series fitted to the group shifts,
+\begin{equation}
+\Delta\lambda(\lambda)=\sum_{k=0}^{K}d_k\,L_k(\tilde\lambda),\qquad
+w_g = \left(\sigma_{s_g}^2+0.3^2+\delta_g^2\right)^{-1},
+\label{eq:arccorr}
+\end{equation}
+with $K=5$ (red) and 2 (blue), $\tilde\lambda$ the wavelength mapped to $[-1,1]$, $\sigma_{s_g}$ the statistical error
+from the Jacobian, 0.3\,\AA{} a floor and $\delta_g$ an extra systematic for unresolved blends (0.5--1\,\AA{},
+Table~\ref{tab:groups}); groups deviating by more than $4\sigma$ are iteratively rejected. Outside the span of
+the accepted groups the correction is continued linearly from its end values and slopes, so that a degree-5 fit never
+extrapolates wildly. The corrected wavelength is $\lambda'=\lambda-\Delta\lambda(\lambda)$.
+
+The per-night fits have residuals of 0.48\,\AA{} rms (red, median of 23 groups) and 0.10\,\AA{} (blue, 4 groups).
+The red-order error is $\approx-8$\,\AA{} at Hg\,4916 and $\approx-3$\,\AA{} at 5240\,\AA{}
+(Fig.~\ref{fig:arcs}, bottom). The arc solution is stable in shape: after removing each night's zero point the
+solutions of the 50 frames agree to $<0.4$\,\AA{} over most of each order. We therefore apply the \emph{median} of the
+nightly corrections to every frame; using each night's own fit adds fit noise (Section~\ref{sec:results_wl}).
+
+This refit was designed for the archive products (improved v1). The arc fit of \banzai{}~1.1.0, run from raw, is
+already far better than the 1.0.1 solution: on the same arcs it is off at the unused lines by at most 0.6\,\AA{}
+instead of $-8$\,\AA. In the final pipeline (improved v3) the unused lines are added to the arc fit itself, which
+brings the remaining error at Hg\,4916 to $\approx0.1$\,\AA{} in the red order (Section~\ref{sec:sites_arcs}); no
+refit after the fact is needed.
+
+\section{The zero point of the object's light}
+\label{sec:wl_zp}
+The arc and the night sky fill the slit; a compact object does not. In a wide slit the object's wavelength zero
+point depends on where it sits across the slit: a displacement $\Delta\theta$ moves its spectrum by
+$\Delta x=\Delta\theta/0.337''$ pixels, i.e. $\approx10$\,\AA{} per arcsec in the red order. Neither the arc nor the
+sky lines can measure this. The telluric bands can (Section~\ref{sec:diag_tell}): for each band $b$ we measure
+$s_b$ (eq.~\ref{eq:tell}), remove its offset $o_b$ (Table~\ref{tab:bands}; calibrated on the 18 EG\,21 spectra after the
+arc refit), and combine
+\begin{equation}
+s_{\rm red}=\frac{\sum_b \omega_b\,(s_b-o_b)/(\sigma_{s_b}^2+0.5^2)}{\sum_b \omega_b/(\sigma_{s_b}^2+0.5^2)},
+\label{eq:tellcomb}
+\end{equation}
+with weights $\omega_b$ (1 for A, 0.5 for B and H$_2$O\,7200, 0.25 for H$_2$O\,9300) and iterative rejection of
+bands deviating by more than $3\sigma$. Both orders image the same slit, so the blue-order shift in pixels is the red
+one times the ratio of the anamorphic magnifications:
+\begin{equation}
+s_{\rm blue} = \rho\,\frac{s_{\rm red}}{D_{\rm red}}\,D_{\rm blue},\qquad \rho=1.13,
+\label{eq:transfer}
+\end{equation}
+with $D$ the dispersions (\AA\,pixel$^{-1}$). $\rho$ was measured once from the slope of the blue-order [O\,{\sc
+iii}] pixel shift against the red-order A-band pixel shift (slope 1.13--1.14, $r=0.99$, residual 0.2\,pixel; it is
+an instrument constant). The corrected wavelengths are $\lambda''=\lambda'-s_{\rm order}$. If no band is usable, the
+sky zero point (Section~\ref{sec:diag_sky}) is used instead (this corrects flexure but not the slit position).
+
+The absolute zero point is that of the telluric template. It is uncertain by $\approx\pm4$\,\AA{}: on the
+standards the A band lies $-3.5\pm0.7$\,\AA{} from the sky lines (if the standards are centred in the slit), whereas
+the [O\,{\sc iii}] lines of Fairall~9 imply $+3.9$\,\AA{} (if [O\,{\sc iii}] is at the systemic redshift). This is a
+single constant; it does not affect the consistency between exposures or between the two orders.
+
+\section{Results}
+\label{sec:results_wl}
+Fig.~\ref{fig:zeropoint} shows the wide-slit problem in the archive products: the blue-order [O\,{\sc iii}] position
+of Fairall~9 scatters by 2.8\,\AA{} rms from exposure to exposure, whereas the 5577\,\AA{} sky line on the same frames
+scatters by 0.4\,\AA; the object's shift correlates with the telluric A band measured in the red order ($r=0.99$ in
+pixels) and not with the sky lines. The red and blue orders disagree on [O\,{\sc iii}] by $-5.9\pm3.0$\,\AA.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_zeropoint.pdf}
+\caption{Left: blue-order [O\,{\sc iii}] shift of Fairall~9 (filled) and 5577\,\AA{} sky-line shift (open) per exposure
+in the archive products. Right: blue-order [O\,{\sc iii}] pixel shift against the red-order A-band (filled) and sky-line
+(open) pixel shifts; the line has slope 1.13.}
+\label{fig:zeropoint}
+\end{figure}
+
+
+After the arc refit and the telluric zero point (Fig.~\ref{fig:redshift}, Table~\ref{tab:summary}) the nuclear lines
+agree from exposure to exposure to 20--40\,\kms{} in both orders and the two orders agree with each other to
+$\approx10$\,\kms. Applying each night's own arc fit instead of the median correction increases the red--blue scatter
+from 0.6 to 1.0\,\AA, confirming that the arc solution's shape is stable and the per-night fit only adds noise. Two
+further tests support the method: (i) before correction, the shifts of [O\,{\sc iii}] and [Ne\,{\sc iii}] follow the
+applied zero point with slopes 0.94 and 0.96, whereas the host-galaxy Ca\,{\sc ii}\,K absorption follows it with slope
+0.17 -- the host is extended and fills the slit like the sky, and the correction is appropriate for the nuclear light
+that RM measures (a caveat for host-starlight decomposition); (ii) the cleaner red order now yields [O\,{\sc i}]\,6300 in
+\OIN{} of the 50 spectra at \OIvel\,\kms, while [O\,{\sc iii}] sits at \OIIIvel\,\kms, i.e. $\approx150$\,\kms{} to the
+blue of [O\,{\sc i}], a typical [O\,{\sc iii}] outflow signature; this bounds the absolute zero-point error at
+$\approx2$\,\AA.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_redshift.pdf}
+\caption{Narrow lines of the 50 Fairall~9 spectra in velocity relative to $z=0.047016$: archive (grey) and this work
+(colour). Right: shift in the archive products against the applied blue-order zero point for [O\,{\sc iii}] (nucleus)
+and Ca\,{\sc ii}\,K (host); dashed: slope 1.}
+\label{fig:redshift}
+\end{figure}
+
+

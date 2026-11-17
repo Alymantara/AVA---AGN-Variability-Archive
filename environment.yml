@@ -4,7 +4,7 @@
 #   pip install -e .
 #   python scripts/check_install.py
 #
-# Not in here (installed separately, see docs/linux_setup.md):
+# Not in here (installed separately, see docs/guides/linux_setup.md):
 #   * SExtractor — system package `source-extractor` (or `conda install -c conda-forge astromatic-source-extractor`);
 #   * banzai-floyds (FLOYDS reduction) — its OWN environment (PyTorch), called as an external program.
 # Versions: the minimums below; the test suite last passed (Nov 2026) with prefect 3.9.3, astropy 8.0.2,

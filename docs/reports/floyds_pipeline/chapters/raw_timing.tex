@@ -1,0 +1,25 @@
+All 412 raw frames were reduced without failures on a laptop (8 cores, 8\,GB of memory), four frames in parallel.
+Table~\ref{tab:timing} gives the wall-clock time per frame. Arcs dominate: the 2-d wavelength solution takes
+$\approx48$\,s, against 4\,s for a lamp flat and 11--16\,s for a science or standard exposure (10\,s with improved v3, which skips the 2-d fringe shift search). Section~\ref{sec:visit_timing} gives the time per visit and per pipeline stage for the final configuration, and
+the projection to a decade of data.
+Disk space matters as much as processor time: a processed 2-d frame is 47\,MB, of which 43\,MB is the
+uncompressed \texttt{BINNED2D} table, so a decade of data needs either selective products or compressed tables.
+
+\begin{table}[!htbp]
+\centering
+\caption{Processing time per frame (wall-clock, four frames in parallel on an 8-core laptop).}
+\label{tab:timing}
+\begin{tabular}{lccc}
+\toprule
+Frame type & $N$ & median time & total, 4 workers \\
+ & (frames) & (s) & (min) \\
+\midrule
+Arc & 122 & 48 & 26 \\
+Lamp flat & 133 & 4 & 3 \\
+Standard (Feige\,110) & 39 & 16 & 3 \\
+Science (Fairall~9, EG\,21) & 118 & 11 & 6 \\
+Science, improved v3 & 118 & 10 & 6 \\
+Standard, improved v3 (two passes) & 39 & $2\times12$ & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}

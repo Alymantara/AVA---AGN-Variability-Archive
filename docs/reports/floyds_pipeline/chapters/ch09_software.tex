@@ -1,0 +1,60 @@
+\chapter{Software}
+\label{sec:software}
+
+All code is in \banzai{} (branch \texttt{rm-improvements}). The diagnostics and archive tools need only
+\textsc{numpy}, \textsc{scipy}, \textsc{astropy} and \textsc{matplotlib}.
+
+\begin{description}
+\item[\texttt{diagnostics.rm\_qa}] narrow-doublet and single-line fits, sky and telluric shifts, order-overlap ratio
+(Chapter~\ref{sec:diagnostics}).
+\item[\texttt{diagnostics.sky\_lines}] off-object sky spectrum from \texttt{BINNED2D}; adaptive top-hat centroids.
+\item[\texttt{utils.arc\_refit\_utils}] arc collapse, line-group model (eqs.~\ref{eq:arcgroup}--\ref{eq:boxcar}),
+correction (eq.~\ref{eq:arccorr}).
+\item[\texttt{utils.wavelength\_offset\_utils}] telluric zero point (eqs.~\ref{eq:tell}, \ref{eq:tellcomb},
+\ref{eq:transfer}).
+\item[\texttt{wavelength\_offsets.ObjectWavelengthCorrector}] pipeline stage (after the extraction trimmer).
+\item[\texttt{diagnostics.reextract}] archive products only (improved v1, Appendix~\ref{sec:app_v1}): fringe undo,
+master pattern, lamp-flat matching, harmonic fringe model, sky and extraction (eqs.~\ref{eq:undo}--\ref{eq:boxcarext});
+command line \texttt{python -m banzai\_floyds.diagnostics.reextract}.
+\item[\texttt{diagnostics.correct\_archive\_wavelengths}] arc refit and telluric zero point on archive
+\texttt{-1d} files; console script \texttt{banzai\_floyds\_correct\_wavelengths}.
+\item[\texttt{utils.sensitivity\_utils}, \texttt{diagnostics.recalibrate\_flux}] template$\times$correction
+sensitivity and telluric correction (eqs.~\ref{eq:sens}--\ref{eq:apply}).
+\item[\texttt{utils.trace\_model\_utils}] object-trace model: refraction along the slit, instrumental template,
+penalised residual correction (eqs.~\ref{eq:adr}--\ref{eq:tracehybrid}); template in
+\texttt{data/orders/trace\_template.dat}.
+\item[\texttt{utils.harmonic\_fringe\_utils}] harmonic fringe model (shared by the pipeline and the archive tool),
+including the blended high-pass phase.
+\item[\texttt{fringe.HarmonicFringeCorrector}] pipeline stage after \texttt{StandardLoader}; \texttt{FringeLoader}
+takes the phase from the stacked lamp-flat master.
+\item[\texttt{telluric}] transmission applied only in the absorption bands; ensemble of the nearest standards for
+science frames (\texttt{utils.telluric\_utils}).
+\item[\texttt{flux}, \texttt{utils.flux\_utils}] ensemble flux calibration (grey-normalised median of the nearest
+standards).
+\item[\texttt{arc\_lines}] used arc lines, now including Hg\,4916 and Ar\,6416, 6677, 6753, 6767 with measured
+strengths (\texttt{work/scripts/arc\_line\_strengths.py}).
+\item[\texttt{data/standards}] reference spectra; Feige\,67 (extended beyond 9200\,\AA{} with a fitted power law)
+and GD\,153 added.
+\item[\texttt{offline}, \texttt{fringe\_masters}] offline reduction of a data set and the fringe phase masters and
+residual templates.
+\end{description}
+Analysis scripts used for this report (in \texttt{work/}): \texttt{scripts/v3\_verify.py} (step-by-step verification
+of a reduction, Section~\ref{sec:sites_verify}), \texttt{scripts/compare\_versions.py} and
+\texttt{make\_raw\_compare\_tex.py} (Table~\ref{tab:versions}), \texttt{scripts/build\_trace\_template.py} (trace
+template and priors of a site), \texttt{scripts/arc\_check\_v3.py} (arc line-group shifts),
+\texttt{v3\_chain.py} (a whole reduction in batches that keep the disk use low) and \texttt{banzai\_run/lean\_2d.py}
+(lean 2-d products).
+New settings (all defaults of this branch): \texttt{FRINGE\_METHOD='harmonic'}, \texttt{FRINGE\_PHASE\_SOURCE='stacked'},
+\texttt{FRINGE\_HARMONIC\_NODES}, \texttt{FRINGE\_PHASE\_HIGHPASS}, \texttt{FRINGE\_TELLURIC\_BLEND},
+\texttt{PROFILE\_TRACE\_MODEL='adr'}, \texttt{PROFILE\_TRACE\_MODEL\_PRIORS}, \texttt{TELLURIC\_MODEL\_BANDS},
+\texttt{TELLURIC\_ENSEMBLE\_N}, \texttt{TELLURIC\_ENSEMBLE\_DAYS}; setting them to the 1.1.0 values
+(\texttt{'2d'}, \texttt{'polynomial'}, \texttt{None}) restores the stock behaviour. The offline reduction is the
+command \texttt{banzai\_floyds\_offline} (\texttt{setup-db}, \texttt{skyflats}, \texttt{run}, \texttt{chain};
+module \texttt{offline}), and the fringe products are built by \texttt{banzai\_floyds\_make\_phase\_master} and
+\texttt{banzai\_floyds\_make\_residual\_template} (module \texttt{fringe\_masters}); Appendix~\ref{sec:app_install}.
+From raw, all corrections run inside \banzai{} (\texttt{banzai\_floyds\_offline chain}: arcs, lamp flats, phase
+masters, standards, residual fringe template, standards again, science). On archive products (improved v1) the order of application is: re-extraction
+$\rightarrow$ arc refit $\rightarrow$ telluric zero point $\rightarrow$ flux calibration. Unit tests with synthetic data (\texttt{tests/test\_wavelength\_offsets.py},
+\texttt{test\_arc\_refit.py}, \texttt{test\_reextract\_flux.py}, \texttt{test\_trace\_model.py},
+\texttt{test\_telluric.py}, \texttt{test\_flux\_ensemble.py}, \texttt{test\_fringe\_masters.py}) cover every new
+step; the full suite of the package (176 tests) passes.

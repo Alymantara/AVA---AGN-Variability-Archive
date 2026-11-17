@@ -1,0 +1,35 @@
+\section{Recommendations}
+\label{sec:recommendations}
+
+\textit{For observers and LCO operations.}
+\begin{enumerate}
+\item Same-block lamp flats are useful but not essential for the fringes: the detector pattern is stable over months
+and only its phase is used (Section~\ref{sec:fringe_harmonic}). A narrow-slit lamp flat would record the fringe
+shape with less smoothing; sky flats are not needed for the method described here.
+\item Check the Zn lamp: it is ``on'' in the headers but produces no lines. Zn\,4680, 4722, 4811 and 5182 would fill
+the blue-order gap at H$\beta$/[O\,{\sc iii}].
+\item Take narrow-slit arcs (or both) for the wavelength solution; with a 6\,arcsec slit the lines are 51\,\AA{}
+top-hats and blend.
+\item Keep a nightly standard of the same configuration as the science if absolute shapes below 3800\,\AA{} matter:
+a same-night standard gives 0.5 per cent there, versus 3--5.5 per cent from another night.
+\end{enumerate}
+
+\textit{For \banzai.}
+\begin{enumerate}
+\item Add Hg\,4916 (both orders) and Ar\,6416, 6677, 6753/6767 (red) to the used lines; fit slit-width top-hats
+(eq.~\ref{eq:arcgroup}) for wide slits; add outlier rejection to the final $x(\lambda)$ fit.
+\item Add the per-exposure object zero point from the telluric bands with the pixel transfer to the blue order
+(stage \texttt{ObjectWavelengthCorrector}).
+\item Restrict the fringe correction to its fringe component (eq.~\ref{eq:delta}) above $\approx6500$\,\AA, bound the
+shift to a few pixels in both directions and never divide by an undefined map value. Do not divide by a scaled
+lamp pattern: take only the fringe phase from the lamp flat and fit amplitude, shape and phase offset per exposure
+on the extracted spectrum (eqs.~\ref{eq:phase}--\ref{eq:harmfit}).
+\item Match standards by slit width when available, fall back to the closest standard of any slit with the
+template$\times$correction model, and add EG\,21 (and the other COJ/OGG nightly standards) to the catalogue.
+\item Model the telluric absorption (e.g.\ a line-by-line transmission model with free water column) convolved with
+each spectrum's line-spread function, which in a wide slit is set by the seeing; the empirical transmission from a
+standard is neither matched in resolution nor anchored redward of 8900\,\AA.
+\item Provide per-order products; the combined spectrum mixes misaligned orders over 4540--5760\,\AA.
+\item Check the absolute scale of the 1.0.1 sensitivity tables (EG\,21 calibrated with them comes out at 0.1--0.5 per cent
+of its catalogue flux).
+\end{enumerate}

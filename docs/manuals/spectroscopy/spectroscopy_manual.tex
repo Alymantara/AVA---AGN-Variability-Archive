@@ -1,0 +1,469 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{ava_style}
+\renewcommand{\AVAManualTitle}{Spectroscopy Manual}
+
+\graphicspath{{figures/}{figures/spectroscopy/}}
+
+\begin{document}
+
+\avatitlepage
+  {Spectroscopy Manual}
+  {0.1}
+  {16 November 2026}
+  {Juan V.\ Hern\'{a}ndez Santisteban}
+  {jvhs1@st-andrews.ac.uk}
+  {School of Physics \& Astronomy, University of St Andrews,\\
+   North Haugh, St Andrews, KY16~9SS, UK}
+
+\tableofcontents
+\clearpage
+
+%%============================================================
+\section{Introduction}
+\label{sec:intro}
+%%============================================================
+
+\begin{warnbox}
+\textbf{Draft --- v0.1.}  This manual describes the spectroscopic pipeline
+as designed and partially implemented.  The banzai-floyds reduction stage
+is under active testing.  Figures in this manual use the current Fairall\,9
+and Mrk\,817 test archives.
+\end{warnbox}
+
+This manual documents the spectroscopic arm of the AGN Variability Archive (AVA):
+acquisition of FLOYDS spectra from the LCO archive, reduction with the improved
+banzai-floyds pipeline, spectral-line fitting, and production of emission-line
+light curves for reverberation mapping.
+
+The spectroscopy pipeline works in concert with the photometry pipeline
+(see the \emph{Photometry Manual}).  Its primary science outputs are:
+\begin{itemize}
+  \item Flux-calibrated 1-d and 2-d spectra, stored per target per night under
+        \path{<archive_root>/spectroscopy/<target>/reduced/<YYYYMMDD>/}.
+  \item H$\beta$, [O\,\textsc{iii}] and continuum flux measurements forming a
+        spectral time series.
+  \item Combined spectroscopic + photometric light curves for RM cross-correlation.
+\end{itemize}
+
+All data paths are configured in \path{config/ava_config.yaml} under
+\texttt{paths.*} and \texttt{spectroscopy.*}.  No hardcoded absolute paths exist
+in the production pipeline.
+
+\subsection{FLOYDS instrument}
+
+FLOYDS is a cross-dispersed, low-resolution spectrograph ($R \approx 300$--600)
+mounted on the 2\,m Faulkes Telescopes at Haleakal\={a} (FTN, site \texttt{ogg})
+and Siding Spring (FTS, site \texttt{coj}).  It simultaneously covers
+$\sim$3200--10\,000\,\AA\ in two overlapping orders:
+\begin{itemize}
+  \item \textbf{Blue arm:} $\sim$3200--5700\,\AA\ (order 2).
+  \item \textbf{Red arm:}  $\sim$5400--10\,000\,\AA\ (order 1).
+\end{itemize}
+The two orders overlap at $\sim$5400--5700\,\AA; the pipeline stitches them
+into a single continuous spectrum for display but keeps both for analysis.
+Standard stars are observed each night for flux calibration, with arcs and lamp
+flats taken in the same observing block.
+
+%%============================================================
+\section{Pipeline Overview}
+\label{sec:overview}
+%%============================================================
+
+The spectroscopy pipeline runs in four stages, each implemented as a Prefect
+task and callable independently:
+
+\begin{enumerate}
+  \item \textbf{Download} (\path{ava/spectroscopy/download.py}) ---
+        queries the LCO archive for new FLOYDS frames (science, standards,
+        arcs, flats); populates the lcodb spectra database.
+  \item \textbf{Reduction} (\path{ava/spectroscopy/reduce.py}) ---
+        runs the improved banzai-floyds pipeline in a dedicated Python~3.12
+        environment; files QC results to \texttt{spec\_qc}.
+  \item \textbf{Spectral products} (\path{ava/spectroscopy/products.py}) ---
+        extracts H$\beta$, [O\,\textsc{iii}] and continuum fluxes from each
+        reduced spectrum; writes the emission-line time series.
+  \item \textbf{Web plots} (\path{ava/spectroscopy/webplots.py}) ---
+        produces the spectral ARM plot, mean spectrum, H$\beta$ series and
+        fit summary for the AVA website.
+\end{enumerate}
+
+%%============================================================
+\section{Database and Archive Structure}
+\label{sec:database}
+%%============================================================
+
+\subsection{Directory layout}
+
+All data live under \texttt{paths.archive\_root} (set in
+\path{config/ava_config.yaml}; defaults to \texttt{data/test\_archive}
+for the sandbox).  The spectroscopy subtree is:
+
+\begin{lstlisting}[style=shell]
+<archive_root>/spectroscopy/
+  raw_data/<target>/YYYYMMDD/*.fits.fz   # raw LCO frames
+  <target>/
+    reduced/YYYYMMDD/
+      *-e91-1d.fits.fz                   # flux-calibrated 1-d spectrum
+      *-e91-2d.fits.fz                   # 2-d rectified spectrum (optional)
+    plots/
+      lco_latest_<target>_spec.png       # most-recent spectrum
+      lco_latest_<target>_spec_avg.png   # mean spectrum
+      lco_latest_<target>_hbeta.png      # H-beta time series
+      lco_latest_<target>_hbeta_fit.png  # H-beta fit summary
+  banzai/                                # banzai-floyds work tree
+    input/, processed/, db.sqlite
+\end{lstlisting}
+
+\subsection{lcodb spectra database}
+
+Spectroscopic metadata is stored in \path{data/lcodb/spectra.sqlite}.
+Key tables:
+
+\begin{center}
+\small
+\begin{tabular}{lp{9cm}}
+\toprule
+Table & Contents \\
+\midrule
+\texttt{spectra} & One row per archive frame: \texttt{frame\_id},
+  \texttt{data\_id}, role (science/standard), night, paths \\
+\texttt{spec\_qc} & One row per reduced spectrum: QC keywords from
+  banzai-floyds (\texttt{L1Q*}), product paths, pipeline version \\
+\texttt{standards} & Available standard stars per night per site \\
+\texttt{spec\_lines} & Per-exposure line and continuum flux fits \\
+\texttt{line\_variability} & Per-target summary: mean, rms, $F_\mathrm{var}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Standard-star coverage}
+
+As of November 2026 the archive contains 9\,524 science spectra across 71 AGN.
+\textbf{All 9\,524 have at least one matched spectrophotometric standard observed
+on the same night from the same site.}  Zero science frames lack a flux calibrator.
+
+%%============================================================
+\section{Download Stage}
+\label{sec:download}
+%%============================================================
+
+\path{ava/spectroscopy/download.py} queries the LCO archive API for new FLOYDS
+frames and populates the \texttt{spectra} table.  It follows the same
+overlap-and-lookback logic as the photometry downloader (see the
+\emph{Photometry Manual}, Section~3):
+
+\begin{itemize}
+  \item Science frames (\texttt{OBJECT = <target>}, \texttt{INSTRUME = FLOYDS}).
+  \item Spectrophotometric standards (the LCO standard-star list).
+  \item Associated calibration frames (arcs, lamp flats) for each observed night.
+\end{itemize}
+
+Frame matching and the download state are recorded per night in the spectra
+database so that partial nights can be resumed.
+
+%%============================================================
+\section{Reduction: improved banzai-floyds}
+\label{sec:reduction}
+%%============================================================
+
+\begin{notebox}
+\textbf{Status: testing.}  The improved banzai-floyds pipeline is a fork of the
+official LCO pipeline with improved fringe correction, sky subtraction, and flux
+calibration.  It is being validated on the Fairall\,9 and Mrk\,817 archives.
+\end{notebox}
+
+\subsection{Reduction environment}
+
+banzai-floyds requires Python~3.12 with \texttt{torch} (neural-network trace
+model).  It runs as a subprocess in its own environment, whose interpreter path
+is set by \texttt{spectroscopy.reduction.python} in \path{config/ava_config.yaml}.
+This isolates the torch dependency from the main AVA environment.
+
+The banzai-floyds code location is set by \texttt{paths.floyds\_pipeline} and
+the sky-flat library by \texttt{spectroscopy.reduction.skyflats\_dir} in the
+same config file.
+
+\subsection{Reduction stages}
+
+For each science target night, \path{reduce.py} orchestrates:
+
+\begin{enumerate}
+  \item \textbf{Calibration database setup} (once per site): builds the arc
+        solution and fringe phase-master library from sky flats via
+        \path{banzai_floyds_offline setup-db} and \path{skyflats}.
+  \item \textbf{Staging}: input symlinks placed in
+        \path{banzai/input/<target>_<run>/} for science + standard frames with
+        their associated calibration frames.
+  \item \textbf{Chain reduction}: \path{banzai_floyds_offline chain} produces:
+        arc solutions, flat-fielded frames, fringe-corrected science spectra, and
+        flux-calibrated 1-d/2-d products.
+  \item \textbf{Filing}: science products (\texttt{-1d}, \texttt{-2d}) are moved
+        to \path{<target>/reduced/<YYYYMMDD>/};
+        calibrations remain in the shared \path{banzai/processed/} tree.
+  \item \textbf{QC}: \texttt{L1Q*} keywords and observing conditions are logged
+        to the \texttt{spec\_qc} database table.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/compare_archive}
+  \caption{Comparison of raw and reduced spectra for Mrk\,817 (blue arm shown).
+    Top: raw 2-d frame showing the cross-dispersed trace, sky lines, and
+    fringe pattern.  Bottom: the banzai-floyds reduced and fringe-corrected
+    1-d spectrum, flux-calibrated against the nightly standard star.  The
+    improvement in fringe suppression redward of 7000\,\AA\ is the primary
+    motivation for the improved pipeline.}
+  \label{fig:compare-archive}
+\end{figure}
+
+\subsection{QC keywords}
+
+The \texttt{spec\_qc} table records the full set of banzai-floyds quality
+keywords per exposure:
+
+\begin{center}
+\small
+\begin{tabular}{lp{8cm}}
+\toprule
+Keyword & Description \\
+\midrule
+\texttt{L1QSN1}, \texttt{L1QSN2} & S/N in blue and red arms \\
+\texttt{L1QFLAG} & Overall QC flag (0 = pass) \\
+\texttt{L1QSTDGR} & Standard star grade (A/B/C/F) \\
+\texttt{L1QSTDDT} & Standard-to-science $\Delta t$ (hours) \\
+\texttt{L1QSTDSP} & Standard-to-science sky separation \\
+\texttt{AIRMASS} & Mean airmass \\
+\texttt{AGFWHM} & Autoguider FWHM (arcsec) \\
+\texttt{WMSCLOUD} & Cloud extinction estimate (mag) \\
+\texttt{SKYMAG} & Sky brightness (mag\,arcsec$^{-2}$) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%============================================================
+\section{Spectral Products}
+\label{sec:products}
+%%============================================================
+
+\path{ava/spectroscopy/products.py} processes the reduced 1-d spectra in
+three steps: arm extraction, emission-line fitting, and writing to the database.
+
+\subsection{Spectral arm extraction and display}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_Mrk_817_spec}
+  \caption{Most-recent reduced FLOYDS spectrum of Mrk\,817 (FTS, \texttt{coj2m002}).
+    The blue and red arms are shown separately; the grey shaded region marks the
+    overlap zone (5400--5700\,\AA).  Key emission lines are labelled: H$\beta$
+    $\lambda$4861, [O\,\textsc{iii}]\,$\lambda\lambda$4959,5007, H$\alpha$
+    $\lambda$6563, [N\,\textsc{ii}]\,$\lambda$6583.  The spectrum is shown in
+    the observed frame; tick marks indicate the positions of host-galaxy
+    absorption features.}
+  \label{fig:spec-mrk817}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_fairall_9_spec}
+  \caption{Most-recent FLOYDS spectrum of Fairall\,9 (FTN, \texttt{ogg2m001}).
+    Fairall\,9 is the reference target for AVA FLOYDS commissioning; its bright
+    AGN ($V \approx 13$\,mag at peak) gives S/N $\sim$80 per resolution element
+    in a 1200\,s exposure in good conditions.}
+  \label{fig:spec-f9}
+\end{figure}
+
+\subsection{Mean spectrum}
+
+The mean spectrum is the inverse-variance weighted co-addition of all good
+epochs in the archive.  It serves as a template for narrow-line subtraction
+and for identifying artefacts in individual exposures.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_Mrk_817_spec_avg}
+  \caption{Mean FLOYDS spectrum of Mrk\,817 (all epochs, all sites).  The
+    shaded band is the $1\sigma$ epoch-to-epoch rms, tracing the AGN
+    variability amplitude across the spectrum.  The rms is highest in the
+    broad H$\beta$ and H$\alpha$ wings, confirming variable broad-line emission.}
+  \label{fig:spec-avg-mrk817}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_fairall_9_spec_avg}
+  \caption{Mean FLOYDS spectrum of Fairall\,9.  The variability rms
+    (shaded) peaks strongly in the broad emission lines; the continuum rms
+    at 5100\,\AA\ is the RM monitoring proxy.}
+  \label{fig:spec-avg-f9}
+\end{figure}
+
+\subsection{Emission-line fitting}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{spectroscopy/hbeta_fit_arms}
+  \caption{H$\beta$-region fit for a single Fairall\,9 epoch (blue arm, 2026
+    October 13).  The model (orange) comprises: narrow H$\beta$ (blue),
+    broad H$\beta$ (red), [O\,\textsc{iii}]\,$\lambda\lambda$4959,5007 (green,
+    constrained to a 1:3 ratio), and a linear continuum (dashed).  Residuals
+    are shown in the lower panel; the fit rms is $\sim$1\,\% of the peak flux.}
+  \label{fig:hbeta-fit-arms}
+\end{figure}
+
+\path{ava/spectroscopy/lines.py} fits the H$\beta$ region
+($\sim$4800--4920\,\AA\ rest frame) of each spectrum:
+\begin{itemize}
+  \item Narrow H$\beta$ (single Gaussian, FWHM $< 500$\,km\,s$^{-1}$).
+  \item Broad H$\beta$ (one or two Gaussians, FWHM $> 1000$\,km\,s$^{-1}$).
+  \item [O\,\textsc{iii}]\,$\lambda\lambda$4959,5007 (doublet with fixed 1:3
+        flux ratio and tied width), used as the flux-scale calibration anchor.
+  \item Linear continuum under the H$\beta$+[O\,\textsc{iii}] blend.
+\end{itemize}
+The fit uses \texttt{scipy.optimize.curve\_fit} with weighted residuals.
+The [O\,\textsc{iii}]\,5007 flux anchors the relative epoch-to-epoch flux
+calibration: narrow-line variability is assumed negligible on monitoring
+timescales.
+
+\subsection{H$\beta$ time series}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_Mrk_817_hbeta}
+  \caption{H$\beta$ broad-line and continuum light curve for Mrk\,817
+    (all epochs).  Top panel: broad H$\beta$ flux (blue), narrow H$\beta$
+    flux (grey) and [O\,\textsc{iii}]\,5007 (green, expected constant).
+    Middle: continuum flux at 5100\,\AA.  Bottom: S/N per epoch.
+    The broad H$\beta$ clearly responds to the continuum with a lag of
+    $\sim$2--6\,weeks, the primary RM signal.}
+  \label{fig:hbeta-mrk817}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_fairall_9_hbeta}
+  \caption{H$\beta$ light curve for Fairall\,9.  The [O\,\textsc{iii}] flux
+    (green) is stable to $<$5\,\%, confirming the flux calibration.  The
+    broad-line variability amplitude ($F_\mathrm{var} \approx 15$\,\%) is
+    higher than Mrk\,817, making Fairall\,9 the preferred commissioning target
+    for RM lag measurements.}
+  \label{fig:hbeta-f9}
+\end{figure}
+
+\subsection{Fit summary plot}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_Mrk_817_hbeta_fit}
+  \caption{H$\beta$ fit summary for Mrk\,817: each panel shows one epoch's
+    fit (grey: data, orange: model, blue: narrow, red: broad, green:
+    [O\,\textsc{iii}]).  Epochs with S/N $<$5 or large fit residuals are
+    flagged in \texttt{spec\_lines.quality}.}
+  \label{fig:hbeta-fit-mrk817}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/lco_latest_fairall_9_hbeta_fit}
+  \caption{H$\beta$ fit summary for Fairall\,9.  The broad H$\beta$ component
+    is well-resolved at all epochs; the typical S/N in the H$\beta$ region
+    is 20--60 per resolution element.}
+  \label{fig:hbeta-fit-f9}
+\end{figure}
+
+\subsection{Per-exposure records}
+
+Each fit result is written to the \texttt{spec\_lines} table:
+
+\begin{center}
+\small
+\begin{tabular}{lp{8cm}}
+\toprule
+Column & Description \\
+\midrule
+\texttt{frame\_id} & Linked to \texttt{spectra.frame\_id} \\
+\texttt{data\_id} & Target name \\
+\texttt{MJD} & Mid-exposure Modified Julian Date \\
+\texttt{f\_hbeta\_broad} & Broad H$\beta$ flux (erg\,s$^{-1}$\,cm$^{-2}$) \\
+\texttt{f\_hbeta\_narrow} & Narrow H$\beta$ flux \\
+\texttt{f\_oiii\_5007} & [O\,\textsc{iii}]\,5007 flux (calibration anchor) \\
+\texttt{f\_cont\_5100} & Continuum flux at rest 5100\,\AA\ \\
+\texttt{snr} & S/N in the H$\beta$ region \\
+\texttt{quality} & Fit quality flag (0 = good) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%============================================================
+\section{Reverberation Mapping Products}
+\label{sec:rm}
+%%============================================================
+
+\subsection{Combined light curves}
+
+The spectroscopic H$\beta$ flux series and the photometric $g$-band light curve
+(the continuum proxy from the photometry pipeline) are aligned on a common MJD
+grid.  The combined dataset is the input for RM cross-correlation analysis with
+\textsc{JAVELIN} and \textsc{ICCF}.
+
+Spectroscopic epochs are overplotted as tick marks on all photometric web plots
+(see the \emph{Photometry Manual}), providing a visual check of monitoring
+cadence.
+
+\subsection{Line variability summary}
+
+The \texttt{line\_variability} table records per-target, per-season summary
+statistics for each emission line: mean flux, rms, and
+$F_\mathrm{var} = \sqrt{(\sigma^2 - \delta^2)} / \langle f \rangle$ (the
+excess fractional variability above measurement noise).
+
+%%============================================================
+\section{Usage}
+\label{sec:usage}
+%%============================================================
+
+\begin{lstlisting}[style=shell]
+# Download new FLOYDS frames for all targets
+python scripts/run_pipeline.py --spec --download
+
+# Reduce new frames with banzai-floyds for one target
+python scripts/run_pipeline.py --spec --target Mrk_817
+
+# Full spectroscopic update: download + reduce + products + plots
+python scripts/run_pipeline.py --spec --all
+
+# Read the emission-line time series
+from ava.config import load_config
+from ava.spectroscopy import products as P
+cfg = load_config()
+lc = P.hbeta_series(cfg.spec_target_dir("Mrk_817"))
+\end{lstlisting}
+
+\begin{warnbox}
+The \texttt{--spec} flag activates the spectroscopic stages.  Photometric
+stages run independently; the two pipelines share only the master target
+list, the AVA database, and the \path{config/ava_config.yaml} configuration.
+\end{warnbox}
+
+%%============================================================
+\section{Known Issues and Future Work}
+\label{sec:future}
+%%============================================================
+
+\begin{enumerate}
+  \item \textbf{Reduction validation ongoing.}  The improved banzai-floyds
+        pipeline is being tested on the Fairall\,9 and Mrk\,817 archives.
+        Production deployment is pending sign-off on the QC metrics.
+  \item \textbf{Sky-subtraction model.}  The neural-network sky model requires
+        the \texttt{torch} environment and site-specific sky-flat libraries.
+        These are built once and cached in \path{banzai/processed/}.
+  \item \textbf{Telluric correction.}  Not yet implemented; affects the red arm
+        above 7000\,\AA\ (O$_2$ B band at 6900\,\AA, A band at 7600\,\AA).
+  \item \textbf{H$\alpha$ fitting.}  Planned for the red arm; deferred until
+        flux calibration is fully validated across both sites.
+  \item \textbf{Public data release.}  Final reduced spectra and RM products
+        for completed targets will be released at
+        \path{https://alymantara.com/ava}.
+\end{enumerate}
+
+\end{document}

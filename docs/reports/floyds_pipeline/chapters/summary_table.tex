@@ -1,0 +1,46 @@
+\begin{table}[!htbp]
+\centering
+\caption{Summary of the quality metrics. Scatters are robust (1.4826 times the median absolute deviation) over the
+50 Fairall~9 spectra unless stated otherwise. Small-scale scatter: rms over the 50 spectra of the ratio of each
+(normalised) spectrum to the median spectrum after removing a 200\,\AA{} running median. Fringe metric: rms of the
+ratio of 25\,\AA{} to 200\,\AA{} running medians in the telluric-free windows 7750--8050 and 8450--8900\,\AA.}
+\label{tab:summary}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.9cm}ccc@{}}
+\toprule
+Metric & \banzai{}~1.0.1 & improved v1 & improved v1 \\
+ & (archive) & (optimal) & (boxcar) \\
+\midrule
+\multicolumn{4}{l}{\textit{Wavelengths (narrow lines at $z=0.047016$; median offset and scatter, \kms)}}\\
+{[O\,{\sc iii}]\,5007, blue order} & \OIIIbOld & \multicolumn{2}{c}{\OIIIbNew} \\
+{[O\,{\sc iii}]\,5007, red order} & \OIIIrOld & \multicolumn{2}{c}{\OIIIrNew} \\
+{[O\,{\sc iii}]\,4959, blue order} & \OIIIfourOld & \multicolumn{2}{c}{\OIIIfourNew} \\
+{[Ne\,{\sc iii}]\,3869, blue order} & \NeIIIOld & \multicolumn{2}{c}{\NeIIINew} \\
+{[O\,{\sc i}]\,6300, red order} & \OIOld & \multicolumn{2}{c}{\OINew} \\
+Ca\,{\sc ii}\,K (host), blue order & \CaKOld & \multicolumn{2}{c}{\CaKNew} \\
+\midrule
+\multicolumn{4}{l}{\textit{Red-order fringing and artefacts (units in each row)}}\\
+Fringe metric (median of 50, per cent) & \FrOld & \FrNewOpt & \FrNewBox \\
+Fringe in the median of 50 spectra, 7300--9500\,\AA{} (per cent) & \FrMedOld & \FrMedNewOpt & \FrMedNewBox \\
+$>8\sigma$ spikes at 4600--5800\,\AA{} (number per spectrum, median / maximum) & \SpOld & \SpNewOpt & \SpNewBox \\
+\midrule
+\multicolumn{4}{l}{\textit{Small-scale scatter between spectra (per cent)}}\\
+blue 3500--4000\,\AA & \SSbaOld & \SSbaOpt & \SSbaBox \\
+blue 4000--4600\,\AA & \SSbbOld & \SSbbOpt & \SSbbBox \\
+blue 4600--5200\,\AA & \SSbcOld & \SSbcOpt & \SSbcBox \\
+blue 5200--5700\,\AA & \SSbdOld & \SSbdOpt & \SSbdBox \\
+red 5000--6000\,\AA & \SSraOld & \SSraOpt & \SSraBox \\
+red 6000--6800\,\AA & \SSrbOld & \SSrbOpt & \SSrbBox \\
+red 7000--7500\,\AA & \SSrcOld & \SSrcOpt & \SSrcBox \\
+red 7700--8500\,\AA & \SSrdOld & \SSrdOpt & \SSrdBox \\
+red 8500--9500\,\AA & \SSreOld & \SSreOpt & \SSreBox \\
+\midrule
+\multicolumn{4}{l}{\textit{Flux consistency (per cent)}}\\
+{[O\,{\sc iii}]\,5007 flux scatter, blue order} & \FOIIIbOld & \FOIIIbOpt & \FOIIIbBox \\
+{[O\,{\sc iii}]\,5007 flux scatter, red order} & \FOIIIrOld & \FOIIIrOpt & \FOIIIrBox \\
+red/blue [O\,{\sc iii}] flux ratio scatter & \FRBOld & \FRBOpt & \FRBBox \\
+EG\,21 shape vs CTIO, blue, rms (18 nights) & \CLbOld & \multicolumn{2}{c}{\CLbNew} \\
+EG\,21 shape vs CTIO, red, rms (18 nights) & \CLrOld & \multicolumn{2}{c}{\CLrNew} \\
+EG\,21 red fringe-scale rms (median of 18) & \EGfrOld & \multicolumn{2}{c}{\EGfrNew} \\
+\bottomrule
+\end{tabular}
+\end{table}

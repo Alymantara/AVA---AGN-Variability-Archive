@@ -1,0 +1,23 @@
+We diagnose the LCO FLOYDS pipeline \banzai{} for reverberation mapping (RM), using a Fairall~9 campaign at Siding
+Spring (COJ; 100 spectra through the 6\,arcsec slit, 57 standard-star spectra, 122 arcs) and an NGC\,4151 campaign at
+Haleakal\=a (OGG; 60 spectra, 100 standard-star spectra), and we describe target-independent corrections, now built into
+\banzai{} and run from the raw frames. Our final version (improved v3) addresses every problem we found.
+(i) \textit{Wavelengths}: the arc fit leaves H$\beta$/[O\,{\sc iii}] and H$\alpha$ unconstrained (the archive red order
+is off by $-8$\,\AA{} at Hg\,4916) and a compact object's zero point in a wide slit depends on its position across the
+slit (up to $\pm2''$, i.e.\ $\pm17$\,\AA{} for NGC\,4151). Adding the detected but unused lines to the arc fit and
+measuring the object's zero point from the telluric bands in its own light bring the [O\,{\sc iii}] scatter from
+exposure to exposure to 0.5--0.9\,\AA{} and the two orders into agreement to 0.3\,\AA{} (COJ). (ii)
+\textit{Fringing}: the archive frames are divided by an eight-month-old lamp flat shifted along the slit by up to
+hundreds of pixels, which destroys data in 13 of 50 frames and biases the flux by up to $\pm10$ per cent; a lamp flat
+gives the phase of the fringes but not their shape. A two-harmonic fringe model with the lamp phase, fitted to each
+extracted spectrum jointly with a telluric template, reduces the red-order fringing of Fairall~9 from 13.7 (archive)
+and 8.1 (\banzai{}~1.1.0) to 1.9 per cent. (iii) \textit{Telluric and flux calibration}: standards are selected by
+proposal rather than slit width, several nightly standards are missing from the catalogue, a single standard
+transfers its clouds and its noise to the science, and the archive spectra are twice too bright because 1.0.1 does not
+scale by the exposure time. An ensemble of the nine nearest standards with the grey level of the clearest half, a
+telluric correction confined to the absorption bands and two added standards reduce the scatter of the red/blue
+[O\,{\sc iii}] flux ratio from 29.2 (archive) and 8.9 (1.1.0) to 6.9 per cent, and bridge a factor-1.8 throughput change
+of the OGG telescope. (iv) \textit{Traces}: a physical model of the object trace (refraction plus an instrumental
+shape for each site) keeps the faint ends of the orders at 0.1--0.3\,px where the polynomial fails. The uncertainties
+are correct per pixel at both sites. We list the open issues and give recommendations for observing and for the
+pipeline.

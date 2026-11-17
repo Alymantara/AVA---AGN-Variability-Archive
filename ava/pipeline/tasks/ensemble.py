@@ -48,7 +48,7 @@ def intercal_lightcurve(phot: Path, ec) -> pd.DataFrame:
     fix = [s for s in scopes if _matches(s, ec.intercal_correct_cameras)]
     if ec.get("intercal_per_season", False):
         # one additive offset per observing season for the corrected cameras (MuSCAT step
-        # between seasons, docs/future_improvements.md); the all-data fit fills seasons
+        # between seasons, docs/notes/future_improvements.md); the all-data fit fills seasons
         # with too few pairs
         lc["season"] = IC.seasons(lc["MJD"], float(ec.get("intercal_season_gap_days", 60.0)))
         ts = IC.intercalibrate_by_season(lc, ref, fix, max_gap=float(ec.intercal_max_gap_days),

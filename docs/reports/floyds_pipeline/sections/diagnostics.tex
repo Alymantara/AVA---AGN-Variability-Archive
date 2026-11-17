@@ -1,0 +1,55 @@
+\section{Diagnostic measurements}
+\label{sec:diagnostics}
+
+The following measurements are made on every spectrum and are independent of the reduction being tested. They are
+implemented in \texttt{banzai\_floyds.diagnostics} (\texttt{rm\_qa}, \texttt{sky\_lines}).
+
+\subsection{Narrow-line position and flux}
+\label{sec:diag_narrow}
+The [O\,{\sc iii}] doublet is fitted, in a window $[-110,+60]$\,\AA{} around the expected position of
+$\lambda5007$, as
+\begin{equation}
+F(\lambda) = \sum_{k=0}^{2} c_k\,\xi^k + A\left[ G(\lambda;\,\lambda_{2}+s,\,\sigma)
+ + r\,G\!\left(\lambda;\,\lambda_{1}+s\frac{\lambda_1}{\lambda_2},\,\sigma\right)\right],
+\label{eq:o3}
+\end{equation}
+where $G(\lambda;\mu,\sigma)=\exp[-(\lambda-\mu)^2/2\sigma^2]$, $\lambda_{1,2}=(1+z)\{4958.911,5006.843\}$\,\AA,
+$r=1/2.98$ is the fixed line ratio \citep{Storey2000}, $\xi=(\lambda-\lambda_2)/100$\,\AA, and the free parameters are
+the shift $s$, the width $\sigma$, the amplitude $A$ and the quadratic continuum $c_k$ (which absorbs the
+H$\beta$ red wing). The fit minimises a soft-$L_1$ loss of the normalised residuals; the parameter covariance is
+$(J^{\rm T}J)^{-1}\chi^2_\nu$ with $J$ the Jacobian. The line flux is $A\sigma\sqrt{2\pi}$. Other narrow features
+([Ne\,{\sc iii}]\,$\lambda3869$, host Ca\,{\sc ii}\,K) are fitted with a single Gaussian of either sign on a linear
+continuum.
+
+\subsection{Night-sky zero point}
+\label{sec:diag_sky}
+A sky spectrum is formed from the \texttt{BINNED2D} \emph{data} (not the sky model) of pixels with
+$|y_{\rm p}|>4\sigma_{\rm p}$ and more than 8 rows from the slit ends, as the median in wavelength bins of half a
+pixel. With a 6\,arcsec slit every sky line is a top-hat of the slit width ($\approx51$\,\AA{} red,
+$\approx25$\,\AA{} blue), so its position is the flux-weighted centroid
+\begin{equation}
+\lambda_c = \frac{\sum_i \lambda_i\, \max(S_i - C_i, 0)}{\sum_i \max(S_i - C_i, 0)},
+\label{eq:centroid}
+\end{equation}
+iterated in a window $|\lambda_i-\lambda_c|<0.6h$ that follows the centroid, with $C_i$ a straight line fitted to
+$0.7h<|\lambda_i-\lambda_0|<h$. The half-window $h$ is widened until the half-maximum extent of the feature fits inside
+$0.6h$, which makes the centroid unbiased for any slit width. Lines used: [O\,{\sc i}]\,5577.338 (both orders),
+Na\,D (intensity-weighted mean of D$_2$/D$_1$, weight 0.3) and [O\,{\sc i}]\,6300.304 (red); [O\,{\sc i}]\,6363.776
+is excluded because it falls inside the window of the 6300 top-hat \citep{Osterbrock1996}.
+
+\subsection{Telluric zero point}
+\label{sec:diag_tell}
+Telluric absorption is imprinted on the object's own light. For a band $b$, the extracted (uncalibrated) counts are
+divided by a straight line through the outer 12 per cent of the band window, $n(\lambda)$, and compared with a
+transmission template $T(\lambda)$ smoothed with a Gaussian of $\sigma=2$ pixels and raised to a free power $\alpha$
+(Beer--Lambert scaling, $T_X=T_1^{X}$):
+\begin{equation}
+\chi^2_b(s) = \sum_i \frac{\left[n_i - \exp\{\alpha(s)\ln T(\lambda_i - s)\}\right]^2}{\epsilon_i^2},\quad
+\alpha(s) = \frac{\sum_i w_i \ln T(\lambda_i-s) \ln n_i}{\sum_i w_i \ln^2 T(\lambda_i-s)},
+\label{eq:tell}
+\end{equation}
+with $w_i=(n_i/\epsilon_i)^2$. $\chi^2_b(s)$ is evaluated on a 0.1\,\AA{} grid over $|s|\le30$\,\AA{}; the minimum is
+refined with a parabola whose curvature $\kappa$ gives $\sigma_s=\sqrt{2\chi^2_\nu/\kappa}$. A band is rejected if
+$\alpha<0.3$ (e.g. an emission line of the target sits on it; Fairall~9's H$\alpha$ falls on the B band).
+The bands and their offsets $o_b$ relative to the A band are listed in Table~\ref{tab:bands}. The template is the
+transmission spectrum shipped with \banzai{}.

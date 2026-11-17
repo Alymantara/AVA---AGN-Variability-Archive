@@ -1,4 +1,4 @@
-Scripts behind `docs/pytics_report.md` (Nov 2026), kept for reproducibility. `<work>` is any scratch folder.
+Scripts behind `docs/notes/pytics_report.md` (Nov 2026), kept for reproducibility. `<work>` is any scratch folder.
 
 1. `make_subset.py gp 59945 60125 <work>/g2023.parquet` — PyTICS input subset from the test archive
 2. `run_original.py <PyTICS clone> <work>/g2023.parquet <work>/orig_g2023 200` — the published PyTICS

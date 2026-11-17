@@ -1,0 +1,142 @@
+% Same-visit cosmic-ray check (banzai_floyds/visit_cosmics.py), input from ch11_cosmics.tex
+\section{The second exposure of the visit}
+\label{sec:cr_pair}
+The object model makes LA Cosmic search the right residual, but it still has to judge a sharp feature by its shape
+alone, and a narrow line from a resolved narrow-line region can be as sharp as a cosmic ray (the 15 H$\alpha$ pixels
+of Fig.~\ref{fig:cr_method}). The visits of the RM programme have two exposures of the same pointing taken
+back to back. A cosmic ray lands in one of them only; a line, a star core, a sky line or a fringe is in both. The
+other exposure of the visit (the \textit{partner}) is therefore the most direct test there is, and we have added it to
+the pipeline as a stage that runs right after LA Cosmic (\texttt{banzai\_floyds/visit\_cosmics.py},
+\texttt{SameVisitCosmicRays}). For a frame $a$ with partner $b$:
+\begin{enumerate}
+\item \textit{Find the partner}: the raw frames of the same night in the folder of the frame with the same molecule
+(\texttt{MOLUID}) and type, the nearest in time first. A frame without a partner (all the standards, which are single
+exposures) keeps the LA Cosmic flags of Section~\ref{sec:cr_model}.
+\item \textit{Reduce the partner} up to and including LA Cosmic, as the frame itself (no database records are written
+for it). Both are sky subtracted with their own sky models.
+\item \textit{Shift} the partner along the slit onto the trace of the frame: the difference of the fitted trace centres
+per column, smoothed over 15 columns, refined where the object is bright (column $S/N>30$) by the difference of the flux
+centroids within 2\,FWHM, smoothed over 5 columns. The trace centres follow the continuum; the narrow-line region of
+NGC\,4151 sits up to half a pixel differently, and half a pixel turns the peak of a bright line into a $\pm$ pattern
+against the partner (Fig.~\ref{fig:cr_pair}, top row, panel \ding{174}).
+\item \textit{Scale} it per column by the median ratio $a/b$ over the trace core, smoothed over 31 columns (the exposure
+time ratio where the object is faint).
+\item \textit{Shift} it along the dispersion. In a wide slit the position of the object across the slit shifts its
+spectrum, and the two exposures of a visit differ by 0.1\,pixel (median) at OGG and 0.3\,pixel at COJ, up to 0.6 and
+1.2\,pixels; that puts the flanks of a bright narrow line out of step. The offset is measured per order from the cross
+correlation of the two spectra summed over the trace (a parabola through its peak) and, where it exceeds 0.1\,pixel,
+removed by resampling the partner (cubic spline). It is recorded as \texttt{L1CRDX1} and \texttt{L1CRDX2}.
+\item \textit{Match} it to the frame. The seeing changes within a visit: the FWHM of Fairall\,9 went from 11.6 to
+14.7\,pixels between the two exposures of 2026 September 6 (and the flux by a factor 0.63), and a scale and a shift
+cannot absorb that. As in image subtraction \citep{Alard1998}, the partner is convolved with a kernel along the slit
+fit to the frame, $m(y)=\sum_{|k|\le6}c_k\,s\,b(y+k)+c_{\rm sky}+c'_{\rm sky}\,y$, with a constant and a slope for a
+difference of the sky models. The kernel is fit per block of 15 columns on both exposures median-filtered over those
+columns (a fit on the noisy partner itself is biased towards zero, and the filter keeps cosmic rays out of the fit),
+with 4$\sigma$ clipping, and applied to the unfiltered partner after its flagged and masked pixels are
+replaced by the filtered values (the kernel has negative side lobes when it sharpens, and would otherwise print a
+negative copy of a cosmic ray of the partner next to it). A kernel shared by 15 columns cannot reproduce a hit of a
+pixel or two.
+\item \textit{Compare}: every pixel gets
+\[
+z=\frac{a-m}{\sqrt{\sigma_a^2+\sigma_m^2+(f\,m)^2}},\qquad f=0.01,
+\]
+with $\sigma_m$ the error of the partner propagated through the kernel, and its excess relative to the signal under it.
+\item \textit{Decide}, starting from the LA Cosmic flags:
+\begin{itemize}
+\item a connected group of flags is \textit{confirmed} if its largest $z$ is at least 3; otherwise the partner shows the
+same feature and the group is \textit{removed};
+\item of a confirmed group only the pixels with $z\ge3$ and their neighbours stay flagged, so that a line peak LA Cosmic
+merged with a hit beside it is not clipped with it;
+\item a pixel the partner cannot check always stays flagged, and a group that is mostly such pixels is kept whole.
+The partner cannot check a pixel that is masked in it, flagged in it too off the object (a warm pixel), at the edge of
+an order, or where
+the matched partner differs from the frame over an extended area (the median of $z$ over $5\times5$ pixels beyond 2):
+the residual 2-d fringes of the red order stay on the detector while the object is moved onto the trace of the frame,
+and the match can fail at the end of an order. A cosmic ray is compact, so an extended difference says nothing about
+one; this covers 0.04--4 per cent of an order in the frames we examined (\texttt{L1CRMISM});
+\item on the object (within 2\,FWHM of the trace) a pixel the partner flagged too is still compared with the partner's
+own value, with the kernel applied to the partner without filling it in. LA Cosmic flags the same sharp line and trace
+peaks in both exposures of a good-seeing visit, and if neither could check the other both would keep the false flags.
+If the two agree the pixel holds the same feature in both exposures, since a cosmic ray does not hit the same pixel
+twice; if the partner is brighter by more than 3$\sigma$ the partner was hit there, and the pixel stays unchecked.
+Nothing is added on such pixels. Off the object the rule does not apply: a warm pixel is in both exposures as well, and
+on the sky nothing tells it from a feature (\texttt{L1CRSHAR} counts the pixels the rule reaches);
+\item new groups, the hits LA Cosmic missed, are held to a stricter standard than confirmations, because on a bright
+line a mismatch of 1 per cent of the partner is already many $\sigma$: a seed must have $z>8$, stand at least 50 per
+cent above the signal under it and be significantly positive itself ($a>5\sigma_a$: a cosmic ray adds charge), lie at
+least 6 pixels from the edge of an order, and grow (into neighbours with $z>3$ and $a>2\sigma_a$) into a compact group
+of at most 30 pixels, 3 pixels thick and 15 long.
+\end{itemize}
+\end{enumerate}
+The result is recorded in every product: \texttt{L1CRMETH} (\texttt{pair} or \texttt{lacosmic}), \texttt{L1CRPART}
+(the partner), \texttt{L1CRNLA} (pixels flagged by LA Cosmic), \texttt{L1CRKEEP}, \texttt{L1CRDROP},
+\texttt{L1CRUNCH} and \texttt{L1CRADD} (groups confirmed, removed, kept because the partner could not check them, and
+added), \texttt{L1CRNPX} (pixels flagged at the end), \texttt{L1CRMISM} (the fraction of the orders the partner
+cannot judge), \texttt{L1CRSHAR} (LA pixels on the trace flagged in the partner too, judged against its own values)
+and \texttt{L1CRDX1/2} (the offset along the dispersion).
+
+\textit{The tolerance $f$} was measured, not chosen. On the trace cores of two pairs, the bright NGC\,4151 visit of 2025
+July 14 at OGG (FWHM 4.6 and 4.9\,pixels) and the Fairall\,9 visit above, $z$ computed with $f=0$ scatters by 0.8--1.1
+at every signal level up to $3\times10^4$\,e$^-$ per pixel (up to 1.4 at COJ, where the object is faint) and 1.1--1.2
+above; $f=0.01$ brings the brightest pixels to 0.7 (Table~\ref{tab:cr_pair_tol}); 0.1 per cent of the core pixels
+have $|z|>3.8$--4.1. Without the kernel $z$ scatters up to 2.9 (OGG) and 3.4 (COJ) even with a
+2 per cent tolerance, mostly from the change of seeing; with the tolerances of our first version (5 per cent and
+0.25\,pixel, chosen by hand to absorb that) $z$ scattered by about 0.3 on bright pixels, which hid the weaker hits on
+bright lines from the comparison.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Robust scatter of $z$ on the trace core of two clean pairs, by the signal of the matched partner (e$^-$ per
+pixel), with the tolerance adopted ($f=0.01$; partner shifted along the dispersion and matched by the kernel). It
+should be 1. The numbers before the arrow are for a scale and a shift along the slit only, with $f=0.02$.}
+\label{tab:cr_pair_tol}
+\begin{tabular}{lccccc}
+\toprule
+Pair (frame vs partner) & $<10^3$ & $10^3$--$3\times10^3$ & $3\times10^3$--$10^4$ & $10^4$--$3\times10^4$ & $>3\times10^4$\\
+ & \multicolumn{5}{c}{signal of the matched partner (e$^-$ per pixel)} \\
+\midrule
+NGC\,4151 OGG, 0002 vs 0001 & 1.29$\to$0.83 & 2.17$\to$0.90 & 2.92$\to$0.91 & 1.63$\to$0.83 & 2.60$\to$0.73\\
+NGC\,4151 OGG, 0001 vs 0002 & 1.15$\to$0.85 & 1.31$\to$0.84 & 1.53$\to$0.85 & 1.02$\to$0.81 & 1.22$\to$0.66\\
+Fairall\,9 COJ, 0014 vs 0013 & 1.93$\to$1.00 & 2.49$\to$0.76 & -- & -- & --\\
+Fairall\,9 COJ, 0013 vs 0014 & 1.86$\to$1.02 & 3.44$\to$0.93 & --$\to$1.31 & -- & --\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{What the tests found while building it.} Each step above was added because a test failed without it, and
+each failure has its own unit test now (\texttt{tests/test\_visit\_cosmics.py}, 14 tests).
+(i) The first version (scale and shift only, hand-set tolerances of 5 per cent and 0.25\,pixel) lost weak hits on
+bright line peaks in the injection test: the tolerances were hiding the change of seeing; matching the seeing fixed
+that. (ii) The kernel printed negative copies of the partner's cosmic rays, 12 false groups in one Fairall\,9 frame;
+filling those pixels fixed it. (iii) A warm pixel flagged in both exposures was unflagged in one of them because its
+neighbours, which the partner could check, agreed; such pixels now always stay flagged. (iv) The first run on the
+whole sample \textit{added} flags on the narrow lines of NGC\,4151 (828 pixels in 41 of 60 frames), more than the
+object model alone: the offsets along the dispersion, an empty frame against a partner made negative by the kernel at
+the order edges, and the unmatched 2-d fringes all produced excesses that the first, loose rule for new groups
+(\,$z>6$, 10 per cent above the signal\,) took for cosmic rays. The dispersion shift, the stricter rule for new
+groups and the guard against extended differences are the answer; on the four worst frames the flags on the lines went
+from 9--23 pixels with the object model to 0--6 kept or added pixels, except one frame where 21 LA pixels on the lines
+are kept and 5 added (2025 June 10). (v) The run of that version on the whole sample still left 215 flagged pixels on
+the lines of NGC\,4151, a hundred times the rate on the continuum next to them, and often at the same line in both
+exposures of a visit. The partner had flagged the same peak, so neither exposure could check the other; the rule for
+pixels flagged in both exposures on the object is the answer (Section~\ref{sec:cr_pair_sample}). Applied everywhere it
+also unflagged warm pixels on the sky, which is why it stops at 2\,FWHM from the trace. Two refinements that looked right on simulations were measured on the real pairs
+and dropped: a kernel along the dispersion (it made the tails of $z$ worse) and a wider filter for the kernel along
+the slit (it followed the change of the profile along the order too coarsely).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_cr_pair.png}
+\caption{The same-visit check step by step on real pairs, both exposures reduced exactly as the stage sees them.
+Columns: \ding{172} the frame minus its sky; \ding{173} the partner minus its sky, shifted onto the trace of the frame
+and scaled per column; \ding{174} their difference, in which a change of seeing or a sub-pixel offset leaves a pattern
+around the trace; \ding{175} the partner shifted along the dispersion and matched to the frame by the kernel along
+the slit; \ding{176}
+$z=($\ding{172}$-$\ding{175}$)/\sigma$; \ding{177} the flags of LA Cosmic with the object model (red) and after the check
+(blue). Rows: the H$\alpha$ peak of NGC\,4151 on 2025 July 15 (Figs.~\ref{fig:cr_halpha}, \ref{fig:cr_method}); an LA
+Cosmic group on the trace of Fairall\,9 that the partner shows to be real structure, in the visit where the FWHM changed
+from 11.6 to 14.7\,pixels.}
+\label{fig:cr_pair}
+\end{figure}
+
+\input{chapters/cr_pair_results}

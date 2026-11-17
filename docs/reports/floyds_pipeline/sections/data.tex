@@ -1,0 +1,33 @@
+\section{Data}
+\label{sec:data}
+
+\begin{table}
+\centering
+\caption{Data used in this report. All frames are from FLOYDS on the 2-m Faulkes Telescope South at Siding Spring
+(\texttt{coj2m002}, camera \texttt{en12}), reduced by \banzai{}~1.0.1.}
+\label{tab:data}
+\begin{tabular}{lccc}
+\toprule
+Set & $N$ & Slit & Dates (2026) \\
+\midrule
+Fairall~9 (KEY2026B-007), 600\,s & 50 & 6\,arcsec & Sep 25 -- Nov 11 \\
+EG\,21 (``FLOYDS standards''), 300\,s & 18 & 2\,arcsec & Oct 10 -- Nov 12 \\
+Raw arcs (Hg + Ar lamp; Zn ``on''), 60\,s & 64 & 6\,arcsec & Aug 1 -- Nov 11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:data} lists the data. For every science and standard exposure we use the archive \texttt{-1d}
+product (tables \texttt{SPECTRUM}, \texttt{EXTRACTED}, \texttt{SENSITIVITY}, \texttt{TELLURIC}) and the
+\texttt{-2d} product (\texttt{SCI}, \texttt{ERR}, \texttt{BPM}, \texttt{ORDERS}, \texttt{WAVELENGTH},
+\texttt{FRINGE}, \texttt{PROFILE}, \texttt{BACKGROUND} and the pixel table \texttt{BINNED2D}). The pixel table lists
+every pixel of both orders with its wavelength, its position along the slit relative to the order centre
+($y_{\rm o}$) and to the fitted trace ($y_{\rm p}$), the profile width $\sigma_{\rm p}$, the column-normalised
+profile weight $P$ and the 1-pixel wavelength bin it belongs to. We verified that \texttt{BINNED2D} reproduces
+\texttt{SCI}, \texttt{ERR}, \texttt{BACKGROUND} and \texttt{PROFILE} to the quantisation of the compressed images.
+The raw arcs are the \texttt{a00} frames corresponding to the arcs (\texttt{a91}) named in the \texttt{L1IDARC} header
+keyword; 49 of the 50 science frames have their arc in the set. The arcs of the standards (taken by another
+programme) were not available.
+
+Fairall~9 was observed at airmass 1.13--1.85 (median 1.21; 34 of 50 frames below 1.3). We adopt
+$z=0.047016$ for the external checks.

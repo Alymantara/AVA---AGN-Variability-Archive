@@ -599,12 +599,12 @@ web:
   # button on target pages. false: no files built, the button is hidden and published files are not served.
   # true for testing; the Data page still describes products as Key Project only until release.
   downloads: true
-  # Manuals copied to <data_dir>/manuals/ (listed on the About page); build the PDFs from docs/*.tex.
+  # Manuals copied to <data_dir>/manuals/ (listed on the About page); PDFs are kept in git (docs/manuals/, docs/reports/).
   manuals:
-    - "docs/ava_system_manual.pdf"
-    - "docs/photometry_manual.pdf"
-    - "docs/spectroscopy_manual.pdf"
-    - "docs/reports/pytics_update/report_pytics_update.pdf"
+    - "docs/manuals/ava_system_manual.pdf"
+    - "docs/manuals/photometry_manual.pdf"
+    - "docs/manuals/spectroscopy_manual.pdf"
+    - "docs/reports/report_pytics_update.pdf"
   host: "0.0.0.0"
   port: 5000
   debug: false

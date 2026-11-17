@@ -1,0 +1,26 @@
+\section{Introduction}
+\label{sec:intro}
+
+Reverberation mapping (RM) of active galactic nuclei measures the delay between continuum and broad-line variations
+and therefore needs spectra whose wavelength scale, line-spread function and relative flux calibration are
+consistent from epoch to epoch at the per-cent level. The narrow emission lines (in particular [O\,{\sc iii}]
+$\lambda\lambda4959,5007$) are used afterwards to put all epochs on a common flux scale and to align them in
+wavelength \citep{vanGroningen1992,Fausnaugh2017}, but this inter-calibration can only remove grey
+offsets, small shifts and small resolution differences: wavelength-dependent errors on scales of tens to hundreds of
+\AA{} (fringing, sensitivity-function structure, order mismatches, extrapolated wavelength solutions) propagate
+directly into the broad-line light curves.
+
+The FLOYDS spectrographs at Las Cumbres Observatory (LCO) record two cross-dispersed orders simultaneously: the red
+order (order~1, $\approx4500$--$10\,000$\,\AA, $\approx3.5$\,\AA\,pixel$^{-1}$) and the blue order (order~2,
+$\approx3200$--$5800$\,\AA, $\approx1.7$\,\AA\,pixel$^{-1}$), with a spatial scale of 0.337\,arcsec\,pixel$^{-1}$.
+RM campaigns use the 6\,arcsec slit to minimise slit losses. The archive products are reduced by the
+\banzai{} pipeline. Members of our collaboration found the wavelength calibration, the extraction and the flux
+calibration of these products unsatisfactory for RM. This report documents a systematic diagnosis of the archive
+products of \banzai{}~1.0.1 (the version that produced all data used here), traces each problem to its origin in the
+code or the calibration data, and describes target-independent corrections that operate on the public
+\texttt{-1d}/\texttt{-2d} archive products. All diagnostics and corrections are implemented as reusable modules
+inside the \banzai{} package (Section~\ref{sec:software}).
+
+Throughout, ``target-independent'' means that no information about the science target (redshift, line list, spectral
+shape) is used to derive a correction. The known redshift of Fairall~9 and its narrow lines are used only as an
+external check.

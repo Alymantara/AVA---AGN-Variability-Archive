@@ -1,0 +1,69 @@
+\section{Flux calibration}
+\label{sec:flux}
+
+\subsection{How \banzai{} selects and uses standards}
+\label{sec:flux_banzai}
+\banzai{} selects the flux standard in this order: the same observing block; otherwise the closest in time from the
+same proposal; otherwise any public standard. Standards are \emph{not} matched by slit width. The Fairall~9 frames
+therefore used the eight 6\,arcsec standards taken by the RM proposal between 2026 September 22 and October 8, and
+every frame after October 8 used the October 8 standard, although a 2\,arcsec EG\,21 spectrum from LCO's standards
+programme exists on most nights. EG\,21 is, moreover, absent from \banzai's flux-standard catalogue (which lists
+GD\,108, EG\,274, Feige\,110, Feige\,34 and BD$+28^\circ4211$), so the 18 EG\,21 observations never produced a
+sensitivity function and were themselves calibrated with the October 8 standard. The red-order sensitivity of the
+October 3 standard has a spike ($+20/-5$ in $\ln S$) at 5200\,\AA. In 1.0.1 the sensitivity is a B-spline in $\ln S$
+with fine knots, which also follows the fringes of the standard (Fig.~\ref{fig:sens}).
+
+\subsection{Template $\times$ nightly correction}
+\label{sec:flux_model}
+Many standards, including EG\,21, have only low-resolution reference fluxes (here the CTIO spectrum in 50\,\AA{} bins;
+\citealt{Hamuy1992,Hamuy1994}), which cannot resolve the instrumental notches of the blue order (50--150\,\AA{} wide).
+We therefore write the sensitivity of night $n$ and order $o$ as
+\begin{equation}
+S_{n,o}(\lambda)=T_o(\lambda)\,\exp\left[\sum_{k=0}^{4}p_{n,o,k}\,L_k(\tilde\lambda)\right],
+\label{eq:sens}
+\end{equation}
+where the template $T_o$ carries the fine structure and the Legendre series the smooth, night-dependent part. $T_{\rm
+blue}$ is the median of the eight 6\,arcsec sensitivities of \banzai{} (each grey-normalised); $T_{\rm red}$ is the
+median of the six good ones smoothed with a 401\,\AA{} running median (no fine structure is needed in the red once
+the fringes are removed in the extraction). With $C(\lambda)$ the count rate of the standard corrected for
+extinction,
+\begin{equation}
+C(\lambda)=\frac{N(\lambda)}{t_{\rm exp}\,\tau(\lambda,X)},
+\label{eq:rate}
+\end{equation}
+\begin{equation}
+\tau(\lambda,X)=\left[10^{-0.4\,k(\lambda)}\right]^{X\exp[-(h-2788\,{\rm m})/10\,400\,{\rm m}]},
+\label{eq:ext}
+\end{equation}
+($k$ the APO extinction curve shipped with \banzai, $h=1149$\,m for COJ), the coefficients $p_{n,o,k}$ are fitted
+to
+\begin{equation}
+y_j=\ln\frac{F^{\rm ref}_j}{\langle C\,T_o\rangle_j}
+\label{eq:sensfit}
+\end{equation}
+in the reference bins $j$ ($\langle\cdot\rangle_j$ the mean over the bin, required to be $\ge80$ per cent populated),
+excluding bins overlapping telluric bands or the cores ($\pm40$\,\AA) of the Balmer lines, with iterative $3\sigma$
+clipping.
+
+\textit{Quality control and grey level.} For each order the fitted $P_n(\lambda)$, after removing its median, is compared
+with the median over all standards on a grid; a standard deviating by more than $4\times\max(\mathrm{MAD}\times1.4826,
+0.02)$ anywhere is rejected. Clouds during the standard exposure raise $S=F^{\rm ref}/C$ grey-ly; to keep the nightly
+shape without transferring the standard's clouds, each standard's sensitivity (both orders) is multiplied by
+$\exp(\bar g-g_n)$, with $g_n$ the median of $\ln S_{n,{\rm red}}$ at 5500--6500\,\AA{} and $\bar g$ the median of $g_n$
+over the clearest (lowest-$g$) half of the standards.
+
+\subsection{Telluric correction and application}
+\label{sec:flux_tell}
+The telluric transmission is measured on the same standard: the calibrated standard $C\,S$ is fitted outside the
+bands with a smoothing spline $\mathcal{C}(\lambda)$ in $\ln$, and $t(\lambda)=C\,S/\mathcal{C}$ inside the bands
+(clipped to $[0.02,1]$; $t=1$ outside). A science frame at airmass $X_{\rm s}$ calibrated with a standard at $X_\star$
+is then
+\begin{equation}
+F_\lambda=\frac{N(\lambda)\,S(\lambda)}{t_{\rm exp}\,\tau(\lambda,X_{\rm s})\,t(\lambda)^{X_{\rm s}/X_\star}},
+\label{eq:apply}
+\end{equation}
+By default $S$ and $t$ are the medians over all good standards of $S_n$ (grey-normalised) and of $t_n^{1/X_{\star,n}}$
+(then raised to $X_{\rm s}$); the standard closest in time can be used instead. The median transfers better between
+nights (Section~\ref{sec:results_flux}): the smooth part of a single 2\,arcsec standard partly reflects that night's
+slit losses, which do not apply to another night or to a 6\,arcsec spectrum. Because RM inter-calibration removes
+grey factors, all comparisons below are made on spectral \emph{shapes} unless stated otherwise.

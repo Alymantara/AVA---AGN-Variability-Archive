@@ -1,0 +1,25 @@
+\section{Software}
+\label{sec:software}
+
+All code is in \banzai{} (branch \texttt{rm-improvements}). The diagnostics and archive tools need only
+\textsc{numpy}, \textsc{scipy}, \textsc{astropy} and \textsc{matplotlib}.
+
+\begin{description}
+\item[\texttt{diagnostics.rm\_qa}] narrow-doublet and single-line fits, sky and telluric shifts, order-overlap ratio
+(Section~\ref{sec:diagnostics}).
+\item[\texttt{diagnostics.sky\_lines}] off-object sky spectrum from \texttt{BINNED2D}; adaptive top-hat centroids.
+\item[\texttt{utils.arc\_refit\_utils}] arc collapse, line-group model (eqs.~\ref{eq:arcgroup}--\ref{eq:boxcar}),
+correction (eq.~\ref{eq:arccorr}).
+\item[\texttt{utils.wavelength\_offset\_utils}] telluric zero point (eqs.~\ref{eq:tell}, \ref{eq:tellcomb},
+\ref{eq:transfer}).
+\item[\texttt{wavelength\_offsets.ObjectWavelengthCorrector}] pipeline stage (after the extraction trimmer).
+\item[\texttt{diagnostics.reextract}] fringe undo, master pattern, lamp-flat matching, harmonic fringe model, sky and extraction
+(eqs.~\ref{eq:undo}--\ref{eq:boxcar}); command line \texttt{python -m banzai\_floyds.diagnostics.reextract}.
+\item[\texttt{diagnostics.correct\_archive\_wavelengths}] arc refit and telluric zero point on archive
+\texttt{-1d} files; console script \texttt{banzai\_floyds\_correct\_wavelengths}.
+\item[\texttt{utils.sensitivity\_utils}, \texttt{diagnostics.recalibrate\_flux}] template$\times$correction
+sensitivity and telluric correction (eqs.~\ref{eq:sens}--\ref{eq:apply}).
+\end{description}
+The order of application is: re-extraction $\rightarrow$ arc refit $\rightarrow$ telluric zero point
+$\rightarrow$ flux calibration. Unit tests with synthetic data (\texttt{tests/test\_wavelength\_offsets.py},
+\texttt{test\_arc\_refit.py}, \texttt{test\_reextract\_flux.py}; 33 tests) cover every step.

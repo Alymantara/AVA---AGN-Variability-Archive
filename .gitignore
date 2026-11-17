@@ -52,12 +52,35 @@ data/test_archive/
 # All local data except the small static inputs the code reads
 data/*
 !data/reference/
+# small hand-curated / reference files the code reads (ava.db and the lcodb databases stay out:
+# the pipeline writes ava.db, the lcodb ones are > 100 MB; copied by hand, docs/guides/linux_setup.md step 7)
+!data/ava/
+data/ava/*
+!data/ava/ava.csv
+!data/ava/ava_link_overrides.csv
+!data/literature/
+data/literature/*
+!data/literature/agn_properties.csv
+!data/literature/references.csv
+!data/literature/mass_conflicts.csv
+!data/literature/build/
+data/literature/build/__pycache__/
 
 # Poster (large, separate deliverable)
 poster/
 
-# LaTeX build products (manual PDFs are built from the .tex sources)
+# LaTeX build products. The finished PDFs are kept in docs/manuals/, docs/reports/ and docs/guides/;
+# the copies LaTeX writes next to the report sources are not.
 docs/*.pdf
+docs/reports/*/report_*.pdf
+*.aux
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+# stray duplicate of the per-report figure folders
+docs/reports/figures/
 docs/*.aux
 docs/*.out
 docs/*.toc

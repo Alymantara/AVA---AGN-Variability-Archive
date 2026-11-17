@@ -1,0 +1,19 @@
+\chapter{Database tables}\label{sec:schema}
+\paragraph{\texttt{frames}} (both databases) one row per archive frame: identifiers (\texttt{id}, \texttt{basename},
+\texttt{filename}, \texttt{exp\_key}, \texttt{raw\_id}), \texttt{proposal\_id}, \texttt{instrument\_id},
+\texttt{site\_id}, \texttt{telescope\_id}, \texttt{tel\_key}, \texttt{date\_obs}, \texttt{date\_utc}, \texttt{day\_obs},
+\texttt{mjd\_obs}, \texttt{object}, \texttt{ra}, \texttt{dec}, \texttt{filter}, \texttt{exptime}, \texttt{obstype},
+\texttt{rlevel}, \texttt{block\_id}, \texttt{request\_id}, \texttt{is\_best}, \texttt{is\_standard},
+\texttt{airmass\_calc}; header columns \texttt{airmass}, \texttt{agfwhm}, \texttt{l1fwhm}, \texttt{l1zp},
+\texttt{l1zperr}, \texttt{l1mean}, \texttt{l1sigma}, \texttt{skymag}, \texttt{wmsskybr}, \texttt{wmscloud},
+\texttt{wmshumid}, \texttt{moondist}, \texttt{moonfrac}, \texttt{moonalt}, \texttt{sunalt}, \texttt{altitude},
+\texttt{azimuth}, \texttt{cat\_ra}, \texttt{cat\_dec}, \texttt{srctype}, \texttt{moltype}, \texttt{groupid},
+\texttt{userid}, \texttt{aperwid}, \texttt{apertype}, \texttt{rotmode}, \texttt{rotskypa}, \texttt{confmode},
+\texttt{ccdsum}, \texttt{pixscale}, \texttt{naxis1}, \texttt{naxis2}, \texttt{gain}, \texttt{rdnoise},
+\texttt{saturate}, \texttt{utstop}.
+\paragraph{\texttt{headers}} the full FITS header of each frame, compressed JSON.
+\paragraph{Views} \texttt{images} and \texttt{image\_quality} (photometry); \texttt{exposures} and
+\texttt{spectrum\_calibs} (spectra); \texttt{targets} (both).
+\paragraph{\texttt{std\_match}, \texttt{calib\_match}} (spectra) the standard and arc/flat associations.
+\paragraph{\texttt{state.sqlite}} \texttt{sync\_state} (per proposal), \texttt{runs} (log),
+\texttt{unknown\_instruments}.

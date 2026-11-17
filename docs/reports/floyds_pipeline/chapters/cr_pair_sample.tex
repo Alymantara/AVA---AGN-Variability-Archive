@@ -1,0 +1,131 @@
+% Same-visit check on the whole sample (input from cr_pair_results.tex)
+\subsection{The whole sample}
+\label{sec:cr_pair_sample}
+All 106 exposures of the sample (60 of NGC\,4151 at OGG, 46 of Fairall\,9 at COJ) were reduced again with the check,
+and every one found its partner (\texttt{L1CRMETH} = \texttt{pair}). These products were made with the version
+\textit{before} the rule for pixels flagged in both exposures on the object; that rule was added after this run, measured on the
+seven frames with the most flags left on the lines, and the sample was not reduced again. The numbers below say which
+version they come from.
+
+\paragraph{Flags on the narrow lines.} Table~\ref{tab:cr_pair_lines} counts the flagged pixels within 12\,\AA\ of
+[O\,\textsc{iii}]\,$\lambda\lambda$4959,\,5007, H$\beta$ and H$\alpha$+[N\,\textsc{ii}] and 8\,pixels of the trace.
+The first version of the check doubled the flags of the object model on the NGC\,4151 lines; the version on the
+sample brings them to 215, fewer than the object model (398) and than 1.1.0 (236), and clears most of the
+H$\alpha$ flags of 1.1.0. Fairall\,9 has few flags on its lines with any detector.
+But 215 pixels in the line windows are 0.32 per cent of them, against 0.003 per cent in five continuum windows on the
+same traces: most are not cosmic rays. Often both exposures of a visit are flagged at the same line, which a cosmic ray
+cannot do. Two causes were found in the worst frames. In good-seeing visits LA Cosmic flags the same line and trace
+peaks in both exposures, so neither can check the other (item (v) above); and on tilted lines a residual offset leaves
+a $\pm$ pattern whose positive half passes as a confirmed hit. The rule for pixels flagged in both exposures removes the
+first (Table~\ref{tab:cr_pair_worst}); the second is left, because a rule for it would be one more cut tuned on the
+frames it is meant to fix.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Pixels flagged as cosmic rays on the narrow lines of the sample (within 12\,\AA\ of the line and 8\,pixels of
+the trace), by order (1 red, 2 blue), for the 1.1.0 detector (final v3 products), LA Cosmic with the object model, the
+first version of the same-visit check, and the version run on the sample (before the rule for pixels flagged in both
+exposures). Last rows: total, and frames with any flagged pixel.}
+\label{tab:cr_pair_lines}
+\begin{tabular}{llcccc}
+\toprule
+Target & Line, order & 1.1.0 & Object model & Check, first & Check, sample \\
+ & & \multicolumn{4}{c}{(pixels)} \\
+\midrule
+NGC\,4151 & H$\alpha$+[N\,\textsc{ii}], 1 & 211 & 70 & 55 & 20 \\
+(60 frames) & H$\beta$, 1 & 1 & 56 & 117 & 28 \\
+ & H$\beta$, 2 & 0 & 6 & 0 & 0 \\
+ & [O\,\textsc{iii}]\,4959, 1 & 0 & 42 & 71 & 31 \\
+ & [O\,\textsc{iii}]\,4959, 2 & 24 & 74 & 139 & 45 \\
+ & [O\,\textsc{iii}]\,5007, 1 & 0 & 89 & 170 & 77 \\
+ & [O\,\textsc{iii}]\,5007, 2 & 0 & 61 & 288 & 14 \\
+ & total & 236 & 398 & 840 & 215 \\
+ & frames with any & 18 & 37 & 41 & 28 \\
+\midrule
+Fairall\,9 & total & 12 & 29 & 21 & 15 \\
+(46 frames) & frames with any & 2 & 6 & 4 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering\small
+\caption{The rule for pixels flagged in both exposures on the seven NGC\,4151 frames with the most flags on the
+lines: pixels on the lines (as in Table~\ref{tab:cr_pair_lines}) flagged by LA Cosmic with the object model, by the
+version run on the sample, and with the rule; and the LA groups kept because the partner cannot check them
+(mostly warm pixels, which the rule must not touch).}
+\label{tab:cr_pair_worst}
+\begin{tabular}{lccccc}
+\toprule
+Frame & \multicolumn{3}{c}{Pixels on the lines} & \multicolumn{2}{c}{Groups the partner cannot check} \\
+ & LA + object model & sample version & with the rule & sample version & with the rule \\
+\midrule
+2025-03-27 0021 & 32 & 33 & 20 & 56 & 47 \\
+2025-03-27 0020 & 24 & 19 & 13 & 56 & 48 \\
+2025-05-31 0020 & 18 & 15 & 12 & 35 & 32 \\
+2025-06-10 0006 & 21 & 26 & 22 & 6 & 5 \\
+2025-06-10 0007 & 18 & 16 & 16 & 5 & 5 \\
+2025-07-05 0004 & 17 & 14 & 14 & 23 & 23 \\
+2025-07-14 0002 & 23 & 0 & 0 & 34 & 30 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Applied everywhere, the rule took the groups the partner cannot check from 56 to 0 in the first of these frames; the
+cutouts showed that the extra groups it removed off the trace were single warm pixels present in both exposures. On
+the object the rule removes only line and trace peaks. It will also unflag a warm pixel that happens to lie on the
+trace: from the density of shared warm pixels on the sky we expect 4--7 such groups per frame, each adding 50--90\,e$^-$
+(at most 340\,e$^-$) to a column of the trace that holds 30\,000--70\,000\,e$^-$ (6000\,e$^-$ in its faintest tenth),
+0.2 per cent of one of 1700 columns. A map of the warm pixels, from the flags that recur at the same place on the
+detector in many frames, would remove them properly; it is left for later.
+
+\paragraph{The header keywords.} Per frame at OGG (median and range), LA Cosmic flags 242 (115--715) pixels and 188
+(96--681) remain, 80 per cent in total; 9 groups are confirmed, 12 removed and 34 kept because the partner cannot check
+them, and 0 (at most 6) added; the partner cannot judge 0.1 per cent of the orders (at most 6 per cent), and the offset
+along the dispersion is at most 0.6\,pixel. At COJ 321 (175--1755) pixels become 278 (129--1519), 90 per cent; 14
+groups are confirmed, 11 removed, 47 kept and 1 (at most 3) added, and the partner cannot judge 0.2 per cent (at most
+2.5 per cent). The offsets along the dispersion at COJ show a limitation of the check: in the blue order of six
+Fairall\,9 frames it measures 1.4--3.4\,pixels, and the two exposures of a visit give offsets of the same sign (2026
+October 26: $-2.05$ and $-2.05$\,pixels; September 30: $-3.37$ and $-1.52$), which a real offset cannot do. The cross
+correlation of the faint blue spectrum is unreliable there. The resampled partner is then misaligned in the blue order
+of those frames, where the extended-difference guard and the strict rule for new groups limit the damage (1--3 groups
+added per frame); a measured offset should be accepted only where the correlation is significant, which is the next fix.
+A second limitation showed in the same visit of Fig.~\ref{fig:cr_pair}: at the end of an order along the dispersion,
+where the matched partner drops to zero, the check added a 9-pixel group that is not a cosmic ray. The guard against
+the edges of the orders covers their edges along the slit only; extending it to their ends is the other fix. The
+header counts bound both effects at a few groups per frame.
+
+\paragraph{Fluxes.} What matters in the end is the flux. Table~\ref{tab:cr_pair_flux} gives the robust scatter of the
+ratio of the two exposures of each visit for the narrow lines and two continuum windows. It is set by the slit losses
+and the seeing, and the choice of detector changes it by 0.5 per cent or less; the one larger change, the blue
+[O\,\textsc{iii}] of NGC\,4151 with the object model alone (2.5 against 1.7 per cent), is mostly undone by the check
+(2.0 per cent). The optimal extraction rebuilds a masked pixel from the profile, so a false flag on a line peak costs
+little flux, and a missed cosmic ray costs more: the gain that matters for the light curves is that of the object model,
+which finds 89 per cent of the bright hits on the OGG line peaks where 1.1.0 found 27. The same-visit check is a
+clean-up on top: about a fifth fewer false flags, a clean H$\alpha$ peak, and a mask that can be trusted on the lines.
+
+\begin{table}[!htbp]
+\centering\small
+\caption{Robust scatter of the flux ratio of the two exposures of each visit (30 visits of NGC\,4151 at OGG, 23 of
+Fairall\,9 at COJ), for the 1.1.0 detector (final v3 products), LA Cosmic with the object model, and the same-visit check
+(version run on the sample). [O\,\textsc{iii}]\,5007 from a doublet fit in each order; H$\alpha$+[N\,\textsc{ii}] for
+NGC\,4151 only.}
+\label{tab:cr_pair_flux}
+\begin{tabular}{llccc}
+\toprule
+Target & Measurement & 1.1.0 & Object model & Same-visit check \\
+ & & \multicolumn{3}{c}{(scatter of the ratio, per cent)} \\
+\midrule
+NGC\,4151 & [O\,\textsc{iii}]\,5007, red order & 2.0 & 1.9 & 2.0 \\
+ & [O\,\textsc{iii}]\,5007, blue order & 1.7 & 2.5 & 2.0 \\
+ & H$\alpha$+[N\,\textsc{ii}] & 2.5 & 2.3 & 2.5 \\
+ & continuum, blue & 1.5 & 1.6 & 1.5 \\
+ & continuum, red & 1.5 & 1.6 & 1.5 \\
+\midrule
+Fairall\,9 & [O\,\textsc{iii}]\,5007, red order & 6.7 & 6.8 & 6.4 \\
+ & [O\,\textsc{iii}]\,5007, blue order & 6.7 & 6.6 & 6.8 \\
+ & continuum, blue & 3.3 & 3.6 & 3.6 \\
+ & continuum, red & 3.0 & 2.8 & 2.8 \\
+\bottomrule
+\end{tabular}
+\end{table}

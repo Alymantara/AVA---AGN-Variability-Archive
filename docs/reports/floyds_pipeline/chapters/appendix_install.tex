@@ -1,0 +1,64 @@
+\chapter{Installing and running the improved pipeline}
+\label{sec:app_install}
+The improved pipeline (improved v3) is the \texttt{rm-improvements} branch of the fork
+\url{https://github.com/Alymantara/banzai-floyds}; the full guide is \texttt{docs/INSTALL\_RM.md} in that branch.
+Two problems were met when installing it on an Apple-silicon laptop, and both are avoided below.
+
+\section{Environment}
+\banzai{} needs PyTorch $\ge2.3$, for which there are no wheels for an Intel (x86\_64) Python running under Rosetta:
+the environment must be native arm64, i.e.
+\begin{verbatim}
+python -c "import platform; print(platform.machine())"
+\end{verbatim}
+must print \texttt{arm64}. With conda, even from an Intel Anaconda:
+\begin{verbatim}
+git clone https://github.com/Alymantara/banzai-floyds.git
+git -C banzai-floyds checkout rm-improvements
+CONDA_SUBDIR=osx-arm64 conda create -y -p ./env-banzai python=3.12 pip
+\end{verbatim}
+On Linux any Python 3.10--3.12 virtual environment works.
+
+\section{Installation}
+\texttt{lco-banzai} compiles C extensions, and compiler settings exported by the login profile (here from an Intel
+conda / oneAPI installation) made the build fail (\texttt{This is not the Intel oneAPI compiler};
+\texttt{unsupported tapi file type ... for architecture x86\_64}). Installing, and running, from a clean environment
+with the system compiler avoids it. A wrapper script \texttt{benv} next to the checkout does this (in zsh the command
+cannot be kept in a variable, which zsh does not split into words):
+\begin{verbatim}
+#!/bin/sh
+exec env -i HOME="$HOME" \
+  PATH="$(cd "$(dirname "$0")" && pwd)/env-banzai/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  OPENTSDB_PYTHON_METRICS_TEST_MODE=True CC=/usr/bin/clang CXX=/usr/bin/clang++ \
+  ${DB_ADDRESS:+DB_ADDRESS="$DB_ADDRESS"} "$@"
+\end{verbatim}
+\begin{verbatim}
+chmod +x benv
+./benv python -m pip install -e ./banzai-floyds
+cd banzai-floyds && ../benv python -m pytest banzai_floyds/tests \
+    --deselect banzai_floyds/tests/test_e2e.py        # 176 passed
+\end{verbatim}
+\texttt{OPENTSDB\_PYTHON\_METRICS\_TEST\_MODE} stops \banzai{} from sending metrics; the end-to-end tests need LCO's
+test database.
+
+\section{Reducing raw frames}
+\begin{verbatim}
+DB=sqlite:///$PWD/floyds.db
+./benv banzai_floyds_offline setup-db --db-address $DB
+./benv banzai_floyds_offline skyflats --db-address $DB \
+       --raw-dir skyflats/ --processed-dir processed/
+./benv banzai_floyds_offline chain --db-address $DB \
+       --raw-dir raw/ --processed-dir processed/
+\end{verbatim}
+\texttt{setup-db} creates the calibration database (both FLOYDS sites, order locations, line-spread parameters, flux
+standards). \texttt{skyflats} processes the sky flats listed in \texttt{data/orders/skyflats.dat}, which fix the shape
+of the orders. \texttt{chain} classifies the raw frames from their headers and runs, in order: arcs, lamp flats, the
+fringe phase masters (one per slit width and $\approx60$-d window), the standards, the residual fringe templates, the
+standards again and the science frames (Section~\ref{sec:visit_timing} for the time per visit). The spectra are in
+\texttt{processed/<site>/<camera>/<date>/processed/*-1d.fits.fz}; use the rows with \texttt{mask == 0} (bit 2 marks
+the O$_2$ A band in science spectra). Keep more than 10\,GB of disk free: \banzai{} memory-maps its arrays in the
+temporary directory and a processed 2-d frame is $\approx50$\,MB before it is made lean
+(Section~\ref{sec:sites_disk}). Sky flats can be the raw frames or the processed \texttt{-f91} files from the archive
+(for OGG only the 2019 March 29 set is listed). Both sites have an object-trace template and priors; for a new
+instrument or after an intervention, rebuild them from the standards with \texttt{work/scripts/build\_trace\_template.py}
+(without a template the pipeline falls back to the 1.1.0 polynomial). Flux standards must be in
+\texttt{data/standards} to be used as standards; others are reduced as science.

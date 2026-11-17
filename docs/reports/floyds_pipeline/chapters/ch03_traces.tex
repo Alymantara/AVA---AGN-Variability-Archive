@@ -1,0 +1,228 @@
+\chapter{Order and object traces}
+\label{sec:traces}
+
+Two traces enter the extraction. The \emph{order trace} gives the position and curvature of each order on the
+detector; it defines the rectified slit coordinate $y_{\rm order}$, the region used for the sky, and the
+extraction window. The \emph{object trace} $c(\lambda)$ gives the position of the object along the slit as a function
+of wavelength; the optimal extraction weights each pixel by a profile centred on it. An error $d$ in the object trace
+of a Gaussian profile of width $\sigma$ biases the optimal-extraction flux by
+\begin{equation}
+\frac{F_{\rm est}}{F}=\frac{\sum_y P(y-d)\,P(y)}{\sum_y P(y)^2}=\exp\!\left(-\frac{d^2}{4\sigma^2}\right),
+\label{eq:tracebias}
+\end{equation}
+i.e. 0.3--1 per cent for $d=0.5$\,px and $\sigma=3$--5\,px, but 5 per cent for $d=1.5$\,px and $\sigma=3$\,px. The
+loss is wavelength dependent where the trace error is, typically at the faint ends of the orders, and therefore does
+not cancel in the RM inter-calibration. Fainter AGN have been reported to suffer most.
+
+\section{How \banzai{} traces the orders}
+\label{sec:traces_orders}
+The order shape is fitted once per slit width and epoch on a sky flat (a list of frames hard-coded in
+\texttt{data/orders/skyflats.dat}; for COJ after 2025 December 8 the 2 and 6\,arcsec sky flats of that night). The
+loader stage accepts no other calibration type, so data cannot be reduced without these frames. For each science
+frame, only a vertical shift of the order (\texttt{ORDYSHFT}) is fitted, by a matched filter on the red order of the
+science frame itself, and applied to both orders.
+
+We traced both orders on all 133 raw lamp flats of the campaign with the same \banzai{} tracing code
+(Fig.~\ref{fig:order_lampflat}). The red order is traced over its full length at a signal-to-noise ratio of 900--2600
+per column, and its shape agrees with the year-old sky flat to 0.4\,px rms; the shape of the orders has not changed.
+The blue order can only be traced at $x>1300$, where it agrees to 0.5--1.3\,px; at shorter $x$ the lamp is too faint
+(signal-to-noise ratio $\lesssim150$ per column) and the trace wanders off. The position, in contrast, moves by
+$-2$ to $+4$\,px from block to block. For the 6\,arcsec Fairall~9 blocks the shift measured on the same-block lamp
+flat agrees with \texttt{ORDYSHFT} to 0.14\,px rms (mean difference $-0.30$\,px), so the archive order positions are
+correct for this bright target. For a faint target the matched filter on the science frame loses signal while the
+lamp-flat measurement does not; the lamp flat taken in every block is the robust choice.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_order_lampflat.pdf}
+\caption{Order traces measured on the 133 raw lamp flats, relative to the sky-flat trace (6\,arcsec flats solid,
+2\,arcsec dotted, colour = date). Left: red (top) and blue (bottom) order; in the shaded region the lamp is too faint
+to trace the blue order. Right, top: median offset per block for both orders and the archive \texttt{ORDYSHFT}.
+Right, bottom: lamp-flat shift against \texttt{ORDYSHFT} for the 6\,arcsec blocks.}
+\label{fig:order_lampflat}
+\end{figure}
+
+\section{How \banzai{} traces the object}
+\label{sec:traces_object}
+The object is detected in a collapsed profile, then followed in chunks along the dispersion: in each chunk the slit
+profile is stacked and its peak centroided, and a polynomial in wavelength is fitted through the chunk centres.
+\banzai{}~1.0.1 used a single degree-7 polynomial over the whole order; 1.1.0 uses degree 5 with a penalty on the
+second derivative, a signal-to-noise threshold for each chunk and a limit on the jump between chunks.
+
+\textit{Measurement.} We measured the object centroid independently on all 68 archive frames: in chunks of 100\,\AA{}
+(red) and 50\,\AA{} (blue), the pixels of \texttt{BINNED2D} are collapsed onto $y_{\rm order}$ and a Gaussian plus a
+linear sky is fitted. Two properties of the archive data had to be handled: the \banzai{}~1.0.1 background is badly
+wrong in the red order at 5200--5800\,\AA{} (it swings between $-360$ and $+950$\,counts), so we fit our own sky; and
+the pixels destroyed by the division by the invalid edge of the shifted flat (Chapter~\ref{sec:fringe}) are not
+masked but carry data $\approx0$ with uncertainty $\approx10^{-4}$, so they dominate any inverse-variance weighting. We
+drop pixels whose uncertainty is below 10 per cent of the chunk median. Neither the re-extraction of the archive
+products (Appendix~\ref{sec:app_v1}) nor the reduction from raw has such pixels.
+
+Fig.~\ref{fig:trace_frame} shows a typical frame: the trace follows the object at both ends and in the middle of both
+orders. The bright-moon frame of Fig.~\ref{fig:trace_frame_moon} shows the striped region destroyed by the flat
+division at $x\approx210$--420 in the red order; the apparent 3\,px trace offset at 5350--5850\,\AA{} on this pair
+(Fig.~\ref{fig:trace_overview}) is caused by these pixels, not by the trace.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_frame_typical.png}
+\caption{Fairall~9, 2026-11-05: background-subtracted archive frame with the order edges (dashed) and the
+\banzai{}~1.0.1 object trace (orange). The six zooms (green dotted lines) are at the two ends and the middle of each
+order; next to each, the spatial profile (median over $\pm12$ columns) with the trace position.}
+\label{fig:trace_frame}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_frame_moon.png}
+\caption{As Fig.~\ref{fig:trace_frame} for the bright-moon frame 2026-10-26 \#13 (2.3\,arcsec seeing). The striped
+block at $x\approx210$--420 in the red order is where \banzai{}~1.0.1 divided by the invalid edge of the shifted
+lamp flat.}
+\label{fig:trace_frame_moon}
+\end{figure}
+
+\textit{Result.} The median offset between the measured centroid and the archive trace is 0.03\,px, and the flux loss
+(eq.~\ref{eq:tracebias}) is below 0.1 per cent at nearly every wavelength (Fig.~\ref{fig:trace_overview}). The
+exception is the faint red end, 9250--9750\,\AA, where the offsets reach 0.8--1.4\,px and the loss 1--2 per cent on
+the worst frames: here the signal-to-noise ratio per chunk falls to 60--170 and the degree-7 polynomial is barely
+constrained. The large offsets are not set by the noise of the centroids (Fig.~\ref{fig:trace_snr}): they are a
+property of the polynomial at the ends of the domain.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_overview.pdf}
+\caption{Object-trace check of the archive products. Left and middle: measured centroid minus the \banzai{} trace per
+chunk (rows: frames in time order) for Fairall~9 and EG\,21, red (top) and blue (bottom) order. Right: flux loss of
+the optimal extraction (eq.~\ref{eq:tracebias}); median, 90th percentile and worst frame.}
+\label{fig:trace_overview}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig_trace_snr.pdf}
+\caption{Absolute trace offset against the signal-to-noise ratio of the chunk; open symbols are chunks at the order
+ends. Offsets below $\approx0.1$\,px are measurement noise (black line: median fitted centroid error).}
+\label{fig:trace_snr}
+\end{figure}
+
+\section{A physical model of the object trace}
+\label{sec:traces_model}
+FLOYDS observes with the rotator in vertical-float mode (\texttt{ROTMODE = VFLOAT}), i.e. with the slit along the
+parallactic angle, so atmospheric differential refraction moves the object \emph{along} the slit by
+\begin{equation}
+\Delta y_{\rm ADR}(\lambda)=\frac{206\,265''}{0.337''}\,\left[n(\lambda)-n(\lambda_0)\right]\tan z ,
+\label{eq:adr}
+\end{equation}
+with $n(\lambda)$ the refractive index of moist air at the measured pressure, temperature and humidity
+\citep[the formulae collected by][]{Filippenko1982} and $z$ the zenith distance. Between 3300 and 9800\,\AA{} this is
+3.8--11.3\,px (median 5.9\,px) for these frames. We model the object trace as
+\begin{equation}
+c(\lambda)=c_o+a\,\Delta y_{\rm ADR}(\lambda)+S_o(\lambda),
+\label{eq:tracemodel}
+\end{equation}
+where $c_o$ is the position of the object in order $o$, $a$ scales the refraction, and $S_o(\lambda)$ is a fixed
+instrumental shape per order (the part of the trace not described by refraction, e.g. the residual between the
+order rectification and the true slit image), learned once from bright standards. Only three numbers are fitted per
+frame ($c_1$, $c_2$ and $a$), with Gaussian priors on $c_1-c_2$ and $a$ (values below).
+
+In the pipeline the model is combined with a penalised correction $R_o(\lambda)$ fitted to its residuals
+(a Legendre series of degree 5 with a penalty on the slope, so that it goes flat where nothing is measured):
+\begin{equation}
+c(\lambda)=c_o+a\,\Delta y_{\rm ADR}(\lambda)+S_o(\lambda)+R_o(\lambda).
+\label{eq:tracehybrid}
+\end{equation}
+Where the chunk centroids are good, $R_o$ follows the structure specific to the frame; where they are sparse or
+noisy, the penalty suppresses it and the physical model takes over. The template $S_o$ and the priors
+($c_1-c_2=-0.87\pm0.29$\,px, $a=0.58\pm0.14$) were measured on 38 standard-star frames reduced from raw
+(Chapter~\ref{sec:raw}); $S_o$ is tabulated every 50\,\AA{} (red) and 25\,\AA{} (blue), smoothed over 5 points,
+and follows the stacked median to 0.01--0.02\,px. Its peak-to-peak amplitude is $\approx1$\,px in both orders. The
+fitted $a$ is 0.4--0.7 rather than 1, which we attribute to the slit not being exactly at the parallactic angle and
+to the order rectification absorbing part of the refraction; only the shape of $\Delta y_{\rm ADR}$ matters. The
+template and priors belong to the instrument: OGG has its own, built in the same way from 100 standard-star frames
+(Section~\ref{sec:sites_trace}).
+
+\textit{Fainter targets.} To test the regime that matters for faint AGN, we took the chunk centroids that
+\banzai{}~1.1.0 measured on the 100 Fairall~9 exposures reduced from raw, made the target 3--100 times fainter
+(the centroid error of each chunk scaled up, chunks below the pipeline's detection threshold dropped, noise added),
+refitted the trace with the pipeline's own functions, and compared it with the full signal-to-noise centroids
+(Table~\ref{tab:tracefaint}). The 1.1.0 polynomial is good up to $\approx10$ times fainter than Fairall~9; at
+30 times the error at the order ends grows to 0.8\,px (90th percentile) and at 60 times to 3.5\,px. The physical
+model keeps the ends at 0.3--0.4\,px down to 60 times fainter, and the combined model
+(eq.~\ref{eq:tracehybrid}) is the best or equal best at every level up to 30 times fainter, including the bright
+case (0.06\,px median at the ends, like the polynomial, and 0.03\,px in the interior). At 100 times fainter most
+chunks fall below the detection threshold and a fifth of the frames cannot be traced by any method.
+
+\begin{table}[!htbp]
+\centering
+\caption{Error of the object trace for simulated fainter versions of the 100 Fairall~9 exposures, with the
+pipeline's own fitting functions: median / 90th percentile of $|c_{\rm fit}-c_{\rm true}|$ in pixels in the
+interior and at the ends of the orders (red $>9200$\,\AA; blue $<3400$ or $>5650$\,\AA). Frames that could not be
+traced at all are not included (in brackets: their number).}
+\label{tab:tracefaint}
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{2}{c}{Polynomial (1.1.0)} & \multicolumn{2}{c}{Physical (eq.~\ref{eq:tracemodel})} &
+ \multicolumn{2}{c}{Combined (eq.~\ref{eq:tracehybrid})} \\
+Fainter by & interior & ends & interior & ends & interior & ends \\
+(factor) & (px) & (px) & (px) & (px) & (px) & (px) \\
+\midrule
+1 & 0.05 / 0.11 & 0.06 / 0.16 & 0.06 / 0.16 & 0.11 / 0.28 & 0.03 / 0.08 & 0.06 / 0.16 \\
+10 & 0.05 / 0.12 & 0.10 / 0.27 & 0.06 / 0.17 & 0.12 / 0.30 & 0.03 / 0.09 & 0.08 / 0.21 \\
+30 & 0.06 / 0.19 & 0.18 / 0.79 (1) & 0.07 / 0.21 & 0.13 / 0.32 & 0.05 / 0.16 & 0.12 / 0.34 \\
+60 & 0.11 / 0.43 & 0.75 / 3.51 (6) & 0.09 / 0.28 & 0.15 / 0.38 (5) & 0.08 / 0.31 & 0.17 / 0.55 (5) \\
+100 & 0.20 / 0.71 & 0.66 / 1.84 (19) & 0.17 / 0.58 & 0.24 / 0.65 (16) & 0.17 / 0.62 & 0.26 / 0.87 (16) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{On the real data.} With the combined model as the default (\texttt{PROFILE\_TRACE\_MODEL = 'adr'}), the
+traces of the 157 frames reduced from raw are slightly better than those of the \banzai{}~1.1.0 (stock) run in every
+measure (Table~\ref{tab:tracereal}); the flux loss at the order ends (90th percentile) drops from 0.15--0.19 to
+0.11--0.13 per cent. For bright targets the trace was never a problem; the change matters for faint ones.
+Figs~\ref{fig:trace_compare_typ}--\ref{fig:trace_compare_eg21} show individual frames with the three traces.
+
+\begin{table}[!htbp]
+\centering
+\caption{Trace offsets on the frames reduced from raw: measured centroid minus trace, median / 90th percentile
+(pixels), and the 90th percentile of the flux loss at the order ends.}
+\label{tab:tracereal}
+\begin{tabular}{llccc}
+\toprule
+Frames & Trace & interior & ends & loss at ends \\
+ & & (px) & (px) & (\%) \\
+\midrule
+Fairall~9 (100) & 1.1.0 polynomial & 0.075 / 0.22 & 0.10 / 0.37 & 0.15 \\
+ & combined model & 0.064 / 0.21 & 0.09 / 0.30 & 0.11 \\
+EG\,21 (18) & 1.1.0 polynomial & 0.074 / 0.23 & 0.10 / 0.43 & 0.19 \\
+ & combined model & 0.060 / 0.22 & 0.08 / 0.33 & 0.11 \\
+Feige\,110 (39) & 1.1.0 polynomial & 0.077 / 0.25 & 0.10 / 0.42 & 0.19 \\
+ & combined model & 0.063 / 0.25 & 0.08 / 0.35 & 0.13 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_compare_a.png}
+\caption{Fairall~9, 2026-11-05: the archive (1.0.1, orange), \banzai{}~1.1.0 (stock, blue) and combined-model
+(purple) traces on the frame, zooms at the ends and middle of both orders, and (bottom) the trace differences
+relative to the 1.1.0 trace with the measured centroids (black). The centroids of a Gaussian fit sit
+$\approx0.2$\,px above the matched-filter traces in the red order because the profile is not exactly Gaussian;
+only the variation with wavelength matters.}
+\label{fig:trace_compare_typ}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_compare_c.png}
+\caption{As Fig.~\ref{fig:trace_compare_typ} for 2026-09-30, a frame with a faint red end: the archive trace
+bends away by 1.3\,px beyond 9600\,\AA.}
+\label{fig:trace_compare_faint}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_trace_compare_d.png}
+\caption{As Fig.~\ref{fig:trace_compare_typ} for EG\,21 on 2026-10-26 (2\,arcsec slit).}
+\label{fig:trace_compare_eg21}
+\end{figure}

@@ -1,0 +1,41 @@
+\chapter{The database}\label{sec:db}
+\section{Contents and construction}
+The package \lcodb{} reads the LCO science archive (\texttt{archive-api.lco.global}) and the observation portal
+(\texttt{observe.lco.global}) with the PI's API token and writes two SQLite databases:
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item \texttt{photometry.sqlite}: Sinistro (camera prefixes \texttt{fa}, and \texttt{fl} for the early
+  Sinistros), Spectral (\texttt{fs}) and MuSCAT (\texttt{ep}) images. Only reduced frames are kept: the BANZAI
+  product (reduction level 91) and, where none exists, the earlier pipeline product (level 90; flag
+  \texttt{is\_best}).
+\item \texttt{spectra.sqlite}: FLOYDS raw frames (science, arcs, lamp flats) and BANZAI-FLOYDS products,
+  plus the flux standards from any proposal (\S\ref{sec:standards}).
+\end{itemize}
+NRES, guide and acquisition cameras, catalogue files and experimental frames are excluded. Each frame keeps its
+archive identifiers (so the file can be fetched later), target, coordinates, filter, exposure time, observing
+block and request, the start time as ISO date, readable UTC (\texttt{date\_utc}) and MJD, and a set of header
+keywords read from the archive's header service, which returns the full FITS header without the pixels. The
+full header is also stored (compressed), so further keywords can be added as columns without new downloads.
+An airmass is computed for every frame from the site, the footprint centre and the mid-exposure time; it agrees
+with the header \texttt{AIRMASS} to 0.01.
+
+\section{Header keywords across the decade}
+A sample of headers from every year, camera and reduction level (2014--2026) showed that the keywords needed
+for basic image quality are not homogeneous:
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item \texttt{MJD-OBS} and \texttt{DATE-OBS} are missing from the headers served for frames before 2023; the
+  database takes the time from the archive record instead, which is complete.
+\item \texttt{TELID} only gives the class (\texttt{1m0a}); the individual telescope comes from the file name
+  (\texttt{1m010}).
+\item \texttt{SKYMAG} is the same in raw and reduced headers, i.e.\ it is a telemetry/scheduler value, and
+  takes the placeholder 22.0 in many frames (\fracSkyPlaceholder\,\% of the 1-m images), which the quality view
+  treats as missing.
+\item \texttt{L1FWHM} uses $-99$ for failures in the old pipeline; \texttt{NAXIS1/2} is reliable in the
+  reduced frames (4096 for BANZAI Sinistro, $4018\times3974$ for the old Sinistro products, 2009--2045 for
+  binned Spectral, 2048 for MuSCAT).
+\end{itemize}
+
+\section{Daily update}
+The first build crawled each proposal from its first semester in 30-day windows. The daily run re-reads the last
+seven days of every active proposal, so late frames and new BANZAI versions are picked up (a changed checksum
+triggers a new header download), fetches the missing headers, and rebuilds the calibration and standard
+associations. New proposals in the PI profile are added automatically.

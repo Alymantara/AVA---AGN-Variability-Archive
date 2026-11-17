@@ -1,0 +1,62 @@
+[
+ {
+  "case": "NGC 4151 OGG 2025-07-15: H\u03b1 peak (Fig. 10.1-10.2)",
+  "y": 82,
+  "x": 528,
+  "counts": {
+   "kept": 12,
+   "removed": 28,
+   "unchecked": 30,
+   "new_groups": 0,
+   "new_pixels": 0,
+   "mismatch_fraction": 0.0004671006657103976,
+   "shared": 22
+  },
+  "dispersion_shift": {
+   "1": -0.05588520973257123,
+   "2": -0.11832013322150015
+  },
+  "la_pixels": 314,
+  "final_pixels": 188
+ },
+ {
+  "case": "Fairall 9 COJ 2026-09-06: seeing 14.7 vs 11.6 px FWHM",
+  "y": 80,
+  "x": 363,
+  "counts": {
+   "kept": 45,
+   "removed": 14,
+   "unchecked": 28,
+   "new_groups": 1,
+   "new_pixels": 9,
+   "mismatch_fraction": 0.007247923827416153,
+   "shared": 91
+  },
+  "dispersion_shift": {
+   "1": -0.24160671835612157,
+   "2": 0.0005693250901593566
+  },
+  "la_pixels": 470,
+  "final_pixels": 418
+ },
+ {
+  "case": "Fairall 9 COJ 2026-09-06: a cosmic ray LA Cosmic missed",
+  "y": 483,
+  "x": 1999,
+  "counts": {
+   "kept": 45,
+   "removed": 14,
+   "unchecked": 28,
+   "new_groups": 1,
+   "new_pixels": 9,
+   "mismatch_fraction": 0.007247923827416153,
+   "shared": 91
+  },
+  "dispersion_shift": {
+   "1": -0.24160671835612157,
+   "2": 0.0005693250901593566
+  },
+  "la_pixels": 470,
+  "final_pixels": 418
+ }
+]
