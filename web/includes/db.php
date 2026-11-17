@@ -105,6 +105,34 @@ function ava_proposals(): array
     return $ids;
 }
 
+/**
+ * Campaign type from the LCO frame counts (agn_lco, refreshed daily by `lcodb stats`):
+ *  - ibrm:   intensive broadband RM — at least AVA_IBRM_MIN_BANDS LCO filters with
+ *            AVA_IBRM_MIN_FRAMES frames each, and AVA_IBRM_MIN_VISITS visits (or still observing);
+ *  - few:    regular monitoring in fewer bands (mostly V-band support for spectroscopic RM, 2014–2018);
+ *  - sparse: too few visits for a light curve, or no LCO data.
+ */
+const AVA_IBRM_MIN_BANDS = 4;
+const AVA_IBRM_MIN_FRAMES = 40;
+const AVA_IBRM_MIN_VISITS = 50;
+
+function ava_campaign(array $t): array
+{
+    $visits = (int) ($t['db_lco_visits'] ?? 0);
+    $filters = ava_target_filters($t);
+    $bands = count(array_filter($filters, fn($n) => $n >= AVA_IBRM_MIN_FRAMES));
+    // A campaign still observing counts on its filter set; its frame counts are still growing.
+    $observing = (int) ($t['ava'] ?? -1) === 2;
+    if ($bands >= AVA_IBRM_MIN_BANDS && $visits >= AVA_IBRM_MIN_VISITS
+        || $observing && count($filters) >= AVA_IBRM_MIN_BANDS) {
+        return ['key' => 'ibrm', 'label' => 'IBRM'];
+    }
+    if ($bands >= 1 && $visits >= AVA_IBRM_MIN_VISITS) {
+        return ['key' => 'few', 'label' => 'Few-band monitoring'];
+    }
+    return ['key' => 'sparse', 'label' => 'Sparse / no data'];
+}
+
 /** Observing status from agn.ava (2 = LCO data in the last 30 days, kept current by ava.database.activity). */
 function ava_status(array $t): array
 {

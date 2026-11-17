@@ -207,7 +207,7 @@ function ava_target_card(array $t): void
     $filters = ava_target_filters($t);
     ?>
   <article class="ava-card" data-name="<?= h(strtolower($t['name'] . ' ' . $t['simbad_name'])) ?>"
-           data-status="<?= $st['key'] ?>" data-z="<?= h((string) $t['redshift']) ?>"
+           data-status="<?= $st['key'] ?>" data-campaign="<?= ava_campaign($t)['key'] ?>" data-z="<?= h((string) $t['redshift']) ?>"
            data-frames="<?= (int) $t['db_lco_images'] ?>">
     <a class="ava-card__link" href="target.php?id=<?= (int) $t['id'] ?>">
       <div class="ava-card__img">

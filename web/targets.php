@@ -4,6 +4,7 @@ require __DIR__ . '/includes/layout.php';
 
 $targets = ava_targets();
 $derivedAll = ava_derived_all();
+$nCamp = array_count_values(array_map(fn($t) => ava_campaign($t)['key'], $targets));
 $nActive = count(array_filter($targets, fn($t) => ava_status($t)['key'] === 'active'));
 $view = ($_GET['view'] ?? '') === 'classic' ? 'classic' : (($_GET['view'] ?? '') === 'modern' ? 'modern' : '');
 
@@ -60,6 +61,13 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
       <input type="radio" class="btn-check" name="status" id="st-pending" value="pending">
       <label class="btn btn-sm" for="st-pending">To be processed</label>
     </div>
+    <label class="visually-hidden" for="campaign">Campaign type</label>
+    <select class="form-select form-select-sm w-auto" id="campaign" title="Campaign type">
+      <option value="all">All campaigns</option>
+      <option value="ibrm">IBRM (<?= $nCamp['ibrm'] ?? 0 ?>)</option>
+      <option value="few">Few-band monitoring (<?= $nCamp['few'] ?? 0 ?>)</option>
+      <option value="sparse">Sparse / no data (<?= $nCamp['sparse'] ?? 0 ?>)</option>
+    </select>
     <span class="ava-view-modern">
       <label class="visually-hidden" for="sort">Sort cards by</label>
       <select class="form-select form-select-sm w-auto" id="sort">
@@ -78,12 +86,17 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
 
   <!-- Classic: the original AVA table -->
   <div class="ava-view-classic">
-    <p class="small ava-legend">
-      <span class="st-observing">Observing</span> = data collected in the last 30 days ·
-      <span class="st-archived">Archived</span> = all available data processed and archived ·
-      <span class="st-pending">to be processed</span> = observed but <strong>not</strong> archived.
-      Click a column header to sort.
-    </p>
+    <details class="ava-notes small ava-legend mb-2">
+      <summary>Notes</summary>
+        <span class="st-observing">Observing</span> = data collected in the last 30 days ·
+        <span class="st-archived">Archived</span> = all available data processed and archived ·
+        <span class="st-pending">to be processed</span> = observed but <strong>not</strong> archived.
+        Click a column header to sort.<br>
+        <strong>IBRM</strong> = intensive broadband reverberation mapping: ≥<?= AVA_IBRM_MIN_BANDS ?> LCO filters with
+        ≥<?= AVA_IBRM_MIN_FRAMES ?> frames each and ≥<?= AVA_IBRM_MIN_VISITS ?> visits (or still observing) ·
+        <strong>Few-band</strong> = regular monitoring in fewer filters (mostly V-band support for spectroscopic RM) ·
+        <strong>Sparse</strong> = fewer than <?= AVA_IBRM_MIN_VISITS ?> visits.
+    </details>
     <div class="ava-table-wrap">
       <table class="table table-hover ava-table ava-classic" id="classic">
         <thead>
@@ -108,7 +121,7 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
               $href = 'target.php?id=' . (int) $t['id'];
               $pcad = (float) ($t['db_lco_cadence'] ?: $t['lco_cadence']);
               $scad = (float) ($t['db_floyds_cadence'] ?: $t['floyds_cadence']); ?>
-            <tr data-name="<?= h(strtolower($t['name'] . ' ' . $t['simbad_name'])) ?>" data-status="<?= ava_status($t)['key'] ?>">
+            <tr data-name="<?= h(strtolower($t['name'] . ' ' . $t['simbad_name'])) ?>" data-status="<?= ava_status($t)['key'] ?>" data-campaign="<?= ava_campaign($t)['key'] ?>">
               <td class="num"><a href="<?= $href ?>"><?= (int) $t['id'] ?></a></td>
               <th scope="row"><a href="<?= $href ?>"><?= h($t['name']) ?></a></th>
               <td><?= h($t['ra']) ?></td>

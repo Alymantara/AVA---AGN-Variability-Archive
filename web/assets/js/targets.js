@@ -1,4 +1,4 @@
-// Targets page: card/classic view toggle, search, status filter, card sort.
+// Targets page: card/classic view toggle, search, status and campaign filters, card sort.
 (() => {
   const root = document.documentElement;
   const grid = document.getElementById('grid');
@@ -10,6 +10,7 @@
   const count = document.getElementById('count');
   const empty = document.getElementById('empty');
   const status = () => document.querySelector('input[name=status]:checked').value;
+  const campaign = document.getElementById('campaign');
 
   // ---- view toggle (remembered per browser, shareable via ?view=) ----
   const setView = (v, push) => {
@@ -36,7 +37,10 @@
   function apply() {
     const term = q.value.trim().toLowerCase().replace(/\s+/g, ' ');
     const st = status();
-    const match = (el) => (st === 'all' || el.dataset.status === st) && (!term || el.dataset.name.includes(term));
+    const cp = campaign.value;
+    const match = (el) => (st === 'all' || el.dataset.status === st)
+      && (cp === 'all' || el.dataset.campaign === cp)
+      && (!term || el.dataset.name.includes(term));
     let n = 0;
     for (const c of cards) { const s = match(c); c.hidden = !s; if (s) n++; }
     for (const r of rows) r.hidden = !match(r);
@@ -45,6 +49,7 @@
   }
 
   q.addEventListener('input', apply);
+  campaign.addEventListener('change', apply);
   document.querySelectorAll('input[name=status]').forEach((r) => r.addEventListener('change', apply));
   sort.addEventListener('change', () => cards.sort(sorters[sort.value]).forEach((c) => grid.appendChild(c)));
 })();
