@@ -28,7 +28,7 @@ $team = [
     'Keith Horne' => 'University of St Andrews',
     'Erin Kara' => 'Massachusetts Institute of Technology',
     'Shai Kaspi' => 'Tel Aviv University',
-    'Hermine Landt' => 'Durham University',
+    'Hermine Landt' => '',
     'James Leftley' => 'European Southern Observatory',
     'Yan-Rong Li' => 'Institute of High Energy Physics, Chinese Academy of Sciences',
     'Marcin Marculewicz' => 'Wayne State University',
@@ -94,7 +94,7 @@ ava_page_start('about', 'About', 'About AVA: the team, LCO programmes, manuals, 
     </ul>
     <h2 class="ava-h mt-4 mb-3">Co-investigators</h2>
     <ul class="ava-team">
-      <?php foreach ($team as $name => $aff): ?><li><strong><?= h($name) ?></strong><span><?= h($aff) ?></span></li><?php endforeach; ?>
+      <?php foreach ($team as $name => $aff): ?><li><strong><?= h($name) ?></strong><?php if ($aff !== ''): ?><span><?= h($aff) ?></span><?php endif; ?></li><?php endforeach; ?>
     </ul>
     <h2 class="ava-h mt-4 mb-3">Previous members</h2>
     <ul class="ava-team ava-team--past">

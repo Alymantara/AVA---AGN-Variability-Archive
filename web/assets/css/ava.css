@@ -76,7 +76,7 @@
   --ava-copper-text: color-mix(in srgb, var(--ava-copper) 88%, var(--ava-abyss));
   --ava-footer-bg: color-mix(in srgb, var(--ava-ink) 7%, var(--ava-paper));
   --ava-pill-bg: color-mix(in srgb, var(--ava-sky) 20%, var(--ava-paper));
-  --ava-hero-img: .85;
+  --ava-hero-img: .93;
 
   --bs-link-color-rgb: 39, 87, 131;
   --bs-link-hover-color-rgb: 10, 22, 40;
@@ -147,7 +147,9 @@ a:hover { color: var(--ava-strong); }
   transform: translateY(-50%) scale(1.04); opacity: 0; filter: saturate(.75) blur(.5px);
   -webkit-mask-image: radial-gradient(closest-side, #000 45%, transparent 100%); mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
   transition: opacity 2.5s ease-in-out; will-change: opacity, transform; }
-.ava-hero__bg img.is-on { opacity: var(--ava-hero-img); animation: ava-drift 16s ease-out both; }
+.ava-hero__bg img.is-on { opacity: var(--ava-hero-img); }
+/* the outgoing image keeps drifting while it fades (same animation name, so it does not restart or snap back) */
+.ava-hero__bg img.is-on, .ava-hero__bg img.is-leaving { animation: ava-drift 16s ease-out both; }
 @keyframes ava-drift { from { transform: translateY(-50%) scale(1.04); } to { transform: translate(-2%, -51%) scale(1.12); } }
 /* fade the images into the page: behind the text, at the bottom and top */
 .ava-hero__bg::after { content: ""; position: absolute; inset: 0;
@@ -165,7 +167,14 @@ a:hover { color: var(--ava-strong); }
 .ava-hero__credit:hover { color: var(--ava-strong); }
 .ava-hero__credit.is-out { opacity: 0; }
 /* Light mode: a monochrome negative, like a photographic plate */
-[data-bs-theme="light"] .ava-hero__bg img { filter: grayscale(1) invert(1) contrast(1.6) brightness(1.04) blur(.4px); mix-blend-mode: multiply; }
+[data-bs-theme="light"] .ava-hero__bg img { filter: grayscale(1) invert(1) contrast(1.4) brightness(1.02); mix-blend-mode: multiply; }
+/* lighter fade in light mode, so the plate reads further into the hero (phones keep the stronger fade behind the text) */
+@media (min-width: 768px) {
+  [data-bs-theme="light"] .ava-hero__bg::after {
+    background: linear-gradient(90deg, var(--ava-bg) 28%, color-mix(in srgb, var(--ava-bg) 35%, transparent) 58%, transparent 85%),
+                linear-gradient(0deg, var(--ava-bg) 0, transparent 25%),
+                linear-gradient(180deg, var(--ava-bg) 0, transparent 15%); }
+}
 @media (max-width: 767.98px) {
   .ava-hero__bg img { width: 120%; right: -35%; }
   .ava-hero__bg::after { background: linear-gradient(90deg, var(--ava-bg) 10%, color-mix(in srgb, var(--ava-bg) 60%, transparent) 100%),
@@ -174,7 +183,7 @@ a:hover { color: var(--ava-strong); }
   .ava-hero__logos { position: static; margin-bottom: 1.75rem; }
   .ava-hero__logos img { height: 24px; }
 }
-@media (prefers-reduced-motion: reduce) { .ava-hero__bg img.is-on { animation: none; } .ava-hero__bg img { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ava-hero__bg img.is-on, .ava-hero__bg img.is-leaving { animation: none; } .ava-hero__bg img { transition: none; } }
 
 .btn-ava { --bs-btn-font-weight: 600; --bs-btn-padding-x: 1.4rem; --bs-btn-padding-y: .75rem; --bs-btn-border-radius: .6rem; }
 .btn-ava-gold { --bs-btn-bg: var(--ava-gold); --bs-btn-border-color: var(--ava-gold); --bs-btn-color: var(--ava-abyss);

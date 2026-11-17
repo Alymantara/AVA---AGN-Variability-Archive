@@ -10,7 +10,11 @@
     if (document.hidden) return;
     const next = imgs[(i + 1) % imgs.length];
     if (!next.complete || !next.naturalWidth) { load(next); return; }    // wait until it has loaded
-    imgs[i].classList.remove('is-on');
+    const prev = imgs[i];
+    prev.classList.add('is-leaving');            // keep drifting while it fades out...
+    prev.classList.remove('is-on');
+    setTimeout(() => prev.classList.remove('is-leaving'), 2700);   // ...then reset once invisible (fade: 2.5 s)
+    next.classList.remove('is-leaving');
     next.classList.add('is-on');
     i = (i + 1) % imgs.length;
     load(imgs[(i + 1) % imgs.length]);
