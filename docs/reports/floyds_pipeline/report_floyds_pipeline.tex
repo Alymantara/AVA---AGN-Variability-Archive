@@ -1,62 +1,35 @@
-% AVA Internal Report — FLOYDS Pipeline Recalibration for Reverberation Mapping
-% Rebranded wrapper around floyds_rm_report source tree.
-% Content (chapters/, sections/, figures/) is unchanged from the original.
+% AVA Internal Report #1 — FLOYDS Pipeline Recalibration for Reverberation Mapping
 \documentclass[10pt,a4paper,oneside]{report}
 \usepackage[T1]{fontenc}
-\usepackage{tgtermes}
-\usepackage{mathptmx}
 \usepackage[a4paper,top=2.3cm,bottom=2.5cm,left=2.4cm,right=2.4cm,headsep=0.6cm]{geometry}
 \usepackage{graphicx}
 \usepackage{pifont}
 \usepackage{amsmath}
-\usepackage{booktabs}
 \usepackage{tabularx}
-\usepackage{longtable}
-\usepackage{xcolor}
-\usepackage[hyphens]{url}
 \usepackage[round,authoryear]{natbib}
 \usepackage[font=small,labelfont=bf,labelsep=period,justification=justified,singlelinecheck=false]{caption}
-\usepackage{titlesec}
-\usepackage{fancyhdr}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,shapes.misc,fit,calc}
-\usepackage[colorlinks=true,linkcolor={blue!60!black},citecolor={blue!60!black},urlcolor={blue!60!black}]{hyperref}
-\PassOptionsToPackage{hyphens}{url}
 
-%% AVA brand colours
-\definecolor{avaInkBlue}{RGB}{26,58,92}
-\definecolor{avaAbyss}{RGB}{10,22,40}
-\definecolor{avaGold}{RGB}{212,160,23}
-\definecolor{avaMidBlue}{RGB}{14,44,80}
+%% AVA brand identity — all colours, fonts, headings, boxes, page style
+\usepackage{ava_style}
 
-\setlength{\parindent}{1.2em}
-\setlength{\parskip}{0pt}
-\setlength{\emergencystretch}{3em}
-\let\oldunderscore\_
-\renewcommand{\_}{\oldunderscore\allowbreak}
-\renewcommand{\topfraction}{0.9}
-\renewcommand{\textfraction}{0.08}
-\renewcommand{\floatpagefraction}{0.75}
-\setcounter{topnumber}{3}
-\setcounter{totalnumber}{4}
+%% Override header right side for this document
+\renewcommand{\AVAManualTitle}{FLOYDS Pipeline Report}
 
-\titleformat{\chapter}[block]{\normalfont\large\bfseries\color{avaInkBlue}}{\thechapter}{1em}{\MakeUppercase}
+%% Restore chapter-level heading format (ava_style uses sections; report class has chapters)
+\usepackage{titlesec}
+\titleformat{\chapter}[block]
+  {\normalfont\large\bfseries\color{avaInkBlue}}{\thechapter}{1em}{\MakeUppercase}
 \titlespacing*{\chapter}{0pt}{0pt}{14pt}
-\titleformat{\section}{\normalfont\normalsize\bfseries}{\thesection}{1em}{\MakeUppercase}
-\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}
-\titleformat{\subsubsection}[runin]{\normalfont\normalsize\itshape}{\thesubsubsection}{0.6em}{}[.]
+\titleformat{\section}
+  {\normalfont\normalsize\bfseries\color{avaInkBlue}}{{\thesection}}{1em}{\MakeUppercase}[\color{avaInkBlue}\titlerule]
+\titleformat{\subsection}{\normalfont\normalsize\bfseries\color{avaInkBlue}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}[runin]{\normalfont\normalsize\itshape\color{avaInkBlue}}{\thesubsubsection}{0.6em}{}[.]
 \titlespacing*{\section}{0pt}{12pt}{5pt}
 \titlespacing*{\subsection}{0pt}{9pt}{3pt}
 
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\itshape\textcolor{avaInkBlue}{AGN Variability Archive}}
-\fancyhead[R]{\small\itshape\textcolor{avaInkBlue}{FLOYDS Pipeline Report}}
-\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}
-\renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\headrule}{\color{avaInkBlue!40}\hrule width\headwidth height\headrulewidth}
-\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\textcolor{avaInkBlue!60}{\thepage}}\renewcommand{\headrulewidth}{0pt}}
-
+%% Convenience macros
 \newcommand{\banzai}{\textsc{banzai-floyds}}
 \newcommand{\kms}{km\,s$^{-1}$}
 
@@ -65,26 +38,32 @@
 
 \begin{document}
 
+%% ---- Title page via ava_style \avatitlepage --------------------------
+%% Args: {Title}{Version}{Date}{Author}{Email}{Address}
+\avatitlepage
+  {Wavelength, trace, fringe, extraction and flux recalibration\\
+   of LCO FLOYDS spectra for reverberation mapping\\[4pt]
+   {\normalsize\upshape Diagnosis of \banzai~1.0.1
+    and target-independent corrections}}
+  {1.0}
+  {November 2026}
+  {Juan V.\ Hern\'andez Santisteban}
+  {jvhs1@st-andrews.ac.uk}
+  {School of Physics and Astronomy, University of St Andrews,
+   North Haugh, St Andrews, KY16~9SS, UK}
+
+%% ---- Abstract page --------------------------------------------------
 \begin{titlepage}
-\noindent
-\raisebox{-0.5\height}{\includegraphics[height=1.4cm]{../st_logo_horizontal}}%
-\hfill
-\raisebox{-0.5\height}{\includegraphics[height=1.0cm]{../../lco_logo}}
-\vspace*{0.8cm}
-{\color{avaInkBlue}\rule{\textwidth}{1.5pt}}\\[6pt]
-{\centering\includegraphics[width=\textwidth,height=1.4cm,keepaspectratio=false]{../../banner}\\[6pt]}
-{\LARGE\bfseries\color{avaAbyss} Wavelength, trace, fringe, extraction and flux recalibration of LCO FLOYDS spectra for reverberation mapping\par}
-\vspace{6pt}
-{\large\itshape\color{avaInkBlue} Diagnosis of \textsc{banzai-floyds}~1.0.1 and target-independent corrections\par}
-\noindent{\color{avaInkBlue}\rule{\textwidth}{1.5pt}}\\[12pt]
-{\large\bfseries Juan V.\ Hern\'andez Santisteban}\\[2pt]
-{\normalsize School of Physics and Astronomy, University of St Andrews, North Haugh, St Andrews, KY16~9SS, UK}\\[4pt]
-{\small\color{avaInkBlue!70} AVA Internal Report \#\,1 $\cdot$ November 2026}\\[22pt]
-\begin{minipage}{0.92\textwidth}
-\small\textbf{Abstract.} \input{sections/abstract}
-\end{minipage}
+\vspace*{2cm}
+{\large\bfseries\color{avaInkBlue} Abstract\par}
+\vspace{0.6em}
+\input{sections/abstract}
 \vfill
-{\small\color{avaInkBlue!70} Keywords: techniques: spectroscopic --- methods: data analysis --- instrumentation: spectrographs --- galaxies: Seyfert}
+{\small\color{avaInkBlue!70}%
+  Keywords: techniques: spectroscopic ---
+  methods: data analysis ---
+  instrumentation: spectrographs ---
+  galaxies: Seyfert}
 \end{titlepage}
 
 \tableofcontents
