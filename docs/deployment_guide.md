@@ -200,6 +200,56 @@ Files (under `paths.archive_root`): `photometry/<data_id>/` (catalogues `sextrac
 
 All writes to `ava.db` curated fields go through scripts in `tools/` that back the database up first.
 
+## 6.1 Literature properties (on demand, not scheduled)
+
+Published AGN properties (redshift, black-hole mass, rest-frame Hβ lag, L5100, AGN type, each with its ADS
+bibcode) live in **`data/literature/`**. This folder is not in git (it is under `data/`), so copy it to the VM
+with `ava.db`.
+
+| File | Contents |
+|---|---|
+| `agn_properties.csv` | one row per AGN, the source of truth; empty cell = no published value |
+| `references.csv` | bibcode → short citation ("Lu et al. (2021)") shown on the website |
+| `mass_conflicts.csv` | campaigns whose masses disagree (> 0.3 dex), for review |
+| `build/`, `cache/` | the scripts and cached NED/SIMBAD/Véron-Cetty/AGNmass/literature results that produce the CSV |
+
+Rules used when building the CSV:
+- **z** comes from NED.
+- **Type** comes from Véron-Cetty & Véron (2010), else the literature.
+- **Mass** comes from the newest Hβ reverberation campaign that reports one (`MASS_POLICY` and
+  `MASS_CAMPAIGN` in `build/build_csv.py`). The AGN Black Hole Mass Database mean is kept in the notes.
+- **Lag** comes from the newest well-sampled campaign.
+
+Import, then recompute the derived properties, then publish:
+
+```
+python tools/import_literature.py --apply-to-agn            # dry run: lists every change
+python tools/import_literature.py --apply-to-agn --write    # backup in backups/, then write
+python tools/derive_agn_properties.py                       # agn_derived: L_bol, Eddington ratio, disc lags
+python scripts/run_pipeline.py -w                           # or tools/publish_web.py: website copy
+```
+
+- `--write` upserts the CSV into the table **`agn_literature`**. A value removed from the CSV is removed from
+  the table.
+- `--apply-to-agn` also copies z, log M_BH, log L5100 and the type, with their citations, into the curated
+  `agn` columns the website shows (`redshift`, `logm`, `l_5100`, `AGN_type` and their `*_cite` / `*_url`).
+- It only writes where the CSV has a value, and never changes a non-AGN type (`XRB`).
+- Use `--db` to run it on another database, e.g. the test archive: `--db data/test_archive/ava.db`.
+
+**When new AGN are added:**
+1. Append them to `cache/targets.csv`.
+2. Re-run `build/match_agnmass.py` and `build/catalogs.py` (it resumes and only queries new targets).
+3. Add the literature search results as a new `cache/lit/batch_<X>.json`.
+4. Run `python build/build_csv.py .` in `data/literature/`.
+5. Import as above.
+
+The searches use NED, SIMBAD, VizieR (Harvard mirrors) and the ADS API; the ADS token is in
+`~/.ads/dev_key` and is never printed.
+
+**Identity fixes** to existing targets (position, `data_id` rename) are one-off migration tools, e.g.
+`tools/db_migrate_20261117.py`. Each is a dry run by default; `--write` backs up first. A `data_id` rename
+also updates the lcodb links (`frames.ava_data_id`, `target_link.ava_data_id`).
+
 # 7. Scheduled jobs (production)
 
 All times UTC. Run everything as one unprivileged service user (e.g. `ava`), with
@@ -348,7 +398,8 @@ In short:
 1. conda environment, configuration outside the repository (`AVA_CONFIG`, `LCODB_CONFIG`), LCO token,
    `scripts/check_install.py --tests`;
 2. copy `ava.db` and the lcodb databases from the development machine (`sqlite3 .backup`, then `scp`; they
-   are not in git: 440 + 250 MB, above GitHub's file limit), then `lcodb daily`;
+   are not in git: 440 + 250 MB, above GitHub's file limit), and the `data/literature/` folder (section
+   6.1), then `lcodb daily`;
 3. `run_pipeline.py -o -O` — folders and Gaia reference stars for every `lco_active` target;
 4. **`tools/port_legacy.py`** — copies the old pipeline's SExtractor catalogues and raw FLOYDS frames into
    the new layout, placing each file by its frame name through the lcodb databases (old folder names differ
