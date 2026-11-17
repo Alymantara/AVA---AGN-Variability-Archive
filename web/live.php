@@ -16,10 +16,10 @@ ava_page_start('live', 'Live Updates', 'LCO Key Project time usage per semester 
 ?>
 <div class="container-xxl ava-page-head">
   <h1>Live updates</h1>
-  <p class="ava-intro">Semester <?= h($current) ?>: usage of the allocated 1-m and 2-m time per semester (dotted black line: total time / days in
-    semester) against the time used on the 1-m (green), 2-m FLOYDS (red) and 2-m MuSCAT3 (purple). Numbers come from
-    the LCO API and are refreshed every 6 hours. For daily allocations see the
-    <a href="https://schedule.lco.global/">LCO daily schedule</a>.</p>
+  <p class="ava-intro">Semester <?= h($current) ?>: LCO Key Project time charged per semester, as a percentage of each
+    allocation, for the 1-m (green), 2-m FLOYDS (orange) and 2-m MuSCAT3 (blue); dashed curves are the filler
+    programme and the dotted line is an even pace through the semester. Numbers come from the LCO API and are
+    refreshed every 6 hours. For daily allocations see the <a href="https://schedule.lco.global/">LCO daily schedule</a>.</p>
 </div>
 
 <div class="container-xxl pb-5">

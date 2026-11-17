@@ -28,6 +28,7 @@ define('AVA_FILTER_DICT', AVA_DATA_DIR . '/filter_dict.txt');
 define('AVA_CONTACT_EMAIL', 'jvhs1@st-andrews.ac.uk');   // shown on the Data page for data requests
 
 // Key Projects shown on Live Updates (first semester => number of semesters).
+// Key Projects shown on the Live usage page: first semester => number of semesters (KEY2020B-006, KEY2023B-001, KEY2026B-007).
 const AVA_KEY_PROJECTS = ['2020B' => 6, '2023B' => 6, '2026B' => 6];
 
 define('AVA_SITE_NAME', 'AVA — AGN Variability Archive');

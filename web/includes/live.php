@@ -11,22 +11,35 @@ function ava_current_semester(?int $ts = null): string
     $ts ??= time();
     $y = (int) date('Y', $ts);
     $m = (int) date('n', $ts);
+    if ($y === 2017 && $m >= 2 || $y === 2018 && $m === 1) {
+        return '2017AB';
+    }
     if ($m === 1) {
         return ($y - 1) . 'B';
     }
     return $y . ($m <= 7 ? 'A' : 'B');
 }
 
+/** Next LCO semester; 2017 was one long semester, 2017AB (2016B -> 2017AB -> 2018A). */
 function ava_next_semester(string $s): string
 {
+    if ($s === '2016B') {
+        return '2017AB';
+    }
+    if ($s === '2017AB') {
+        return '2018A';
+    }
     $y = (int) substr($s, 0, 4);
     return $s[4] === 'A' ? "{$y}B" : ($y + 1) . 'A';
 }
 
-/** project start => semesters up to (and including) the current one. */
-function ava_project_semesters(): array
+/**
+ * project start => its semesters up to (and including) the current one. A new semester appears on its own when it
+ * starts (no edit needed); later ones stay hidden until then.
+ */
+function ava_project_semesters(?int $ts = null): array
 {
-    $now = ava_current_semester();
+    $now = ava_current_semester($ts);
     $out = [];
     foreach (AVA_KEY_PROJECTS as $start => $n) {
         $list = [];
