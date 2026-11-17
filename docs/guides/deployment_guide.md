@@ -397,8 +397,10 @@ deletes. A file is deleted only when all its checks pass:
    rows of the semester in progress, plus any other row that changed (late charges, refunds).
 2. **Curves**: the change between two snapshots is the time LCO charged in those 6 hours, overheads included.
    Before a curve's first snapshot, and after its last, the daily curve is **estimated** from the lcodb
-   databases (`lco_usage.estimate_from_lcodb`; read only). The estimate is each day's exposure hours, scaled so
-   the curve meets the charged totals. Allocations come from the latest snapshot, so a new semester needs no
+   databases (`lco_usage.estimate_from_lcodb`; read only). Each day is weighted by an overhead model fitted
+   every run (charged ≈ a·exposure hours + b·exposures + c·blocks per instrument class, semesters since 2020B;
+   `lco_usage.overheads`; fit in `data/lco_usage/estimated/overheads.txt`), then scaled so the curve meets the
+   charged totals. scipy is needed (already in the environment). Allocations come from the latest snapshot, so a new semester needs no
    manual update.
 3. **Plot and publish**: `lco_usage_<semester>.png` for the current semester: hours charged so far per
    instrument class (1-m, 2-m FLOYDS, 2-m MuSCAT3, and the key project's filler programmes), as a percentage of

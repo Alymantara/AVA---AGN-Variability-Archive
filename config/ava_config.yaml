@@ -648,6 +648,13 @@ cleanup:
 lco_usage:
   input_dir: "data/lco_usage/estimated"      # rewritten each run while estimate_from_lcodb is true
   estimate_from_lcodb: true
+  # Estimate's daily shape: "fit" = charged ~ a·exposure hours + b·exposures + c·blocks per instrument class,
+  # fitted each run over the semesters since fit_since (the lcodb databases are complete from 2020B; classes with
+  # fewer than min_points semesters use exposure hours); "proportional" = exposure hours only.
+  overheads:
+    model: "fit"
+    fit_since: "2020B"
+    min_points: 6
   allocations: "data/lco_usage/allocations.json"   # proposal, semester, instrument, alloc, used (hours)
   plots_dir: "data/lco_usage/plots"
   formats: ["png"]

@@ -276,41 +276,50 @@ def _tel_class(telescope_id: str) -> str:
 
 def exposures_from_lcodb(photometry_db: Path | None, spectra_db: Path | None,
                          proposal_regex: str = r"^KEY") -> pd.DataFrame:
-    """Open-shutter hours per proposal, UT day and instrument class, from the lcodb databases (read only).
+    """Open-shutter hours, exposures and blocks per proposal, UT day and instrument class, from the lcodb
+    databases (read only).
 
     Each exposure is counted once: frames of several reduction levels share ``exp_key``, and the four MuSCAT
-    channels of one exposure differ only in the camera (``ep01..ep04``).  FLOYDS counts every frame (spectra,
-    arcs, lamp flats).  Class names: ``<1M0|2M0>-SCICAM-<SINISTRO|MUSCAT|SPECTRAL>`` and ``2M0-FLOYDS-SCICAM``.
-    Returns proposal, mjd (start of the UT day), instrument, hours.
+    channels of one exposure differ only in the camera (``ep01..ep04``; the longest channel is kept, as LCO
+    charges the longest).  FLOYDS counts every frame (spectra, arcs, lamp flats).  A block (``block_id``: one
+    scheduled observation, one slew and acquisition) is counted on the day of its first exposure.
+    Class names: ``<1M0|2M0>-SCICAM-<SINISTRO|MUSCAT|SPECTRAL>`` and ``2M0-FLOYDS-SCICAM``.
+    Returns proposal, mjd (start of the UT day), instrument, hours, n_exp, n_blocks.
     """
     import re
     import sqlite3
     from contextlib import closing
 
+    cols = ["proposal", "mjd", "instrument", "hours", "n_exp", "n_blocks"]
     rx = re.compile(proposal_regex)
     frames = []
     if photometry_db is not None and Path(photometry_db).exists():
         with closing(sqlite3.connect(f"file:{photometry_db}?mode=ro", uri=True)) as con:
-            f = pd.read_sql("SELECT proposal_id, exp_key, basename, camera_type, telescope_id, mjd_obs, exptime "
-                            "FROM frames WHERE obstype = 'EXPOSE' AND exptime > 0", con)
+            f = pd.read_sql("SELECT proposal_id, exp_key, basename, camera_type, telescope_id, mjd_obs, exptime, "
+                            "block_id FROM frames WHERE obstype = 'EXPOSE' AND exptime > 0", con)
         f["key"] = f["exp_key"].fillna(f["basename"]).str.replace(r"-ep\d\d-", "-ep-", regex=True)
         f["instrument"] = f["telescope_id"].map(_tel_class) + "-SCICAM-" + f["camera_type"].str.upper()
         frames.append(f)
     if spectra_db is not None and Path(spectra_db).exists():
         with closing(sqlite3.connect(f"file:{spectra_db}?mode=ro", uri=True)) as con:
-            f = pd.read_sql("SELECT proposal_id, exp_key, basename, mjd_obs, exptime FROM frames "
+            f = pd.read_sql("SELECT proposal_id, exp_key, basename, mjd_obs, exptime, block_id FROM frames "
                             "WHERE exptime > 0", con)
         f["key"] = "floyds:" + f["exp_key"].fillna(f["basename"])
         f["instrument"] = "2M0-FLOYDS-SCICAM"
         frames.append(f)
     if not frames:
-        return pd.DataFrame(columns=["proposal", "mjd", "instrument", "hours"])
+        return pd.DataFrame(columns=cols)
     f = pd.concat(frames, ignore_index=True)
     f = f[f["proposal_id"].fillna("").map(lambda p: bool(rx.search(p))) & f["mjd_obs"].notna()]
-    f = f.drop_duplicates("key")
+    f = f.sort_values("exptime").drop_duplicates("key", keep="last")      # longest MuSCAT channel
     f["mjd"] = np.floor(f["mjd_obs"].astype(float))
-    out = (f.groupby(["proposal_id", "mjd", "instrument"])["exptime"].sum() / 3600.0).reset_index()
-    return out.rename(columns={"proposal_id": "proposal", "exptime": "hours"})
+    f["block"] = f["block_id"].astype("Int64").astype(str).where(f["block_id"].notna(), "k:" + f["key"])
+    first = f.sort_values("mjd_obs").drop_duplicates(["proposal_id", "instrument", "block"])
+    g = ["proposal_id", "mjd", "instrument"]
+    out = f.groupby(g).agg(hours=("exptime", "sum"), n_exp=("key", "size"))
+    out["hours"] /= 3600.0
+    out["n_blocks"] = first.groupby(g).size().reindex(out.index, fill_value=0)
+    return out.reset_index().rename(columns={"proposal_id": "proposal"})[cols]
 
 
 def _fold_class(inst: str, allocated: list[str]) -> str:
@@ -326,48 +335,126 @@ def _fold_class(inst: str, allocated: list[str]) -> str:
     return same[0] if same else inst
 
 
-def estimate_charged(exposures: pd.DataFrame, allocations: pd.DataFrame, totals_mjd: float,
-                     fallback_factor: dict | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Daily charged hours: the exposure hours of each (proposal, semester, class) times charged / exposure.
+def _keyed(exposures: pd.DataFrame, allocations: pd.DataFrame, totals_mjd: float) -> list[tuple[dict, pd.DataFrame]]:
+    """(key, daily rows) per (proposal, semester, class) of the proposals in ``allocations``; classes folded onto
+    the allocated ones (:func:`_fold_class`).  Key: proposal, semester, instrument, used (charged at
+    ``totals_mjd``; NaN if the totals do not list the semester) and the exposure hours / exposures / blocks
+    before ``totals_mjd`` (exposure, n_exp, n_blocks)."""
+    ex = exposures[exposures["proposal"].isin(set(allocations["proposal"]))].copy()
+    for c in ("n_exp", "n_blocks"):
+        if c not in ex:
+            ex[c] = 0
+    ex["semester"] = [semester_of(date.fromordinal(MJD0.toordinal() + int(m))) for m in ex["mjd"]]
+    out = []
+    for (prop, sem), g in ex.groupby(["proposal", "semester"]):
+        a = allocations[(allocations["proposal"] == prop) & (allocations["semester"] == sem)]
+        a = a.sort_values("alloc", ascending=False)
+        allocated = list(dict.fromkeys(a["instrument"]))
+        g = g.assign(instrument=[_fold_class(i, allocated) for i in g["instrument"]])
+        for inst, gi in g.groupby("instrument"):
+            b = gi[gi["mjd"] < totals_mjd]
+            out.append((dict(proposal=prop, semester=sem, instrument=inst,
+                             used=float(a.loc[a["instrument"] == inst, "used"].sum()) if len(a) else np.nan,
+                             exposure=float(b["hours"].sum()), n_exp=int(b["n_exp"].sum()),
+                             n_blocks=int(b["n_blocks"].sum())), gi))
+    return out
 
+
+def _model_hours(df: pd.DataFrame, inst: str, coefs: dict | None) -> np.ndarray:
+    """Overhead model a·hours + b·exposures + c·blocks (``coefs[inst]`` = (a, b, c), b and c in hours), or the
+    exposure hours alone for a class without a fit."""
+    c = (coefs or {}).get(inst)
+    h = df["hours"].to_numpy(float)
+    if c is None:
+        return h
+    n = df["n_exp"].to_numpy(float) if "n_exp" in df else np.zeros(len(df))
+    k = df["n_blocks"].to_numpy(float) if "n_blocks" in df else np.zeros(len(df))
+    return c[0] * h + c[1] * n + c[2] * k
+
+
+def fit_overheads(exposures: pd.DataFrame, allocations: pd.DataFrame, totals_mjd: float, since: str = "2020B",
+                  min_points: int = 6) -> pd.DataFrame:
+    """Fit charged = a·exposure hours + b·exposures + c·blocks per instrument class (non-negative least squares).
+
+    One point per (proposal, semester) from ``since`` on (the lcodb databases are complete from 2020B), with
+    something charged and something exposed before ``totals_mjd``.  Classes with fewer than ``min_points`` are not
+    fitted (the estimate then uses charged / exposure hours).  Returns instrument, n, a, b_s (seconds per
+    exposure), c_min (minutes per block), and the leave-one-out RMS of the model and of the flat factor (hours
+    and fraction).
+    """
+    from scipy.optimize import nnls
+
+    pts = pd.DataFrame([k for k, _ in _keyed(exposures, allocations, totals_mjd)])
+    rows = []
+    if pts.empty:
+        return pd.DataFrame(columns=["instrument", "n", "a", "b_s", "c_min", "loo_model", "loo_flat",
+                                     "loo_model_frac", "loo_flat_frac"])
+    pts = pts[(pts["used"] > 0) & (pts["exposure"] > 0)
+              & pts["semester"].map(lambda x: x != "2017AB" and x >= since)]
+    for inst, g in pts.groupby("instrument"):
+        if len(g) < min_points:
+            continue
+        X, y = g[["exposure", "n_exp", "n_blocks"]].to_numpy(float), g["used"].to_numpy(float)
+        coef = nnls(X, y)[0]
+        lm, lf = [], []
+        for i in range(len(g)):
+            m = np.arange(len(g)) != i
+            lm.append(X[i] @ nnls(X[m], y[m])[0] - y[i])
+            lf.append(y[m].sum() / X[m, 0].sum() * X[i, 0] - y[i])
+        lm, lf = np.array(lm), np.array(lf)
+        rows.append(dict(instrument=inst, n=len(g), a=coef[0], b_s=coef[1] * 3600, c_min=coef[2] * 60,
+                         loo_model=np.sqrt(np.mean(lm ** 2)), loo_flat=np.sqrt(np.mean(lf ** 2)),
+                         loo_model_frac=np.sqrt(np.mean((lm / y) ** 2)), loo_flat_frac=np.sqrt(np.mean((lf / y) ** 2))))
+    return pd.DataFrame(rows)
+
+
+def overhead_coefs(fit: pd.DataFrame) -> dict:
+    """``fit_overheads`` table → {instrument: (a, b, c)} with b, c in hours per exposure / block."""
+    return {r.instrument: (r.a, r.b_s / 3600, r.c_min / 60) for r in fit.itertuples()}
+
+
+def estimate_charged(exposures: pd.DataFrame, allocations: pd.DataFrame, totals_mjd: float,
+                     fallback_factor: dict | None = None,
+                     coefs: dict | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Daily charged hours, scaled so each (proposal, semester, class) adds up to its charged total.
+
+    Each day's weight is the overhead model of its class (``coefs``: a·exposure hours + b·exposures + c·blocks,
+    from :func:`fit_overheads`), or its exposure hours for a class without a fit.  The weights are then multiplied
+    by charged / weight of that (proposal, semester, class), so the totals are exact and the shape follows the
+    model (with the model the factor is ~1).
     ``allocations.used`` is the time charged up to ``totals_mjd`` (the date the totals were taken), so the factor
-    of the semester in progress uses only exposures before it, and later exposures get the same factor.
-    Only proposals in ``allocations`` are kept.  Exposures of a (proposal, semester) that the totals list with
+    of the semester in progress uses only days before it, and later days get the same factor.
+    Only proposals in ``allocations`` are kept.  Days of a (proposal, semester) that the totals list with
     nothing charged to that class are dropped (factor 0: e.g. frames taken before a proposal's first semester).
     A (proposal, semester) missing from the totals (a semester newer than the table) gets the median factor of
     the class over all semesters (``fallback_factor`` overrides).
     Returns (long table: proposal, mjd, instrument, hours; factor table).
     """
-    ex = exposures[exposures["proposal"].isin(set(allocations["proposal"]))].copy()
-    ex["semester"] = [semester_of(date.fromordinal(MJD0.toordinal() + int(m))) for m in ex["mjd"]]
-    al = allocations.copy()
     rows = []
-    for (prop, sem), g in ex.groupby(["proposal", "semester"]):
-        a = al[(al["proposal"] == prop) & (al["semester"] == sem)].sort_values("alloc", ascending=False)
-        allocated = list(dict.fromkeys(a["instrument"]))
-        g = g.assign(instrument=[_fold_class(i, allocated) for i in g["instrument"]])
-        for inst, gi in g.groupby("instrument"):
-            used = float(a.loc[a["instrument"] == inst, "used"].sum())
-            exp_h = float(gi.loc[gi["mjd"] < totals_mjd, "hours"].sum())
-            if len(a) == 0:
-                k = np.nan                                  # semester not in the totals: median factor
-            elif used <= 0:
-                k = 0.0                                     # nothing charged here: drop
-            else:
-                k = used / exp_h if exp_h > 0 else np.nan
-            rows.append(dict(proposal=prop, semester=sem, instrument=inst, used=used, exposure=exp_h, factor=k))
-            rows[-1]["_data"] = gi
-    fac = pd.DataFrame([{k: v for k, v in r.items() if k != "_data"} for r in rows])
+    for key, gi in _keyed(exposures, allocations, totals_mjd):
+        w = _model_hours(gi, key["instrument"], coefs)
+        wsum = float(w[(gi["mjd"] < totals_mjd).to_numpy()].sum())
+        used = key["used"]
+        if not np.isfinite(used):
+            k = np.nan                                  # semester not in the totals: median factor
+        elif used <= 0:
+            k = 0.0                                     # nothing charged here: drop
+        else:
+            k = used / wsum if wsum > 0 else np.nan
+        rows.append((dict(proposal=key["proposal"], semester=key["semester"], instrument=key["instrument"],
+                          used=0.0 if not np.isfinite(used) else used, exposure=key["exposure"], weight=wsum,
+                          factor=k), gi.assign(hours=w)))
+    fac = pd.DataFrame([r for r, _ in rows])
     med = fac[fac["factor"] > 0].groupby("instrument")["factor"].median().to_dict() if len(fac) else {}
     med.update(fallback_factor or {})
     out = []
-    for r, f in zip(rows, fac.itertuples()):
-        k = f.factor if np.isfinite(f.factor) else med.get(f.instrument, np.nan)
+    for i, (r, gi) in enumerate(rows):
+        k = r["factor"] if np.isfinite(r["factor"]) else med.get(r["instrument"], np.nan)
         if not np.isfinite(k):
             k = 1.0
-        fac.loc[f.Index, "applied"] = k
+        fac.loc[i, "applied"] = k
         if k > 0:
-            out.append(r["_data"].assign(hours=r["_data"]["hours"] * k))
+            out.append(gi.assign(hours=gi["hours"] * k))
     est = pd.concat(out, ignore_index=True) if out else exposures.iloc[0:0]
     return est[["proposal", "mjd", "instrument", "hours"]], fac
 
@@ -386,7 +473,8 @@ def write_estimated(est: pd.DataFrame, out_dir: Path, note: str) -> list[Path]:
 def update_estimated(cfg, out_dir: Path, totals_date: date | None = None, log=print) -> list[Path]:
     """Rewrite the estimated per-proposal files from the lcodb databases (read only; no LCO request).
 
-    Also writes ``factors.txt`` (CSV: charged / exposure per proposal, semester and class) next to them.
+    With ``lco_usage.overheads.model: fit`` the daily shape uses the fitted overhead model (:func:`fit_overheads`,
+    written to ``overheads.txt``).  Also writes ``factors.txt`` (CSV: charged / exposure per proposal, semester and class) next to them.
     """
     from ava.lcodb.config import load_config
     st = settings(cfg)
@@ -402,7 +490,13 @@ def update_estimated(cfg, out_dir: Path, totals_date: date | None = None, log=pr
         t = mjd_of(datetime.fromtimestamp(st["allocations"].stat().st_mtime, timezone.utc))
     d = date.fromordinal(MJD0.toordinal() + int(t))
     ex = exposures_from_lcodb(phot, spec)
-    est, fac = estimate_charged(ex, alloc, totals_mjd=t)
+    fit = None
+    if st["overhead_model"] == "fit":
+        fit = fit_overheads(ex, alloc, totals_mjd=t, since=st["overhead_since"], min_points=st["overhead_min_points"])
+        for r in fit.itertuples():
+            log(f"overheads {r.instrument}: {r.a:.3f} x exposure + {r.b_s:.1f} s/exposure + {r.c_min:.2f} min/block "
+                f"(n={r.n}; leave-one-out {100 * r.loo_model_frac:.1f}% vs {100 * r.loo_flat_frac:.1f}% flat)")
+    est, fac = estimate_charged(ex, alloc, totals_mjd=t, coefs=overhead_coefs(fit) if fit is not None else None)
     out_dir = Path(out_dir)
     for old in out_dir.glob("*.csv"):
         old.unlink()
@@ -410,6 +504,8 @@ def update_estimated(cfg, out_dir: Path, totals_date: date | None = None, log=pr
                                                f"scaled per semester to the charged totals of "
                                                f"{st['allocations'].name} (taken {d})")
     fac.round(4).to_csv(out_dir / "factors.txt", index=False)
+    if fit is not None:
+        fit.round(4).to_csv(out_dir / "overheads.txt", index=False)
     log(f"estimated usage from lcodb: {len(files)} proposal file(s) in {out_dir}")
     return files
 
@@ -825,6 +921,9 @@ def settings(cfg) -> dict:
         style=str(c.get("style") or "percent"),
         publish=bool(c.get("publish", True)),
         estimate_from_lcodb=bool(c.get("estimate_from_lcodb", False)),
+        overhead_model=str((c.get("overheads") or {}).get("model") or "fit"),
+        overhead_since=str((c.get("overheads") or {}).get("fit_since") or "2020B"),
+        overhead_min_points=int((c.get("overheads") or {}).get("min_points") or 6),
         snapshot_mode=str((c.get("snapshots") or {}).get("mode") or "dry_run"),
         snapshot_file=cfg._resolve((c.get("snapshots") or {}).get("file") or "data/lco_usage/snapshots.csv"),
         snapshot_prefix=str((c.get("snapshots") or {}).get("prefix") or "KEY"),

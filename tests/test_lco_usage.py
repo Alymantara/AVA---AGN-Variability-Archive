@@ -196,37 +196,40 @@ def _lcodb(tmp_path):
     m = U.mjd_of(date(2026, 9, 1)) + 0.2
     with sqlite3.connect(phot) as con:
         con.execute("CREATE TABLE frames (proposal_id, exp_key, basename, camera_type, telescope_id, mjd_obs, "
-                    "exptime, obstype, rlevel)")
+                    "exptime, obstype, rlevel, block_id)")
         rows = [
             # one Sinistro exposure at two reduction levels: counted once
-            ("KEY2026B-007", "lsc1m005-fa15-20260901-0001", "a-e91", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 91),
-            ("KEY2026B-007", "lsc1m005-fa15-20260901-0001", "a-e90", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 90),
-            ("KEY2026B-007", "lsc1m005-fa15-20260902-0002", "b-e91", "sinistro", "1m0a", m + 1, 3600.0, "EXPOSE", 91),
-        ] + [  # four MuSCAT channels of one exposure: counted once
-            ("KEY2026B-007", f"ogg2m001-ep0{c}-20260901-0005", f"m{c}", "muscat", "2m0a", m, 1800.0, "EXPOSE", 91)
-            for c in range(1, 5)
+            ("KEY2026B-007", "lsc1m005-fa15-20260901-0001", "a-e91", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 91, 1),
+            ("KEY2026B-007", "lsc1m005-fa15-20260901-0001", "a-e90", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 90, 1),
+            ("KEY2026B-007", "lsc1m005-fa15-20260902-0002", "b-e91", "sinistro", "1m0a", m + 1, 3600.0, "EXPOSE", 91, 2),
+        ] + [  # four MuSCAT channels of one exposure: counted once, at the longest channel (30 min)
+            ("KEY2026B-007", f"ogg2m001-ep0{c}-20260901-0005", f"m{c}", "muscat", "2m0a", m, 600.0 * c if c < 4
+             else 1800.0, "EXPOSE", 91, 3) for c in range(1, 5)
         ] + [
-            ("KEY2014A-003", "x", "x", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 91),       # not an AVA proposal
-            ("KEY2026B-007", "y", "y", "sinistro", "1m0a", m, 3600.0, "BIAS", 91),         # not EXPOSE
+            ("KEY2014A-003", "x", "x", "sinistro", "1m0a", m, 3600.0, "EXPOSE", 91, 4),    # not an AVA proposal
+            ("KEY2026B-007", "y", "y", "sinistro", "1m0a", m, 3600.0, "BIAS", 91, 1),      # not EXPOSE
         ]
-        con.executemany("INSERT INTO frames VALUES (?,?,?,?,?,?,?,?,?)", rows)
+        con.executemany("INSERT INTO frames VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
     with sqlite3.connect(spec) as con:
-        con.execute("CREATE TABLE frames (proposal_id, exp_key, basename, mjd_obs, exptime)")
-        con.executemany("INSERT INTO frames VALUES (?,?,?,?,?)", [
-            ("KEY2026B-007f", "coj2m002-en12-20260901-0010", "s0", m, 1800.0),
-            ("KEY2026B-007f", "coj2m002-en12-20260901-0010", "s91", m, 1800.0),   # same exposure, level 91
-            ("KEY2026B-007f", "coj2m002-en12-20260901-0011", "arc", m, 60.0),      # arcs count too
+        con.execute("CREATE TABLE frames (proposal_id, exp_key, basename, mjd_obs, exptime, block_id)")
+        con.executemany("INSERT INTO frames VALUES (?,?,?,?,?,?)", [
+            ("KEY2026B-007f", "coj2m002-en12-20260901-0010", "s0", m, 1800.0, 9),
+            ("KEY2026B-007f", "coj2m002-en12-20260901-0010", "s91", m, 1800.0, 9),  # same exposure, level 91
+            ("KEY2026B-007f", "coj2m002-en12-20260901-0011", "arc", m, 60.0, 9),     # arcs count too, same block
         ])
     return phot, spec
 
 
 def test_exposures_from_lcodb(tmp_path):
     ex = U.exposures_from_lcodb(*_lcodb(tmp_path))
-    by = ex.groupby(["proposal", "instrument"])["hours"].sum().to_dict()
-    assert by == {("KEY2014A-003", "1M0-SCICAM-SINISTRO"): 1.0,
-                  ("KEY2026B-007", "1M0-SCICAM-SINISTRO"): 2.0,
-                  ("KEY2026B-007", "2M0-SCICAM-MUSCAT"): 0.5,
-                  ("KEY2026B-007f", "2M0-FLOYDS-SCICAM"): pytest.approx(31 / 60)}
+    by = ex.groupby(["proposal", "instrument"])[["hours", "n_exp", "n_blocks"]].sum()
+    assert by["hours"].to_dict() == {("KEY2014A-003", "1M0-SCICAM-SINISTRO"): 1.0,
+                                     ("KEY2026B-007", "1M0-SCICAM-SINISTRO"): 2.0,
+                                     ("KEY2026B-007", "2M0-SCICAM-MUSCAT"): 0.5,
+                                     ("KEY2026B-007f", "2M0-FLOYDS-SCICAM"): pytest.approx(31 / 60)}
+    assert by.loc[("KEY2026B-007f", "2M0-FLOYDS-SCICAM"), "n_exp"] == 2
+    assert by.loc[("KEY2026B-007f", "2M0-FLOYDS-SCICAM"), "n_blocks"] == 1
+    assert by.loc[("KEY2026B-007", "1M0-SCICAM-SINISTRO"), "n_blocks"] == 2
     assert set(ex["mjd"]) == {U.mjd_of(date(2026, 9, 1)), U.mjd_of(date(2026, 9, 2))}
 
 
@@ -396,3 +399,48 @@ def test_append_snapshot_keeps_log_small(tmp_path):
     old = inc[inc["semester"] == "2026A"]
     assert sorted(old["hours"].round(3)) == [-0.5, 0.5]                             # late charge, then refund
     assert (old["mjd"] < U.semester_bounds("2026A")[1]).all()                       # drawn inside 2026A
+
+
+def _synthetic_semesters(a=1.1, b_s=20.0, c_min=4.0, n=10, seed=0):
+    """Made-up exposures for n past semesters of one proposal, charged exactly by a known overhead model."""
+    rng = np.random.default_rng(seed)
+    rows, alloc = [], []
+    sems = ["2021A", "2021B", "2022A", "2022B", "2023A", "2023B", "2024A", "2024B", "2025A", "2025B"][:n]
+    for sem in sems:
+        start, _ = U.semester_bounds(sem)
+        days = start + np.arange(0, 150, 3)
+        h = rng.uniform(1, 6, len(days))
+        ne = rng.integers(5, 60, len(days))
+        nb = rng.integers(1, 12, len(days))
+        rows.append(pd.DataFrame({"proposal": "KEY2020B-006", "mjd": days, "instrument": "1M0-SCICAM-SINISTRO",
+                                  "hours": h, "n_exp": ne, "n_blocks": nb}))
+        used = a * h.sum() + b_s / 3600 * ne.sum() + c_min / 60 * nb.sum()
+        alloc.append(dict(proposal="KEY2020B-006", semester=sem, instrument="1M0-SCICAM-SINISTRO", alloc=1000.0,
+                          used=used))
+    return pd.concat(rows, ignore_index=True), pd.DataFrame(alloc)
+
+
+def test_fit_overheads_recovers_model():
+    ex, alloc = _synthetic_semesters()
+    fit = U.fit_overheads(ex, alloc, totals_mjd=U.mjd_of(date(2026, 11, 1)), since="2020B", min_points=6)
+    (r,) = fit.itertuples()
+    assert (r.instrument, r.n) == ("1M0-SCICAM-SINISTRO", 10)
+    assert r.a == pytest.approx(1.1, rel=1e-6) and r.b_s == pytest.approx(20.0, rel=1e-5)
+    assert r.c_min == pytest.approx(4.0, rel=1e-5)
+    assert r.loo_model < 1e-6 < r.loo_flat                       # exact model beats a flat factor
+    # too few semesters, or before fit_since: not fitted
+    assert U.fit_overheads(ex, alloc, U.mjd_of(date(2026, 11, 1)), min_points=11).empty
+    assert U.fit_overheads(ex, alloc, U.mjd_of(date(2026, 11, 1)), since="2026A").empty
+
+
+def test_estimate_with_model_shape():
+    """With the model the daily curve follows a·h + b·n + c·blocks, and each semester still ends at its total."""
+    ex, alloc = _synthetic_semesters(n=6)
+    coefs = U.overhead_coefs(U.fit_overheads(ex, alloc, U.mjd_of(date(2026, 11, 1))))
+    est, fac = U.estimate_charged(ex, alloc, U.mjd_of(date(2026, 11, 1)), coefs=coefs)
+    assert fac["applied"].to_numpy() == pytest.approx(1.0)       # exact model: no rescaling needed
+    day = est.merge(ex, on=["proposal", "mjd", "instrument"], suffixes=("", "_exp"))
+    want = 1.1 * day["hours_exp"] + 20 / 3600 * day["n_exp"] + 4 / 60 * day["n_blocks"]
+    assert day["hours"].to_numpy() == pytest.approx(want.to_numpy())
+    flat, _ = U.estimate_charged(ex, alloc, U.mjd_of(date(2026, 11, 1)))
+    assert flat.groupby("mjd")["hours"].sum().sum() == pytest.approx(est["hours"].sum())   # same totals

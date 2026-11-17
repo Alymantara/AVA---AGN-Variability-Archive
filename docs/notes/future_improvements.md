@@ -369,10 +369,22 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   the latest snapshot's totals and time (not the allocations file's modification time, which git loses).
 - **New semester:** the current semester is always drawn (new plot from the first run after the boundary); the
   previous one is redrawn during the first `finalise_days` (7) of the new one, then frozen.
-- **Overheads in the estimate:** spread in proportion to exposure time within a semester (one factor per
-  proposal, semester and class). Better: fit charged = a·exposure + b·n_exposures + c·n_blocks per class over
-  the 2018B+ semesters, so short-exposure and FLOYDS-acquisition days carry their real overhead. MuSCAT: keep
-  the longest channel of an exposure, not the first (factor 0.98 in 2026B suggests a small overcount). Both open.
+- **Overhead model (fitted 17 Nov 2026; `lco_usage.overheads`):** charged = a·exposure hours + b·exposures +
+  c·blocks per instrument class, non-negative least squares over the (proposal, semester) points since 2020B
+  (database complete from then; 2018B–2020A points were off by up to 2.5x), refitted every run, written to
+  `estimated/overheads.txt`. Each day's weight is the model; each semester is still scaled to its charged total
+  (factors now 0.93–1.10, were 1.4–1.6). Fit on 17 Nov 2026 (leave-one-out RMS, model vs flat factor):
+  | Class | n | a | b (s/exposure) | c (min/block) | LOO model | LOO flat |
+  |---|---|---|---|---|---|---|
+  | 1-m Sinistro | 15 | 1.164 | 25.5 | 0.15 | 5.3 % | 7.4 % |
+  | 2-m FLOYDS | 20 | 0.822 | 0 | 10.3 | 6.2 % | 7.6 % |
+  | 2-m MuSCAT3 | 10 | 0.356 | 0 | 4.2 | 13.2 % | 22.0 % |
+  Spectral (4 points) and classes with < 6 semesters use exposure hours. **Caveats:** on the 1-m, exposures and
+  blocks are nearly proportional (~13 exposures per block), so only b + 13c is constrained (fitted from 2018B:
+  17.5 s + 3.4 min); FLOYDS a < 1 because arcs and flats are counted as exposure time; MuSCAT a = 0.36 is
+  unexplained (charging per request?). The coefficients are empirical weights, not LCO's overhead table.
+  Check against the legacy 2024B plot of 17 Oct 2024: 1-m 314.8 h (flat 313.0, legacy 320.1), FLOYDS 45.1 h
+  (flat 46.2, legacy 45.5). MuSCAT exposures now counted at the longest channel.
 - **Plot style (user, 17 Nov 2026):** `lco_usage.style: percent`: every curve on one axis, % of its allocation,
   calendar dates, no MJD axis, legend outside the plot with used/allocated hours, website fonts and axis colours.
   Curve colours: the legacy ones (user: "keep the original colours"). The legacy layout (one y axis per class) and
