@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "ava"
@@ -12,62 +12,40 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 
 dependencies = [
-    # Astronomy core
-    "astropy>=5.3",
-    "astroquery>=0.4.6",
-    "specutils>=1.11",
+    # Astronomy
+    "astropy>=6.0",
+    "astroquery>=0.4.7",
+    "astroalign>=2.5",
     # Data / numerics
-    "numpy>=1.24",
+    "numpy>=1.26",
     "scipy>=1.11",
-    "pandas>=2.0",
-    # Image reduction
-    "ccdproc>=2.4",
-    "photutils>=1.9",
-    # Database
+    "pandas>=2.1",
+    "pyarrow>=14.0",
+    "numba>=0.58",
+    "lmfit>=1.2",
     "sqlalchemy>=2.0",
-    # Config & CLI
+    # Plots
+    "matplotlib>=3.8",
+    "pillow>=10.0",
+    # Config, CLI, HTTP
     "pyyaml>=6.0",
     "click>=8.1",
-    "python-dotenv>=1.0",
-    # Plotting
-    "matplotlib>=3.7",
-    "plotly>=5.17",
-    # HTTP (LCO API)
     "requests>=2.31",
-    # Calibrated photometry storage (measurements.parquet) and WCS repair from star patterns
-    "pyarrow>=14.0",
-    "astroalign>=2.5",
-    # PyTICS ensemble solver (ava.photometry.ensemble)
-    "numba>=0.58",
+    "python-dotenv>=1.0",
+    # Orchestration (Prefect 3)
+    "prefect>=3.9,<4",
 ]
 
 [project.optional-dependencies]
-web = [
-    "flask>=3.0",
-    "flask-sqlalchemy>=3.1",
-    "gunicorn>=21.0",
-]
-pipeline = [
-    "prefect>=2.14",
-]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
-    "black>=23.0",
     "ruff>=0.1",
-    "ipykernel",
-    "jupyterlab",
 ]
 
 [project.scripts]
-# Pipeline entry points
-ava-ingest   = "ava.scripts.ingest_lco_data:main"
-ava-spec     = "ava.scripts.run_spectroscopy:main"
-ava-phot     = "ava.scripts.run_photometry:main"
-ava-db       = "ava.scripts.update_database:main"
-ava-web      = "ava.scripts.serve_web:main"
-# LCO archive database CLI (replaces the standalone `lcodb` command)
-lcodb        = "ava.lcodb.cli:main"
+# LCO archive database CLI
+lcodb = "ava.lcodb.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

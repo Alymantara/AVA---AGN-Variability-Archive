@@ -98,6 +98,28 @@ def frame_meta(db: Path, data_id: str) -> dict[str, dict]:
     return {r["frame"]: {c: r[c] for c in META_COLUMNS} for r in fq.to_dict("records")}
 
 
+def listing_meta(lcodb_db: Path, data_id: str, camera_defaults: dict | None = None) -> dict[str, dict]:
+    """frame -> metadata from the LCO archive listing (lcodb photometry ``frames``), for catalogues whose image
+    is not available (legacy catalogues).  Saturation level and image size are not in the listing: they come
+    from ``camera_defaults`` (2-letter camera prefix -> {saturate, naxis1, naxis2}), else stay empty."""
+    if lcodb_db is None or not Path(lcodb_db).exists():
+        return {}
+    with closing(sqlite3.connect(f"file:{lcodb_db}?mode=ro", uri=True)) as con:
+        rows = con.execute("SELECT basename, filter, exptime, mjd_obs, day_obs, site_id, "
+                           "COALESCE(airmass, airmass_calc), l1fwhm, instrument_id FROM frames "
+                           "WHERE ava_data_id = ? AND rlevel = 91", (data_id,)).fetchall()
+    out = {}
+    for b, filt, exp, mjd, day, site, am, fwhm, inst in rows:
+        if exp is None or mjd is None or not filt:
+            continue
+        d = (camera_defaults or {}).get(str(inst or b.split("-")[1])[:2].lower()) or {}
+        out[b] = dict(filter=str(filt).replace("zs*diffuser", "zs").strip(), exptime=float(exp),
+                      mjd_mid=float(mjd) + float(exp) / 86400.0 / 2.0, day_obs=str(day or "").replace("-", ""),
+                      airmass=am, seeing_hdr=fwhm, saturate=d.get("saturate"), naxis1=d.get("naxis1"),
+                      naxis2=d.get("naxis2"), site=site or b[:3])
+    return out
+
+
 def meta_complete(m: dict | None) -> bool:
     """Everything a recalibration needs from the image is stored (time, filter, saturation, image size)."""
     return bool(m) and all(m.get(c) is not None and not (isinstance(m.get(c), float) and not np.isfinite(m[c]))

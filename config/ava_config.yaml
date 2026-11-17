@@ -321,6 +321,15 @@ photometry:
     min_standards: 5
     frame_db: null         # SQLite holding frame_qc; null = the lcodb photometry DB
     n_workers: 4
+    # Frame metadata for catalogues WITHOUT their image (legacy catalogues ported from the old pipeline):
+    # time, filter, exposure, night, site and airmass come from the LCO archive listing (lcodb photometry DB);
+    # the saturation level and image size, which the listing lacks, from these per-camera values (by 2-letter
+    # prefix).  A camera missing here gets no saturation / edge cut beyond SExtractor's own FLAGS (4 saturated,
+    # 8 truncated), which already exclude such stars.  Sinistro: BANZAI headers, Nov 2026 (SATURATE 128800-129200).
+    # MuSCAT (ep) and Spectral (fs): read SATURATE / NAXIS1 / NAXIS2 from one of their e91 images and add them.
+    camera_defaults:
+      fa: {saturate: 128000, naxis1: 4096, naxis2: 4096}
+      fl: {saturate: 128000, naxis1: 4096, naxis2: 4096}
 
   # Frame QC (flags stored in frame_qc.qc_flags; qc_pass = no flag).
   qc:

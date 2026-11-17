@@ -1,36 +1,41 @@
+# AVA pipeline environment (Linux / macOS).
+#   conda env create -f environment.yml
+#   conda activate ava
+#   pip install -e .
+#   python scripts/check_install.py
+#
+# Not in here (installed separately, see docs/linux_setup.md):
+#   * SExtractor — system package `source-extractor` (or `conda install -c conda-forge astromatic-source-extractor`);
+#   * banzai-floyds (FLOYDS reduction) — its OWN environment (PyTorch), called as an external program.
+# Versions: the minimums below; the test suite last passed (Nov 2026) with prefect 3.9.3, astropy 8.0.2,
+# numpy 2.4.6, pandas 3.1.1, scipy 1.17.1, pyarrow 26.0.1, numba 0.68.1, astroalign 2.6.2, matplotlib 3.11.2.
 name: ava
 channels:
   - conda-forge
-  - defaults
+  - nodefaults               # conda-forge only (mixing in `defaults` makes the solve very slow)
 dependencies:
   - python=3.12
   - pip
   # Astronomy
-  - astropy>=5.3
-  - astroquery>=0.4.6
-  - specutils>=1.11
-  - ccdproc>=2.4
-  - photutils>=1.9
-  # Numerics
-  - numpy>=1.24
+  - astropy>=6.0
+  - astroquery>=0.4.7          # Gaia / VizieR reference stars (initialise step)
+  - astroalign>=2.5            # WCS repair from star patterns
+  # Numerics and data
+  - numpy>=1.26
   - scipy>=1.11
-  - pandas>=2.0
-  - matplotlib>=3.7
+  - pandas>=2.1
+  - pyarrow>=14.0              # Parquet (measurements, light curves)
+  - numba>=0.58                # PyTICS ensemble solver
+  - lmfit>=1.2                 # reference-catalogue fallback model
+  - sqlalchemy>=2.0
+  # Plots and figures
+  - matplotlib>=3.8
+  - pillow>=10.0               # web assets / poster tools
   # Tools
   - pyyaml>=6.0
   - click>=8.1
-  - sqlalchemy>=2.0
   - requests>=2.31
   - python-dotenv>=1.0
-  - plotly>=5.17
-  - pyarrow>=14.0
-  - numba>=0.58          # PyTICS ensemble (ava.photometry.ensemble)
-  - astroalign>=2.5
-  - ipykernel
-  - jupyterlab
+  - pytest>=7.4
   - pip:
-    - flask>=3.0
-    - flask-sqlalchemy>=3.1
-    - gunicorn>=21.0
-    - prefect>=2.14
-    - banzai-floyds  # or install via: pip install -e /path/to/floyds/banzai-floyds
+    - prefect>=3.9,<4          # orchestration (Prefect 3; the code does not run on Prefect 2)

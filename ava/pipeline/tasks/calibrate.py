@@ -10,7 +10,8 @@ the current pipeline version (or all with ``force``):
 
 1. frame metadata from the raw frame's SCI header
    (``cfg.phot_raw(target)/YYYYMMDD/<frame>.fits.fz``), or — once the image has
-   been deleted — from the values stored in ``frame_qc`` at its first calibration;
+   been deleted — from the values stored in ``frame_qc`` at its first calibration, or for legacy
+   catalogues without an image, from the LCO archive listing (see ``raw_meta_provider``);
 2. detections matched to ``reference_stars.csv`` (``star_id``; WCS re-solved
    from star patterns when needed);
 3. zero point at the catalogue's science aperture (10.5"), AGN magnitude,
@@ -45,23 +46,35 @@ def frame_db_path() -> Path:
 
 
 def raw_meta_provider(target: str):
-    """Frame metadata: the raw image's header if the image is on disk, else the values stored in ``frame_qc``
-    when the frame was first calibrated (images are deleted after processing: ``ava.archive.cleanup``);
-    None if neither exists."""
-    from ava.photometry.process import header_meta
-    from ava.photometry.store import frame_meta, meta_complete
+    """Frame metadata, from the first source that has it:
 
-    raw, stored = cfg.phot_raw(target), None
+    1. the raw image's header, if the image is on disk;
+    2. the values stored in ``frame_qc`` when the frame was first calibrated (images are deleted after
+       processing: ``ava.archive.cleanup``);
+    3. the LCO archive listing in the lcodb photometry DB + ``photometry.calibration.camera_defaults``
+       (legacy catalogues ported without their images: ``tools/port_legacy.py``).
+
+    None if no source has the frame."""
+    from ava.lcodb.config import load_config
+    from ava.photometry.process import header_meta
+    from ava.photometry.store import frame_meta, listing_meta, meta_complete
+
+    raw, stored, listed = cfg.phot_raw(target), None, None
 
     def meta(frame: str):
-        nonlocal stored
+        nonlocal stored, listed
         p = raw / frame.split("-")[2] / f"{frame}.fits.fz"
         if p.exists() and p.stat().st_size > 0:
             return header_meta(p)
         if stored is None:
             stored = frame_meta(frame_db_path(), target)
         m = stored.get(frame)
-        return m if meta_complete(m) else None
+        if meta_complete(m):
+            return m
+        if listed is None:
+            defaults = dict(cfg._raw.get("photometry", {}).get("calibration", {}).get("camera_defaults") or {})
+            listed = listing_meta(load_config(cfg.lcodb_config_path).db_path("photometry"), target, defaults)
+        return listed.get(frame)
     return meta
 
 

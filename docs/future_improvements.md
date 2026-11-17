@@ -318,3 +318,14 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   through `ava.lcodb.query`.
 - New targets of 16 Nov 2026 (ids 72–81) are linked in both lcodb databases (sync of 16 Nov), but nothing
   is downloaded, catalogued or calibrated yet, and they are not in `data/test_archive/ava.db`.
+
+## Linux set-up and legacy port (16 Nov 2026; `docs/linux_setup.md`)
+
+- `scripts/check_install.py` (machine check incl. a SExtractor test run), `tools/port_legacy.py` (old catalogues +
+  raw FLOYDS -> new layout, placed by frame name via lcodb), `tools/backfill_status.py` (what is left; aperture
+  survey).  `environment.yml` / `pyproject.toml` fixed (Prefect 3; build backend was invalid).
+- Legacy catalogues have no images: calibration metadata from the archive listing + `camera_defaults`.
+  **To do:** MuSCAT / Spectral `camera_defaults` from a real header; listing time is ~12 s later than MJD-OBS.
+- Aperture choice verified per catalogue (APERDIAM, else count 10 / 12-16); other counts -> frame_qc
+  `error:ValueError` (visible in `backfill_status.py --apertures`).
+

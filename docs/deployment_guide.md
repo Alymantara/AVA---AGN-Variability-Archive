@@ -114,14 +114,13 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
 | PyYAML | 6.0.3 | click | 8.5.1 |
 | SQLAlchemy | 2.1.8 | | |
 
-- **TO FIX before deployment:**
-  - `pyproject.toml` says `prefect>=2.14`; the code needs **Prefect 3** (tested 3.9.3).
-  - `environment.yml` lists `banzai-floyds` in the AVA environment; it must be in its own environment
-    (section 4.3) and should be removed there.
-  - `flask` / `gunicorn` (the `web` extra) and the `ava-ingest`/`ava-spec`/`ava-phot`/`ava-db`/`ava-web`
-    entry points are left over from an earlier design; the website is PHP. Remove, or ignore.
-  - Generate a lock file (`conda-lock` or `pip freeze`) from the production environment once it passes
-    the tests.
+- `environment.yml` / `pyproject.toml` (fixed 16 Nov 2026): Prefect 3, conda-forge only, the packages the
+  code imports (incl. `lmfit`, `pillow`), banzai-floyds and the unused Flask/web extra removed, and a valid
+  build backend (`pip install -e .` failed before). Generate a lock file (`conda env export`) from the
+  production environment once it passes `scripts/check_install.py --tests`.
+- **`scripts/check_install.py`** checks a machine: package versions, config paths, LCO token, databases,
+  the SExtractor binary and a SExtractor test run with the AVA configuration, banzai-floyds, and (`--tests`)
+  the offline test suite.
 - Matplotlib uses the non-interactive `Agg` backend (set by the code); no display is needed.
 - Tests: `PYTHONPATH=. pytest -q` (all offline; no archive access).
 
@@ -340,19 +339,28 @@ deletes. A file is deleted only when all its checks pass:
 
 # 9. First-time setup and backfill
 
-1. Create the service user, the data volume and the folders; install section 4.
-2. Copy `ava.db`, the lcodb databases and `data/reference/` from the development machine (or rebuild the
-   lcodb databases with `python -m ava.lcodb sync --full`, which takes many hours).
-3. Edit the configuration (section 5.1), install the LCO token, run the tests.
-4. Run `python -m ava.lcodb daily` once by hand and check the log (section 7.1).
-5. **Backfill** (one-off; weeks): per target, `scripts/download.py` in batches sized to the scratch
-   volume, then `run_pipeline.py -e -c` (and the MuSCAT re-extraction), then `scripts/cleanup.py --live`
-   frees the space for the next batch. At the
-   archive rate limit (1 file/s) 498k frames take ≥ 6 days of requests alone; the 18.9 TB transfer takes
-   ≥ 2 days at 1 Gbit/s. Calibration needs ~26 CPU-hours; SExtractor time per frame — **CHECK**. Mrk 817
-   already has 22k catalogues (`~/astro/agn/Mrk_817/sextractor_ava`) that can be copied instead.
-   Spectra: `-D -R -P` over all nights.
-6. Then `-t` (PyTICS full fit), `-p`, `-w`, and switch the cron jobs on.
+Step-by-step commands (for a Linux machine already running the old pipeline): **`docs/linux_setup.md`**.
+In short:
+
+1. conda environment, configuration outside the repository (`AVA_CONFIG`, `LCODB_CONFIG`), LCO token,
+   `scripts/check_install.py --tests`;
+2. copy `ava.db` and the lcodb databases from the development machine (`sqlite3 .backup`, then `scp`; they
+   are not in git: 440 + 250 MB, above GitHub's file limit), then `lcodb daily`;
+3. `run_pipeline.py -o -O` — folders and Gaia reference stars for every `lco_active` target;
+4. **`tools/port_legacy.py`** — copies the old pipeline's SExtractor catalogues and raw FLOYDS frames into
+   the new layout, placing each file by its frame name through the lcodb databases (old folder names differ
+   from the new `data_id`s); dry run by default;
+5. **`tools/backfill_status.py`** — per target: frames still to download / extract / calibrate, spectra to
+   download / reduce, and (`--apertures N`) the aperture series of the catalogues;
+6. `run_pipeline.py -c` on the ported catalogues: they have no images, so frame metadata comes from the
+   archive listing (lcodb) plus `photometry.calibration.camera_defaults` (saturation level, image size; the
+   listing time is ~12 s later than the header `MJD-OBS`, negligible);
+7. backfill the rest in batches (`scripts/download.py ... --live`, then `-e -c`), spectra with `-D`
+   (`select: oldest`), then `-t -p -R -P -w`, and only then the daily jobs and the clean-up.
+
+Download volume: 498k photometry frames × 38 MB ≈ 18.9 TB if nothing were ported; the legacy catalogues
+(80–90 % of the photometry) cut this to the remaining 10–20 %. The archive rate limit is shared with the old
+pipeline while both run: schedule the backfill away from its downloads.
 
 # 10. Backups and monitoring
 
@@ -370,7 +378,7 @@ deletes. A file is deleted only when all its checks pass:
 |---|---|
 | Switch `cleanup.mode` to `live` once the first production runs are checked | 7.4 |
 | MuSCAT re-extraction during the backfill (before images are deleted) | 7.4, 9 |
-| Fix `pyproject.toml` / `environment.yml` (Prefect 3, banzai-floyds environment, unused web extra) | 4.2 |
+| `camera_defaults` for MuSCAT (ep) and Spectral (fs): SATURATE / NAXIS from one of their images | 9 |
 | Remove `/Users/juan/...` paths from the config | 4.3, 5.1 |
 | Backup job | 10 |
 | Measure SExtractor time, banzai-floyds memory, and daily run time on the VM | 3.2, 7.3 |
