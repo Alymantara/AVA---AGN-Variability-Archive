@@ -15,9 +15,8 @@ $recent = array_slice($recent, 0, 12);
 ava_page_start('live', 'Live Updates', 'LCO Key Project time usage per semester and the latest AVA observations.');
 ?>
 <div class="container-xxl ava-page-head">
-  <p class="ava-eyebrow">Live updates · semester <?= h($current) ?></p>
   <h1>Live updates</h1>
-  <p class="ava-lead">Usage of the allocated 1-m and 2-m time per semester (dotted black line: total time / days in
+  <p class="ava-intro">Semester <?= h($current) ?>: usage of the allocated 1-m and 2-m time per semester (dotted black line: total time / days in
     semester) against the time used on the 1-m (green), 2-m FLOYDS (red) and 2-m MuSCAT3 (purple). Numbers come from
     the LCO API and are refreshed every 6 hours. For daily allocations see the
     <a href="https://schedule.lco.global/">LCO daily schedule</a>.</p>
@@ -62,8 +61,10 @@ ava_page_start('live', 'Live Updates', 'LCO Key Project time usage per semester 
     <?php endforeach; ?>
   </div>
 
-  <h2 class="ava-h mt-5">Latest observations</h2>
-  <div class="ava-table-wrap" style="max-height:none">
+  <details class="ava-collapse mt-5">
+    <summary><h2 class="ava-h m-0">Latest observations</h2>
+      <span class="ava-collapse__hint"><?= count($recent) ?> most recently observed AGN</span></summary>
+  <div class="ava-table-wrap mt-3" style="max-height:none">
     <table class="table table-hover ava-table">
       <thead><tr><th>AGN</th><th>Last image</th><th class="num">Frames</th><th class="num">Cadence (d)</th><th>Last spectrum</th><th class="num">Spectral epochs</th></tr></thead>
       <tbody>
@@ -80,6 +81,7 @@ ava_page_start('live', 'Live Updates', 'LCO Key Project time usage per semester 
       </tbody>
     </table>
   </div>
+  </details>
   <p class="small text-secondary mt-2">From the archive database snapshot of <?= gmdate('Y-m-d H:i', (int) filemtime(AVA_DB_PATH)) ?> UTC.</p>
 </div>
 

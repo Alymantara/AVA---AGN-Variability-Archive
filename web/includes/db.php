@@ -30,6 +30,19 @@ function ava_db(): PDO
     return $pdo;
 }
 
+/**
+ * SQL condition selecting the AVA AGN targets shown and counted on the site (aliases: a = agn,
+ * l = agn_lco): not in AVA_EXCLUDED, not a non-AGN type, and with LCO frames or FLOYDS spectra.
+ * Values come from fixed config lists and are quoted.
+ */
+function ava_target_filter_sql(): string
+{
+    $q = fn(array $v) => implode(', ', array_map(fn($d) => ava_db()->quote($d), $v ?: ['']));
+    return "COALESCE(a.data_id, '') NOT IN (" . $q(AVA_EXCLUDED) . ")"
+        . " AND COALESCE(a.AGN_type, '') NOT IN (" . $q(AVA_NON_AGN_TYPES) . ")"
+        . " AND (COALESCE(l.db_lco_images, 0) > 0 OR COALESCE(l.db_floyds_epochs, 0) > 0)";
+}
+
 /** Headline numbers for the stats strip. */
 function ava_stats(): array
 {
@@ -38,7 +51,7 @@ function ava_stats(): array
         return $s;
     }
     $db = ava_db();
-    $agn = (int) $db->query('SELECT COUNT(*) FROM agn')->fetchColumn();
+    $agn = (int) $db->query('SELECT COUNT(*) FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id WHERE ' . ava_target_filter_sql())->fetchColumn();
     $row = $db->query('SELECT SUM(db_lco_images) AS images, SUM(db_floyds_epochs) AS spectra,
                               MIN(db_lco_start) AS first FROM agn_lco')->fetch();
     $first = $db->query('SELECT MIN(d) FROM (SELECT MIN(lco_start) AS d FROM agn
@@ -62,6 +75,7 @@ function ava_targets(): array
 {
     $sql = 'SELECT ' . AVA_TARGET_COLUMNS . '
             FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id
+            WHERE ' . ava_target_filter_sql() . '
             ORDER BY a.name COLLATE NOCASE';
     return ava_db()->query($sql)->fetchAll();
 }
@@ -69,7 +83,7 @@ function ava_targets(): array
 function ava_target(int $id): ?array
 {
     $st = ava_db()->prepare('SELECT ' . AVA_TARGET_COLUMNS . '
-            FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id WHERE a.id = ?');
+            FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id WHERE a.id = ? AND ' . ava_target_filter_sql());
     $st->execute([$id]);
     return $st->fetch() ?: null;
 }
@@ -91,12 +105,15 @@ function ava_proposals(): array
     return $ids;
 }
 
-/** Observing status from agn.lco_active. */
+/** Observing status from agn.ava (2 = LCO data in the last 30 days, kept current by ava.database.activity). */
 function ava_status(array $t): array
 {
-    return ((int) ($t['lco_active'] ?? 0) === 1)
-        ? ['key' => 'active', 'label' => 'Active']
-        : ['key' => 'archive', 'label' => 'Archive'];
+    return match ((int) ($t['ava'] ?? -1)) {
+        2 => ['key' => 'active', 'label' => 'Active'],
+        1 => ['key' => 'archived', 'label' => 'Archived'],
+        0 => ['key' => 'pending', 'label' => 'To be processed'],
+        default => ['key' => 'tba', 'label' => 'tba'],
+    };
 }
 
 /** Processing state from the legacy agn.ava flag. */
@@ -207,4 +224,60 @@ function ava_band_variability(string $dataId): array
         $out[$r['filter']] = $r;
     }
     return $out;
+}
+
+/** Derived properties (ava.database.derived → agn_derived): k_bol, L_bol, Eddington ratio, disc lags. */
+function ava_derived(string $dataId): ?array
+{
+    if (!ava_has_table('agn_derived')) {
+        return null;
+    }
+    $st = ava_db()->prepare('SELECT * FROM agn_derived WHERE data_id = ?');
+    $st->execute([$dataId]);
+    return $st->fetch() ?: null;
+}
+
+/** Literature properties (ava.database.literature → agn_literature): Hβ lag, mass error, type, with citations. */
+function ava_literature(string $dataId): ?array
+{
+    if (!ava_has_table('agn_literature')) {
+        return null;
+    }
+    $st = ava_db()->prepare('SELECT * FROM agn_literature WHERE data_id = ?');
+    $st->execute([$dataId]);
+    return $st->fetch() ?: null;
+}
+
+/** log L_bol for a target: agn_derived (k_bol × L5100, follows the curated mass/L5100), else the curated agn.logl. */
+function ava_log_lbol(array $t, ?array $derived): ?float
+{
+    $l = $derived['log_lbol'] ?? null;
+    if (!is_numeric($l)) {
+        $l = $t['logl'] ?? null;
+    }
+    return is_numeric($l) && (float) $l > 38 ? (float) $l : null;
+}
+
+/** data_id => agn_derived row, for every AGN (empty if the table is not published yet). */
+function ava_derived_all(): array
+{
+    if (!ava_has_table('agn_derived')) {
+        return [];
+    }
+    $out = [];
+    foreach (ava_db()->query('SELECT * FROM agn_derived') as $r) {
+        $out[$r['data_id']] = $r;
+    }
+    return $out;
+}
+
+
+/** Legacy percentage text ("10.215%", "0.0") as "10.2%"; "—" when missing or zero. */
+function fmt_pct($v): string
+{
+    $x = is_string($v) ? rtrim(trim($v), '%') : $v;
+    if (!is_numeric($x) || (float) $x == 0.0) {
+        return '—';
+    }
+    return number_format((float) $x, 1) . '%';
 }

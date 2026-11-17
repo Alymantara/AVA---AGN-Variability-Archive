@@ -55,5 +55,6 @@ Point `paths.floyds_pipeline` in `ava_config.yaml` to your banzai-floyds folder.
 
 ## Database
 
-SQLite by default (`data/ava.db`). Currently tracks 71 AGNs with
-LCO photometry and FLOYDS spectroscopy statistics.
+SQLite by default (`data/ava.db`). Its `agn` catalogue has 71 entries, of which 65 are
+AVA AGN targets with LCO photometry and/or FLOYDS spectroscopy (the ones the website shows
+and counts; see `AVA_EXCLUDED` / `AVA_NON_AGN_TYPES` in `web/includes/config.php`).

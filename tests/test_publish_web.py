@@ -109,3 +109,90 @@ def test_usage_plots(tmp_path, src):
     _png(usage / "notes.png")
     s = publish(dest=tmp_path / "out", usage_src=usage, **kw)
     assert s.usage_copied == 1 and (tmp_path / "out" / "usage" / "lco_usage_2026B.png").exists()
+
+
+def test_manuals(tmp_path, src):
+    kw, _ = src
+    m = tmp_path / "docs" / "photometry_manual.pdf"
+    m.parent.mkdir()
+    m.write_bytes(b"%PDF-1.5")
+    notpdf = tmp_path / "docs" / "notes.tex"
+    notpdf.write_text("x")
+    dest = tmp_path / "out"
+    s = publish(dest=dest, manuals=[m, notpdf, tmp_path / "docs" / "missing.pdf"], **kw)
+    assert s.manuals_copied == 1 and (dest / "manuals" / "photometry_manual.pdf").read_bytes() == b"%PDF-1.5"
+    assert publish(dest=dest, manuals=[m], **kw).manuals_copied == 0
+
+
+def test_filters(tmp_path, src):
+    import json
+    import zipfile
+
+    import numpy as np
+
+    kw, _ = src
+    fdir = tmp_path / "lco_filters"
+    fdir.mkdir()
+    w = np.arange(4000.0, 6001.0, 2.0)
+    np.savetxt(fdir / "lco_g.txt", np.c_[w, np.where((w > 4500) & (w < 5500), 0.8, 0.0)])
+    dest = tmp_path / "out"
+    s = publish(dest=dest, filters_src=fdir, **kw)
+    assert s.filters_copied == 1
+    g = json.loads((dest / "filters" / "filters.json").read_text())["filters"]["g"]
+    assert g["file"] == "lco_g.txt" and g["peak"] == 0.8
+    assert g["fwhm_A"] == pytest.approx(996, abs=4) and 4990 < g["pivot_A"] < 5010
+    assert "README.txt" in " ".join(zipfile.ZipFile(dest / "filters" / "ava_lco_filters.zip").namelist())
+    assert "filter_dict" in (dest / ".htaccess").read_text()          # curves themselves stay downloadable
+    assert publish(dest=dest, filters_src=fdir, **kw).filters_copied == 0
+
+
+def test_publish_download_copy_and_zip(tmp_path):
+    import os
+    import zipfile
+
+    from ava.web.publish import PublishSummary, publish_download
+
+    src = tmp_path / "src"
+    src.mkdir()
+    a, b = src / "a_blue.dat", src / "a.hjd"
+    a.write_text("1 2 3\n")
+    b.write_text("a_blue.dat 60000.1\n")
+    csv = src / "T_LCO_merged_lightcurve.csv"
+    csv.write_text("MJD,flux\n")
+    out = tmp_path / "web" / "downloads" / "T"
+    s = PublishSummary(dest=tmp_path)
+    assert publish_download([csv], out / csv.name, False, s)
+    assert (out / csv.name).read_text() == "MJD,flux\n"
+    z = out / "T_FLOYDS_prepspec.zip"
+    assert publish_download([a, b, src / "missing.dat"], z, False, s)
+    assert sorted(zipfile.ZipFile(z).namelist()) == ["T_FLOYDS_prepspec/a.hjd", "T_FLOYDS_prepspec/a_blue.dat"]
+    assert not publish_download([a, b], z, False, s)          # unchanged: zip kept
+    os.utime(a, (z.stat().st_mtime + 10,) * 2)
+    assert publish_download([a, b], z, False, s)              # newer member: rebuilt
+    assert not publish_download([], out / "T_FLOYDS_1d.zip", False, s)
+    assert not (out / "T_FLOYDS_1d.zip").exists()
+
+
+def test_downloads_switch(tmp_path):
+    import json
+
+    from ava.web.publish import publish
+
+    db = tmp_path / "ava.db"
+    _db(db, ["Mrk_817", "NGC_4151"])
+    plots = tmp_path / "plots"
+    lc = tmp_path / "src" / "Mrk_817_LCO_merged_lightcurve.csv"
+    lc.parent.mkdir()
+    lc.write_text("MJD,flux\n")
+    dl = lambda t: {f"{t}_LCO_merged_lightcurve.csv": [lc] if t == "Mrk_817" else []}  # noqa: E731
+    fd = tmp_path / "filter_dict.txt"
+    fd.write_text("u 3500\n")
+    dest = tmp_path / "web"
+    kw = dict(db=db, filter_dict=fd, dest=dest, plots_dir_for=lambda t: plots / t, downloads_for=dl)
+    publish(**kw, downloads=True)
+    assert json.loads((dest / "site.json").read_text()) == {"downloads": True}
+    assert (dest / "downloads" / "Mrk_817" / lc.name).exists()
+    assert not (dest / "downloads" / ".htaccess").exists()
+    publish(**kw, downloads=False)
+    assert json.loads((dest / "site.json").read_text()) == {"downloads": False}
+    assert "Require all denied" in (dest / "downloads" / ".htaccess").read_text()

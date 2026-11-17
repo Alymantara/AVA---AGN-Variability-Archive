@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/includes/layout.php';
 
 $targets = ava_targets();
+$derivedAll = ava_derived_all();
 $nActive = count(array_filter($targets, fn($t) => ava_status($t)['key'] === 'active'));
 $view = ($_GET['view'] ?? '') === 'classic' ? 'classic' : (($_GET['view'] ?? '') === 'modern' ? 'modern' : '');
 
@@ -34,7 +35,6 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
 </script>
 
 <div class="container-xxl ava-page-head pb-3">
-  <p class="ava-eyebrow">The sample</p>
   <h1>Targets</h1>
   <p class="ava-lead mb-0"><?= count($targets) ?> active galactic nuclei, <?= $nActive ?> of them actively monitored.
     Select a target for its data summary, light curves and diagnostics.</p>
@@ -55,8 +55,10 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
       <label class="btn btn-sm" for="st-all">All</label>
       <input type="radio" class="btn-check" name="status" id="st-active" value="active">
       <label class="btn btn-sm" for="st-active">Active</label>
-      <input type="radio" class="btn-check" name="status" id="st-archive" value="archive">
-      <label class="btn btn-sm" for="st-archive">Archive</label>
+      <input type="radio" class="btn-check" name="status" id="st-archived" value="archived">
+      <label class="btn btn-sm" for="st-archived">Archived</label>
+      <input type="radio" class="btn-check" name="status" id="st-pending" value="pending">
+      <label class="btn btn-sm" for="st-pending">To be processed</label>
     </div>
     <span class="ava-view-modern">
       <label class="visually-hidden" for="sort">Sort cards by</label>
@@ -112,9 +114,9 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
               <td><?= h($t['ra']) ?></td>
               <td><?= h($t['dec']) ?></td>
               <td class="num"><?= fmt_num($t['Vmag'], 2) ?></td>
-              <td class="num"><?= fmt_num($t['logl'], 2) ?></td>
+              <td class="num"><?= fmt_num(ava_log_lbol($t, $derivedAll[$t['data_id']] ?? null), 2) ?></td>
               <td class="num"><?= fmt_num($t['logm'], 2) ?></td>
-              <td class="num"><?= h((string) $t['redshift']) ?></td>
+              <td class="num"><?= fmt_num($t['redshift'], 4) ?></td>
               <td class="filters"><?php foreach (array_keys(ava_target_filters($t)) as $f): ?><span style="color: var(<?= ava_filter_var($f) ?>)"><?= h($f) ?></span><?php endforeach; ?></td>
               <td class="num"><?= $pcad > 0 ? number_format($pcad, 2) : '—' ?></td>
               <td class="num"><?= $scad > 0 ? number_format($scad, 1) : '—' ?></td>

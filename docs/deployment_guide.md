@@ -234,6 +234,9 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 4. `match` — for each science spectrum, its **flux standard star** and its arc and lamp flat;
 5. `link` — LCO object names → AVA targets, and the "observing" flag (`agn.ava = 2`, data in the last 30
    days).
+6. `stats` — the per-AGN LCO statistics in the AVA database (`agn_lco`: frames, visits, cadence, date spans,
+   FLOYDS epochs) recomputed from the linked frames by `tools/ava_crossmatch.py`, after a backup to
+   `data/backups/`. These are the frame and spectra counts shown on the website (after the next publish).
 
 Run time today: ~11 minutes. Log: `<db_dir>/daily.log`.
 

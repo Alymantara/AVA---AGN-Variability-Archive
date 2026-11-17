@@ -1,0 +1,46 @@
+"""Offline tests for ava.database.activity (observing flag agn.ava)."""
+
+import sqlite3
+from contextlib import closing
+from datetime import date
+
+from ava.database.activity import last_frames, new_flag, update_observing
+
+TODAY = date(2026, 11, 16)          # cutoff (30 d) = 2026-10-17
+
+
+def test_new_flag_rules():
+    cut = "2026-10-17"
+    assert new_flag(1, "2026-11-10", cut) == 2      # archived, observed again
+    assert new_flag(0, "2026-10-17", cut) == 2      # inclusive cutoff
+    assert new_flag(2, "2026-09-20", cut) == 0      # stopped: to be processed
+    assert new_flag(1, "2025-01-01", cut) == 1      # archived stays archived
+    assert new_flag(None, None, cut) is None        # no frames: untouched
+
+
+def _frames(path, rows):
+    with closing(sqlite3.connect(path)) as c:
+        c.execute("CREATE TABLE frames (ava_id INTEGER, obstype TEXT, day_obs TEXT)")
+        c.executemany("INSERT INTO frames VALUES (?,?,?)", rows)
+        c.commit()
+
+
+def test_last_frames_science_only(tmp_path):
+    ph, sp = tmp_path / "p.sqlite", tmp_path / "s.sqlite"
+    _frames(ph, [(1, "EXPOSE", "2026-09-01"), (1, "BIAS", "2026-11-15"), (None, "EXPOSE", "2026-11-15")])
+    _frames(sp, [(1, "SPECTRUM", "2026-11-01"), (2, "ARC", "2026-11-15"), (3, "SPECTRUM", "2026-08-01")])
+    assert last_frames([("photometry", ph), ("spectra", sp), ("spectra", None)]) == {1: "2026-11-01", 3: "2026-08-01"}
+
+
+def test_update_observing(tmp_path):
+    db = tmp_path / "ava.db"
+    with closing(sqlite3.connect(db)) as c:
+        c.execute("CREATE TABLE agn (id INTEGER PRIMARY KEY, data_id TEXT, ava INTEGER)")
+        c.executemany("INSERT INTO agn VALUES (?,?,?)", [(1, "A", 1), (2, "B", 2), (3, "C", None), (4, "D", 2)])
+        c.commit()
+    last = {1: "2026-11-14", 2: "2026-09-01", 4: "2026-11-01"}
+    assert update_observing(db, last, today=TODAY, dry_run=True) == [("A", 1, 2, "2026-11-14"), ("B", 2, 0, "2026-09-01")]
+    update_observing(db, last, today=TODAY)
+    assert update_observing(db, last, today=TODAY) == []                     # idempotent
+    with closing(sqlite3.connect(db)) as c:
+        assert dict(c.execute("SELECT data_id, ava FROM agn")) == {"A": 2, "B": 0, "C": None, "D": 2}

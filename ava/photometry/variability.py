@@ -84,3 +84,31 @@ def record_band_variability(db: Path, data_id: str, bv: pd.DataFrame, error_mode
                         (*sets.values(), data_id))
         con.commit()
     return {r.filter: r.fvar for r in bv.itertuples(index=False)}
+
+
+def update_from_merged(db: Path, phot_dir, error: str = "total", min_epochs: int = 10,
+                       error_model: str = "pytics", dry_run: bool = False) -> dict[str, dict]:
+    """F_var of every AGN in ``db`` that has a merged light curve
+    (``phot_dir(data_id)/<data_id>_LCO_merged_lightcurve.csv``) → ``photometry_variability`` +
+    ``agn.frac_<band>``.  Keeps the main database in step with the merged light curves whichever
+    database the ensemble step wrote to.  Returns ``{data_id: {band: fvar}}``."""
+    with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=60)) as con:
+        ids = [r[0] for r in con.execute("SELECT data_id FROM agn WHERE data_id IS NOT NULL")]
+    out = {}
+    for t in ids:
+        csv = Path(phot_dir(t)) / f"{t}_LCO_merged_lightcurve.csv"
+        if not csv.is_file():
+            continue
+        bv = band_variability(pd.read_csv(csv), error=error, min_epochs=min_epochs)
+        if bv.empty:
+            continue
+        out[t] = (dict(zip(bv["filter"], bv["fvar"])) if dry_run
+                  else record_band_variability(db, t, bv, f"{error_model}/{error}"))
+    return out
+
+
+def update_from_config(cfg, dry_run: bool = False) -> dict[str, dict]:
+    """Pipeline entry point (publish step): settings ``ensemble.fvar_error``, ``ensemble.fvar_min_epochs``."""
+    ec = cfg._raw.get("ensemble", {}) or {}
+    return update_from_merged(cfg.db_path, cfg.phot_dir, str(ec.get("fvar_error", "total")),
+                              int(ec.get("fvar_min_epochs", 10)), str(ec.get("error_model", "pytics")), dry_run)

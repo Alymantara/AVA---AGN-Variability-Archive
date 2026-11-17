@@ -77,7 +77,7 @@ Code defaults are only fallbacks that equal the documented config values.
 
 ## Must be set per host (values, not code)
 
-- **`paths` in `ava_config.yaml`:** `spectra_root`, `photometry_root`, `swift_db` and `template_dir` (`/data2`, `/data3`).
+- **`paths` in `ava_config.yaml`:** set `archive_root` to where the archive's data lives; `photometry_root`, `spectra_root`, `swift_db` and `template_dir` are relative to it (the old `/data2`, `/data3` paths are gone). The website's copy is `web.data_dir`, which can live elsewhere.
 - **`floyds_pipeline` and `spectroscopy.reduction`:** `python`, `package` and `skyflats_dir` (currently `~/astro/floyds`).
 - **Token:** `lco.token_file` (`~/.lco_token`), or the `LCO_API_TOKEN` environment variable.
 - **`db_dir` in `lcodb_config.yaml`:** `../data/lcodb`.
