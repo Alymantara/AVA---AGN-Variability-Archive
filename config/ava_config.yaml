@@ -666,7 +666,10 @@ lco_usage:
   # included), which replaces the estimate from the first snapshot on. Allocations then come from the snapshots.
   snapshots:
     mode: "dry_run"        # dry_run: only log what would be requested | live (or scripts/lco_usage.py --live-snapshot)
-    file: "data/lco_usage/snapshots.csv"   # append-only log: utc, mjd, proposal, semester, instrument, alloc, used
+    # Append-only log: utc, mjd, proposal, semester, instrument, alloc, used. The repository's copy is only the seed
+    # (report totals of 14 Nov 2026). PRODUCTION: point this at the data volume (e.g. /srv/ava/lco_usage/snapshots.csv),
+    # outside the checkout, so git pull never touches it; the first live snapshot copies the seed there.
+    file: "data/lco_usage/snapshots.csv"
     prefix: "KEY"          # proposals kept (key projects and their f fillers)
   # In the first finalise_days of a new semester the previous one is redrawn too (its last charges), then left.
   finalise_days: 7

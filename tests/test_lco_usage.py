@@ -379,11 +379,38 @@ def test_take_snapshot_live_mocked(tmp_path, monkeypatch):
             return _portal(10.0, 2.0)
 
     monkeypatch.setattr(api, "Client", FakeClient)
+    monkeypatch.setattr(U, "SNAPSHOT_SEED", tmp_path / "no_seed.csv")
     cfg = _cfg(tmp_path, snapshots={"file": str(tmp_path / "snap.csv")})
     cfg.lco_token = "t0ken"
     assert U.take_snapshot(cfg, live=False, log=lambda *_: None) == 0 and not (tmp_path / "snap.csv").exists()
     assert U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 6), log=lambda *_: None) == 2
     assert U.read_snapshots(tmp_path / "snap.csv")["utc"].tolist() == ["2026-11-17T06:00:00Z"] * 2
+
+
+def test_live_snapshot_seeds_log_outside_checkout(tmp_path, monkeypatch):
+    """Production keeps the log off the checkout; the first live snapshot starts it from the seed in git."""
+    import ava.lcodb.api as api
+
+    class FakeClient:
+        def __init__(self, token, **kw):
+            pass
+
+        def proposals(self):
+            return _portal(10.0, 2.0)
+
+    seed = tmp_path / "repo" / "snapshots.csv"
+    U.append_snapshot(seed, U.parse_proposals(_portal(5.0, 1.0)), _dt(2026, 11, 14, 22))
+    monkeypatch.setattr(api, "Client", FakeClient)
+    monkeypatch.setattr(U, "SNAPSHOT_SEED", seed)
+    live = tmp_path / "volume" / "lco_usage" / "snapshots.csv"
+    cfg = _cfg(tmp_path, snapshots={"file": str(live)})
+    cfg.lco_token = "t0ken"
+    U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 6), log=lambda *_: None)
+    U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 12), log=lambda *_: None)
+    assert U.read_snapshots(live)["utc"].unique().tolist() == [
+        "2026-11-14T22:00:00Z", "2026-11-17T06:00:00Z", "2026-11-17T12:00:00Z"]
+    assert U.read_snapshots(seed)["utc"].nunique() == 1                             # the seed is never written
+    assert not U.seed_snapshots(seed, seed=seed)                                    # log == seed: nothing to do
 
 
 def test_append_snapshot_keeps_log_small(tmp_path):

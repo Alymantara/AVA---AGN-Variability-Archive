@@ -71,7 +71,7 @@ data/lco_usage/*
 !data/lco_usage/README.md
 !data/lco_usage/allocations.json
 !data/lco_usage/dummy/
-# snapshot log of LCO's charged totals: appended by the production job, pushed back daily (scripts/push_lco_snapshots.sh)
+# seed of the snapshot log of LCO's charged totals (production keeps its live log on the data volume, not in git)
 !data/lco_usage/snapshots.csv
 
 # Poster (large, separate deliverable)

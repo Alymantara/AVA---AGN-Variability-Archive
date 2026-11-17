@@ -81,7 +81,29 @@ Code defaults are only fallbacks that equal the documented config values.
 - **`floyds_pipeline` and `spectroscopy.reduction`:** `python`, `package` and `skyflats_dir` (currently `~/astro/floyds`).
 - **Token:** `lco.token_file` (`~/.lco_token`), or the `LCO_API_TOKEN` environment variable.
 - **`db_dir` in `lcodb_config.yaml`:** `../data/lcodb`.
-- **Prefect:** a work pool or `--serve`, plus the cron for `scripts/lcodb_daily.sh` (09:30 UTC, before the pipeline at 10:30).
+- **Prefect:** a work pool or `--serve` for the processing steps.
+- **Crontab** (all UTC; full lines in `deployment_guide.md` §7):
+
+  | When | Job | Command |
+  |---|---|---|
+  | 01:00 daily | 1. update the archive tables | `scripts/lcodb_daily.sh` |
+  | 02:00 daily | 2. download, then 3. process and publish | Prefect steps `-d -D`, then the processing steps |
+  | 05:00 daily | 4. delete finished raw frames | `scripts/cleanup.py --live` |
+  | every 6 h (`0 */6 * * *`) | 6. LCO time-usage plots | `scripts/lco_usage.py --live-snapshot` |
+
+- **LCO usage job (6), production VM only:**
+  - Only the VM's cron line passes `--live-snapshot`; `lco_usage.snapshots.mode` stays `dry_run` in the
+    repository's config, so other machines never append to `data/lco_usage/snapshots.csv`.
+  - Set `lco_usage.snapshots.file` to a path on the data volume, outside the checkout (e.g.
+    `/srv/ava/lco_usage/snapshots.csv`). The repository's `data/lco_usage/snapshots.csv` is only the seed:
+    the first live run copies it there. After that the VM appends to its own copy every 6 hours, `git pull`
+    never touches it, and nothing is pushed back to GitHub. The VM's copy is the one to back up.
+  - `web.data_dir` must be writable by the service user: plots go to `<web.data_dir>/usage/`
+    (`lco_usage.publish: true`).
+  - Log file: `/srv/ava/logs/lco_usage.log` (or the host's log folder).
+  - After installing, run `python scripts/lco_usage.py --all` once to draw every past semester.
+  - When the real per-proposal daily files arrive: set `lco_usage.input_dir` to `data/lco_usage/proposals`
+    and `estimate_from_lcodb: false`.
 
 ## Still hard-coded (left for a decision; none blocks a deployment)
 

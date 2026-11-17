@@ -1,0 +1,254 @@
+<title>AVA Pipeline Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one wide engineering drawing (scrolls sideways when narrow), a floating detail card, then reference tables. */
+:root {
+  --bg: #FFFFFF; --fg: #1B2230; --sub: #4A5568; --arrow: #3A4352; --line: #D9DEE6; --accent: #1F7A6B;
+  --public: #2F7A2A; --private: #B23B3B; --card: #FFFFFF; --shadow: 0 10px 30px rgba(20,30,50,.16);
+  --r_ext-fill: #F7F8FA; --r_ext-stroke: #9AA3B2; --r_vm-fill: #FAFBFC; --r_vm-stroke: #2B3442;
+  --r_web-fill: #F5FAF4; --r_web-stroke: #3C7A34;
+  --ext-fill: #EEF1F6; --ext-stroke: #5B6B82; --job-fill: #E2F1EE; --job-stroke: #1F7A6B;
+  --step-fill: #FFFFFF; --step-stroke: #1F7A6B; --ondemand-fill: #FBF0DC; --ondemand-stroke: #A4680F;
+  --db-fill: #ECE7F7; --db-stroke: #5A4A9A; --file-fill: #F5F3F9; --file-stroke: #7C719E;
+  --temp-fill: #FFFFFF; --temp-stroke: #7C719E; --tobuild-fill: #FFFFFF; --tobuild-stroke: #B23B3B;
+  --web-fill: #E5F1E2; --web-stroke: #3C7A34; --git-fill: #EEEEEE; --git-stroke: #3F4652;
+  --mac-fill: #F1F1F1; --mac-stroke: #3F4652; --legacy-fill: #F6F6F6; --legacy-stroke: #8A8F99;
+  --sel: #E0A100;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161D; --fg: #E6EAF0; --sub: #A3ADBD; --arrow: #B7C0CE; --line: #2A313C; --accent: #4CC0A9;
+  --public: #7FD175; --private: #F08A8A; --card: #1A2029; --shadow: 0 10px 30px rgba(0,0,0,.5);
+  --r_ext-fill: #161B23; --r_ext-stroke: #4B5566; --r_vm-fill: #151A21; --r_vm-stroke: #8C98AA;
+  --r_web-fill: #141C15; --r_web-stroke: #5DA553;
+  --ext-fill: #222A36; --ext-stroke: #8695AC; --job-fill: #13302B; --job-stroke: #4CC0A9;
+  --step-fill: #182027; --step-stroke: #4CC0A9; --ondemand-fill: #33270F; --ondemand-stroke: #E2A23F;
+  --db-fill: #2A2440; --db-stroke: #A596E0; --file-fill: #221F2C; --file-stroke: #9C91C2;
+  --temp-fill: #151A21; --temp-stroke: #9C91C2; --tobuild-fill: #151A21; --tobuild-stroke: #F08A8A;
+  --web-fill: #1B2E19; --web-stroke: #6DB862; --git-fill: #252A31; --git-stroke: #AAB3C0;
+  --mac-fill: #22262C; --mac-stroke: #AAB3C0; --legacy-fill: #1C1F24; --legacy-stroke: #7D8592;
+  --sel: #FFC53D; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12161D; --fg: #E6EAF0; --sub: #A3ADBD; --arrow: #B7C0CE; --line: #2A313C; --accent: #4CC0A9;
+  --public: #7FD175; --private: #F08A8A; --card: #1A2029; --shadow: 0 10px 30px rgba(0,0,0,.5);
+  --r_ext-fill: #161B23; --r_ext-stroke: #4B5566; --r_vm-fill: #151A21; --r_vm-stroke: #8C98AA;
+  --r_web-fill: #141C15; --r_web-stroke: #5DA553;
+  --ext-fill: #222A36; --ext-stroke: #8695AC; --job-fill: #13302B; --job-stroke: #4CC0A9;
+  --step-fill: #182027; --step-stroke: #4CC0A9; --ondemand-fill: #33270F; --ondemand-stroke: #E2A23F;
+  --db-fill: #2A2440; --db-stroke: #A596E0; --file-fill: #221F2C; --file-stroke: #9C91C2;
+  --temp-fill: #151A21; --temp-stroke: #9C91C2; --tobuild-fill: #151A21; --tobuild-stroke: #F08A8A;
+  --web-fill: #1B2E19; --web-stroke: #6DB862; --git-fill: #252A31; --git-stroke: #AAB3C0;
+  --mac-fill: #22262C; --mac-stroke: #AAB3C0; --legacy-fill: #1C1F24; --legacy-stroke: #7D8592;
+  --sel: #FFC53D; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1720px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: end; justify-content: space-between; }
+h1 { font-size: 28px; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--sub); max-width: 78ch; }
+.lede code, td code, .card code, li code { font-family: var(--mono); font-size: .88em; }
+.tools { display: flex; gap: 8px; align-items: center; }
+.tools button { font: 500 13px var(--sans); color: var(--fg); background: var(--card); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.tools button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { color: var(--sub); font-size: 13px; }
+.stage { margin-top: 18px; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.stage svg { display: block; }
+.stage.fit svg { width: 100%; height: auto; }
+.stage:not(.fit) svg { width: 1680px; height: auto; max-width: none; }
+.node { cursor: pointer; transition: opacity .15s; }
+.node:hover > rect:first-of-type, .node:focus-visible > rect:first-of-type { stroke-width: 2.6px; }
+.node:focus { outline: none; }
+.node.sel > rect:first-of-type { stroke: var(--sel) !important; stroke-width: 3px; }
+.node.rel > rect:first-of-type { stroke-width: 2.4px; }
+svg.focus .node:not(.sel):not(.rel) { opacity: .28; }
+svg.focus polyline, svg.focus > text { opacity: .45; }
+@media (prefers-reduced-motion: reduce) { .node { transition: none; } }
+
+.card { position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100vw - 32px)); max-height: 72vh; overflow: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; }
+.card .kind { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.card h2 { font-size: 19px; margin: 2px 0 10px; text-wrap: balance; padding-right: 28px; }
+.card dl { display: grid; grid-template-columns: 74px 1fr; gap: 6px 12px; margin: 10px 0 0; font-size: 13.5px; }
+.card dt { color: var(--sub); font-weight: 600; }
+.card dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.card dd.run { font-family: var(--mono); font-size: 12px; }
+.card p { margin: 0; font-size: 14px; }
+.card ul { margin: 0; padding-left: 16px; }
+.card .close { position: absolute; top: 12px; right: 12px; border: 0; background: none; color: var(--sub); font-size: 22px;
+  line-height: 1; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.card .close:focus-visible { outline: 2px solid var(--accent); }
+.card .rels { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.card .rels button { font: 500 12px var(--sans); color: var(--fg); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.card .rels button:hover, .card .rels button:focus-visible { border-color: var(--accent); outline: none; }
+
+section { margin-top: 40px; }
+h3 { font-size: 18px; margin: 0 0 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 32px; }
+.grid2 > div { min-width: 0; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--sub); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+td.t { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.yes { color: var(--public); } .pill.no { color: var(--private); }
+ol.notes { padding-left: 20px; margin: 0; } ol.notes li { margin-bottom: 8px; max-width: 90ch; }
+footer { margin-top: 40px; color: var(--sub); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AVA Pipeline Map</h1>
+      <p class="lede">Every job, step, store and boundary of the AGN Variability Archive, from the LCO archive to the
+        public website. Click any box for its script or flag, when it runs, and what it reads and writes; the boxes it
+        touches stay lit. Times are UTC. Static copy: <code>docs/figures/ava_pipeline_overview.svg</code>.</p>
+    </div>
+    <div class="tools" role="group" aria-label="Diagram size">
+      <button id="btn-fit" type="button" aria-pressed="true">Fit width</button>
+      <button id="btn-full" type="button" aria-pressed="false">Actual size</button>
+    </div>
+  </header>
+
+  <div class="stage fit" id="stage">
+%%SVG%%
+  </div>
+  <p class="hint">Tip: Esc clears the selection. A link to a box (e.g. <code>#db-ava</code>) opens it directly.</p>
+
+  <aside class="card" id="card" hidden aria-live="polite">
+    <button class="close" id="card-close" type="button" aria-label="Close">×</button>
+    <div class="kind" id="c-kind"></div>
+    <h2 id="c-title"></h2>
+    <p id="c-what"></p>
+    <dl>
+      <dt>Runs</dt><dd class="run" id="c-run"></dd>
+      <dt>When</dt><dd id="c-when"></dd>
+      <dt id="c-rd-t">Reads</dt><dd id="c-rd"></dd>
+      <dt id="c-wr-t">Writes</dt><dd id="c-wr"></dd>
+    </dl>
+    <div class="rels" id="c-rels"></div>
+  </aside>
+
+  <section class="grid2">
+    <div>
+      <h3>The production day</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>UTC</th><th>Job</th><th>Command</th><th>Built?</th></tr></thead>
+        <tbody>
+          <tr><td class="t">01:00</td><td>1. Archive tables</td><td><code>scripts/lcodb_daily.sh</code></td><td><span class="pill yes">yes</span></td></tr>
+          <tr><td class="t">02:00</td><td>2–3. Download, process, publish</td><td><code>deploy.py</code> / <code>run_pipeline.py -d -e -c -t -p -D -R -P -w</code></td><td><span class="pill yes">yes</span></td></tr>
+          <tr><td class="t">05:00</td><td>4. Clean-up of raw frames</td><td><code>scripts/cleanup.py --live</code></td><td><span class="pill yes">yes</span></td></tr>
+          <tr><td class="t">*/6 h</td><td>6. LCO usage snapshot + plots</td><td><code>scripts/lco_usage.py --live-snapshot</code></td><td><span class="pill yes">yes</span></td></tr>
+          <tr><td class="t">weekly</td><td>5. Backups</td><td>—</td><td><span class="pill no">to build</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div>
+      <h3>What travels how</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th>Route to the VM</th></tr></thead>
+        <tbody>
+          <tr><td>Code, <code>config/</code>, <code>data/reference/</code>, <code>data/literature/*.csv</code>, <code>data/ava/*.csv</code>, manual PDFs</td><td>GitHub (clone / pull)</td></tr>
+          <tr><td><code>data/lco_usage/snapshots.csv</code></td><td>GitHub, once, as a seed at install; then updated only on the VM (never pushed back)</td></tr>
+          <tr><td><code>ava.db</code>, <code>photometry.sqlite</code>, <code>spectra.sqlite</code>, <code>state.sqlite</code></td><td>Copied by hand once (linux_setup step 7)</td></tr>
+          <tr><td>Legacy catalogues and raw FLOYDS</td><td><code>tools/port_legacy.py</code> on the VM</td></tr>
+          <tr><td>Images, spectra, catalogues</td><td>Downloaded from LCO; raw files deleted after processing</td></tr>
+          <tr><td>Website data</td><td><code>-w</code> into <code>web.data_dir</code> (rsync if the site is on another host)</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section>
+    <h3>Where the code and the guides disagree (checked %%DATE%%)</h3>
+    <ol class="notes">
+      <li><code>scripts/lcodb_daily.sh</code> suggests a 09:30 UTC cron, and <code>config/ava_config.yaml</code> has
+        <code>pipeline.prefect.schedule_cron: "30 10 * * *"</code> "after lcodb daily (09:30)". Both guides use 01:00 and 02:00.</li>
+      <li><code>pipeline.prefect.nightly_steps</code> in the config is <code>download_data, extract, calibrate_data, plot, publish</code>:
+        no PyTICS and no spectroscopy. The deployment guide (§7.3) lists the full set as "to set"; <code>scripts/deploy.py</code> without flags would deploy the short list.</li>
+      <li>Job 3 is described two ways: as a Prefect deployment with a server and worker (deployment guide §7.3) and as a plain cron line running
+        <code>run_pipeline.py</code> at 02:00 (linux_setup §17). Pick one for production.</li>
+      <li>The clean-up cron line has <code>--live</code> in the deployment guide (§7.4) and not in linux_setup §17 (dry run until checked). Intended, but the guides should say which is the final form.</li>
+      <li>Deployment guide §6.1 says <code>data/literature/</code> is not in git and must be copied with <code>ava.db</code>. The CSVs and <code>build/</code> scripts are in git
+        (only <code>cache/</code> is ignored), as linux_setup step 7 says.</li>
+      <li><code>run_pipeline.py -m / -s</code> (CALI merge) are still offered, but the task raises "merge task not yet ported". Neither guide mentions them.</li>
+      <li>The <code>-w</code> step also recomputes the per-band F_var (as <code>-t</code> does); the guide's table lists only derived properties, observing flag, web copy and releases.</li>
+      <li>The guides list the ADS host for the publications page; the website only links to ADS. The ADS API is used by the literature build (<code>data/literature/build/</code>).</li>
+    </ol>
+  </section>
+
+  <footer>Generated by <code>tools/make_pipeline_diagram.py</code> from the code on %%DATE%%. Regenerate after changing the pipeline.</footer>
+</div>
+
+<script>
+(() => {
+  const D = %%DETAILS%%;
+  const svg = document.getElementById('ava-diagram');
+  const stage = document.getElementById('stage');
+  const card = document.getElementById('card');
+  const $ = id => document.getElementById(id);
+  const nodes = {};
+  svg.querySelectorAll('.node').forEach(g => { nodes[g.dataset.id] = g; });
+  const toHash = id => id.replace(/_/g, '-');
+  const fromHash = h => h.replace(/^#/, '').replace(/-/g, '_');
+
+  function list(el, label, items) {
+    el.textContent = '';
+    const show = items && items.length;
+    el.hidden = !show; label.hidden = !show;
+    if (!show) return;
+    const ul = document.createElement('ul');
+    items.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+    el.appendChild(ul);
+  }
+
+  function select(id, fromHashChange) {
+    Object.values(nodes).forEach(g => g.classList.remove('sel', 'rel'));
+    if (!id || !D[id]) { svg.classList.remove('focus'); card.hidden = true;
+      if (!fromHashChange && location.hash) history.replaceState(null, '', location.pathname + location.search);
+      return; }
+    const d = D[id];
+    svg.classList.add('focus');
+    nodes[id].classList.add('sel');
+    (d.rel || []).forEach(r => nodes[r] && nodes[r].classList.add('rel'));
+    $('c-kind').textContent = d.kind; $('c-title').textContent = d.title; $('c-what').textContent = d.what;
+    $('c-run').textContent = d.run; $('c-when').textContent = d.when;
+    list($('c-rd'), $('c-rd-t'), d.reads); list($('c-wr'), $('c-wr-t'), d.writes);
+    const rels = $('c-rels'); rels.textContent = '';
+    (d.rel || []).forEach(r => { if (!D[r]) return; const b = document.createElement('button');
+      b.type = 'button'; b.textContent = D[r].title; b.addEventListener('click', () => select(r)); rels.appendChild(b); });
+    card.hidden = false;
+    if (!fromHashChange) { try { history.replaceState(null, '', '#' + toHash(id)); } catch (e) {} }
+  }
+
+  Object.entries(nodes).forEach(([id, g]) => {
+    g.addEventListener('click', e => { e.stopPropagation(); select(id); });
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(id); } });
+  });
+  svg.addEventListener('click', () => select(null));
+  $('card-close').addEventListener('click', () => select(null));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') select(null); });
+  window.addEventListener('hashchange', () => select(fromHash(location.hash), true));
+
+  function setFit(fit) {
+    stage.classList.toggle('fit', fit);
+    $('btn-fit').setAttribute('aria-pressed', String(fit));
+    $('btn-full').setAttribute('aria-pressed', String(!fit));
+    try { localStorage.setItem('ava-map-fit', fit ? '1' : '0'); } catch (e) {}
+  }
+  $('btn-fit').addEventListener('click', () => setFit(true));
+  $('btn-full').addEventListener('click', () => setFit(false));
+  let fit = window.innerWidth >= 1100;
+  try { const v = localStorage.getItem('ava-map-fit'); if (v !== null && window.innerWidth >= 1100) fit = v === '1'; } catch (e) {}
+  setFit(fit);
+  if (location.hash) select(fromHash(location.hash), true);
+})();
+</script>

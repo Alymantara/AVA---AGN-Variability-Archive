@@ -360,10 +360,15 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   semester's end are drawn on its last minute. Allocations from the latest snapshot. Live only with
   `lco_usage.snapshots.mode: live` or `--live-snapshot` (one paged GET of `/api/proposals/`; `ava.lcodb.api.Client`).
   **Not yet run live:** check the first live snapshot against the report numbers before relying on it.
-- **Snapshot log in git (user, 17 Nov 2026):** `data/lco_usage/snapshots.csv` is tracked; seeded with the report's
-  totals of 14 Nov 2026 22:38 UTC (81 rows, = allocations.json). Production: `--live-snapshot` in the 6-hourly cron,
-  `scripts/push_lco_snapshots.sh` daily (stages only that file; deploy key with write access). CSV, not JSON or
-  SQLite: append-only lines give small, readable git diffs; a binary DB would be re-stored whole on each push.
+- **Snapshot log: seed in git, live log on the VM (user, 17 Nov 2026; daily push dropped the same day):**
+  `data/lco_usage/snapshots.csv` is tracked only as the seed for the first deployment (the report's totals of
+  14 Nov 2026 22:38 UTC, 81 rows, = allocations.json). The user decided against pushing it back from the VM
+  (`scripts/push_lco_snapshots.sh` and its cron job removed; no deploy key with write access needed): it was only
+  wanted for the first download, and the VM keeps it up to date. Production sets `lco_usage.snapshots.file` on
+  the data volume, outside the checkout; the first live snapshot copies the seed there (`seed_snapshots`), so
+  `git pull` never touches or conflicts with the live log, and the VM's copy diverges from git as expected.
+  Chosen over keeping it in the checkout untracked or `skip-worktree` (fragile: easy to lose or commit by
+  mistake). CSV, not JSON or SQLite: append-only lines, readable, cheap to append.
   Only rows of the semester in progress or changed rows are written (~0.6 MB/yr). The estimate now fills the
   time after the last snapshot (before production starts it carries 2026B on from 14 Nov), and its scaling uses
   the latest snapshot's totals and time (not the allocations file's modification time, which git loses).

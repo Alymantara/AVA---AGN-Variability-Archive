@@ -161,6 +161,7 @@ Settings to change for production (all in `config/ava_config.yaml` unless noted)
 | `pipeline.n_cores` | | number of targets in parallel (≈ vCPU / 2) |
 | `pipeline.prefect.*` | `schedule_cron: "30 10 * * *"` | section 7 |
 | `web.data_dir` | | the website's data folder (section 8) |
+| `lco_usage.snapshots.file` | `data/lco_usage/snapshots.csv` (the seed) | on the data volume, e.g. `/srv/ava/lco_usage/snapshots.csv` (section 7.5) |
 | `releases.dir` | `releases` | on the data volume |
 
 ## 5.2 Secrets
@@ -178,7 +179,7 @@ Settings to change for production (all in `config/ava_config.yaml` unless noted)
 | `irsa.ipac.caltech.edu`, `ned.ipac.caltech.edu` | extinction, redshifts (when adding targets) |
 | `catalogs.mast.stsci.edu`, SDSS SkyServer | Pan-STARRS / SDSS comparison photometry |
 | `ui.adsabs.harvard.edu` | publications page (optional) |
-| `github.com` | installation; **daily push** of `data/lco_usage/snapshots.csv` (job 7, SSH deploy key with write access) |
+| `github.com` | installation and updates (`git pull`; read only) |
 | `pypi.org`, `conda.anaconda.org` | installation only |
 
 **LCO rate limits:** the archive blocks clients for hours above ~4 requests/s. The code limits itself
@@ -264,7 +265,6 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 | 05:00 daily | **4. Delete raw frames AVA has finished with** (photometry images, FLOYDS nights) | yes (`scripts/cleanup.py`) |
 | weekly | 5. Back up databases and products (section 10) | **TO BUILD** |
 | every 6 h | **6. LCO time-usage plots** (website Live Updates page): snapshot of LCO's charged totals, plot, publish | yes (`scripts/lco_usage.py --live-snapshot`) |
-| 07:00 daily | **7. Push the usage snapshot log to GitHub** | yes (`scripts/push_lco_snapshots.sh`) |
 
 ## 7.1 Job 1 — update the archive tables (01:00)
 
@@ -381,11 +381,10 @@ deletes. A file is deleted only when all its checks pass:
   night). **Do the MuSCAT re-extraction with the larger apertures during the backfill**, before the MuSCAT
   images are deleted.
 
-## 7.5 Jobs 6 and 7 — LCO time-usage plots (every 6 hours) and the snapshot log
+## 7.5 Job 6 — LCO time-usage plots (every 6 hours)
 
 ```
 0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py --live-snapshot >> /srv/ava/logs/lco_usage.log 2>&1
-0 7 * * *    /opt/ava/AVA/scripts/push_lco_snapshots.sh >> /srv/ava/logs/lco_snapshots_push.log 2>&1
 ```
 
 `scripts/lco_usage.py` (`ava/lco/usage.py`, settings `lco_usage:` in the AVA config; port of the legacy
@@ -393,7 +392,7 @@ deletes. A file is deleted only when all its checks pass:
 
 1. **Snapshot** (`--live-snapshot`): **one read-only request** to the observation portal (`GET /api/proposals/`,
    paged; token from `~/.lco_token`). It appends every `KEY*` proposal's charged and allocated hours per
-   semester and instrument class to `data/lco_usage/snapshots.csv`. To keep the log small, each run writes the
+   semester and instrument class to the snapshot log (`lco_usage.snapshots.file`). To keep the log small, each run writes the
    rows of the semester in progress, plus any other row that changed (late charges, refunds).
 2. **Curves**: the change between two snapshots is the time LCO charged in those 6 hours, overheads included.
    Before a curve's first snapshot, and after its last, the daily curve is **estimated** from the lcodb
@@ -408,15 +407,17 @@ deletes. A file is deleted only when all its checks pass:
    (`lco_usage.publish`) for the Live Updates page. The `-w` publish step also copies them (`web.usage_src`).
    `--all` redraws every semester (once, after installing).
 
-- **The snapshot log is kept in git.** The repository's copy starts with the totals the LCO usage report
-  fetched on 14 Nov 2026 (22:38 UTC; the same numbers as `allocations.json`). The production job continues
-  appending to it, and **job 7** commits that one file and pushes it once a day
-  (`scripts/push_lco_snapshots.sh`: only `snapshots.csv` is staged; `pull --rebase` first; nothing to do if no
-  new rows). So the history can always be downloaded from GitHub, and a new VM resumes from the last pushed
-  snapshot. Set-up: the VM's checkout must be a `git clone` whose `origin` it can push to (an SSH **deploy key
-  with write access** on the GitHub repository, for the service user). **Append only on the VM:** do not run
-  `--live-snapshot` on other machines (they run in dry run and only log the request they would make), and
-  do not edit `snapshots.csv` by hand.
+- **The snapshot log lives on the VM, not in git.** `data/lco_usage/snapshots.csv` in the repository is only
+  the **seed**: the totals the LCO usage report fetched on 14 Nov 2026 (22:38 UTC; the same numbers as
+  `allocations.json`). In the production config set `lco_usage.snapshots.file` to a path on the data volume,
+  outside the checkout (e.g. `/srv/ava/lco_usage/snapshots.csv`). The first live snapshot copies the seed
+  there, and from then on the log grows on the VM only. It is **not pushed back to GitHub**, so after deployment
+  the VM's log and the repository's seed diverge. That is expected: because the live log is outside the
+  checkout, `git pull` never touches it and never conflicts. Back it up with the other data (section 10). To
+  look at it elsewhere, copy it from the VM (`scp`). **Append only on the VM:** do not run `--live-snapshot`
+  on other machines (they run in dry run and only log the request they would make), and do not edit the log
+  by hand. (If the setting is left at the repository path, the job would append to the tracked seed, and
+  `git pull` would then fail on a modified file.)
 - **Dry run elsewhere.** `lco_usage.snapshots.mode` stays `dry_run` in the repository's config; only the
   production cron line passes `--live-snapshot`. The request is a single paged GET and does not compete
   with the archive jobs' rate limits.
@@ -487,4 +488,4 @@ pipeline while both run: schedule the backfill away from its downloads.
 | Backup job | 10 |
 | Measure SExtractor time, banzai-floyds memory, and daily run time on the VM | 3.2, 7.3 |
 | Website hosting, domain and HTTPS | 8 |
-| LCO usage snapshots: deploy key with write access for job 7; check the first live snapshot against the report | 7.5 |
+| LCO usage snapshots: set `lco_usage.snapshots.file` on the data volume; check the first live snapshot against the report | 5.1, 7.5 |
