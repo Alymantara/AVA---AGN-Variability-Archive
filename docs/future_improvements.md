@@ -282,12 +282,12 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - Positions come from SIMBAD via Sesame (SIMBAD's TAP service and astroquery 0.4.6 both fail) and are replaced by the Gaia DR3 nucleus within 2″.
 - Redshifts come from SIMBAD, or NED for Kaz 102/163. E(B−V) is SF11 from IRSA. The literature values are as supplied.
 
-**Corrected:** id 30 is RX J2219.8**+**0935, not "RX J22198-0935": the declination is +09°35′ (SIMBAD, LCO frames). Its data_id `J22198-0935` is kept.
+**Corrected:** id 30 is RX J2219.8**+**0935, not "RX J22198-0935": the declination is +09°35′ (SIMBAD, LCO frames). On 17 Nov 2026 its data_id became `J22198+0935` as well (`tools/db_migrate_20261117.py`, also in the lcodb links); the LCO OBJECT name stays "J22198-0935".
 
 **LCO spellings:** all are linked by `lcodb link`, including 3C 382/3c382, Ark 564/Ark564, NGC 1566/NGC1566, PHL 1811/PHL1811, Mrk 1018/Mrk1018, RX J1755+65/RX J1755.0+6519, and "IRAS 09149-6202" (an LCO typo for 09149-6206).
 
 **To do:**
-- **Kaz 163** (a galaxy pair) has no Gaia source within 2″ of NED's position. The nearest is G = 20.3 at 2.8″, which coincides with the LCO pointing. Check which nucleus is the AGN before setting `agn_gaia_dr3_id`.
+- ~~**Kaz 163**: check which nucleus is the AGN.~~ Done 17 Nov 2026 (`tools/db_migrate_20261117.py`): the AGN is the southern nucleus, 2MASS J17465953+6836303 = Gaia DR3 1634665450507168000 (G = 16.3, quasar probability 1.00); position and `agn_gaia_dr3_id` set to it. The old position was the VII Zw 742 pair centre, near the northern galaxy; LCO frames are still linked (the field covers both), but photometry apertures must use the new position.
 - **Redshift disagreements, SIMBAD vs NED:** 3C 382 0.0579 vs 0.0556; RX J1755 0.0785 vs 0.0806; PHL 1811 0.192 vs 0.194.
 - **ADS bibcodes:** add them in `*_url` for the new literature values (only the citation names were supplied).
 - **Vmag** is not maintained by the pipeline: only the original import set it. After the merge (PyTICS / intercalibration), the photometry package should update `agn.Vmag` (or a g-band equivalent) from the merged light curve.
