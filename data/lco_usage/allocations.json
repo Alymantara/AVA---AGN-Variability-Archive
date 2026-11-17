@@ -1,0 +1,650 @@
+[
+ {
+  "proposal": "KEY2026B-007f",
+  "title": "Filler program for KEY2026B-007",
+  "semester": "2026B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 0,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2026B-007f",
+  "title": "Filler program for KEY2026B-007",
+  "semester": "2026B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 20.571388888888897,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2027B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 0,
+  "alloc": 150.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2027B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 0,
+  "alloc": 300.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2027A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 0,
+  "alloc": 300.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2027A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 0,
+  "alloc": 150.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2026B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 8.170000000000003,
+  "alloc": 10.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2026B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 104.72638888888902,
+  "alloc": 156.0
+ },
+ {
+  "proposal": "KEY2026B-007",
+  "title": "Echoes in Time: A Decade\u2011long Intensive Broadband Reverberation Mapping Survey of Local Active Galactic Nuclei",
+  "semester": "2026B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 450.64277777779114,
+  "alloc": 954.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2026A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 11.575277777777782,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2026A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 34.02749999999997,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2025B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 49.840277777777764,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2025B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 46.091111111111005,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2025A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 18.235,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2024B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 81.34416666666657,
+  "alloc": 85.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2024A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 4.841666666666669,
+  "alloc": 50.0
+ },
+ {
+  "proposal": "KEY2023B-001f",
+  "title": "Reverberation Mapping: experimental",
+  "semester": "2023B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 63.124444444444414,
+  "alloc": 75.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2026A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 33.17194444444444,
+  "alloc": 35.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2026A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 10.631388888888896,
+  "alloc": 13.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2026A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 763.2227777778279,
+  "alloc": 771.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 4.746111111111111,
+  "alloc": 5.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 6.458611111111114,
+  "alloc": 8.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 774.7611111110999,
+  "alloc": 775.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 10.701111111111109,
+  "alloc": 13.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 66.8938888888888,
+  "alloc": 67.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2025A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 1090.966111111121,
+  "alloc": 1091.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 744.6450000000037,
+  "alloc": 788.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 88.75972222222235,
+  "alloc": 96.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 6.868611111111113,
+  "alloc": 21.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 104.92694444444462,
+  "alloc": 105.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 4.691944444444443,
+  "alloc": 6.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2024A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 1199.3802777777519,
+  "alloc": 1199.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 0,
+  "alloc": 0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 63.7722222222222,
+  "alloc": 65.0
+ },
+ {
+  "proposal": "KEY2023B-001",
+  "title": "From Disc to Dust: Intensive Broadband Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 1030.4608333333,
+  "alloc": 1030.6
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 0,
+  "alloc": 0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 122.28611111111134,
+  "alloc": 123.1
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2023A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 1052.947499999924,
+  "alloc": 1053.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 3.121388888888889,
+  "alloc": 10.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 99.12250000000016,
+  "alloc": 148.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 1192.6474999999027,
+  "alloc": 1230.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 955.8327777777088,
+  "alloc": 1008.3
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 6.67305555555555,
+  "alloc": 6.7
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2022A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 103.19444444444466,
+  "alloc": 103.3
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 877.3869444443512,
+  "alloc": 898.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 126.72750000000076,
+  "alloc": 129.6
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021B",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 20.116944444444435,
+  "alloc": 22.1
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 693.195277777753,
+  "alloc": 710.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021A",
+  "instrument": "2M0-SCICAM-MUSCAT",
+  "used": 11.4358333333333,
+  "alloc": 13.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2021A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 153.26277777777733,
+  "alloc": 166.2
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2020B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 81.8800000000001,
+  "alloc": 116.0
+ },
+ {
+  "proposal": "KEY2020B-006",
+  "title": "Intensive Disk Reverberation Mapping of Nearby Active Galactic Nuclei",
+  "semester": "2020B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 691.574722222224,
+  "alloc": 727.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2020A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 53.3941666666666,
+  "alloc": 60.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2020A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 454.28944444444,
+  "alloc": 845.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2020A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 74.2008333333333,
+  "alloc": 74.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 691.188375555568,
+  "alloc": 816.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 210.189376666667,
+  "alloc": 236.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019B",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 39.6725827777778,
+  "alloc": 66.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 417.950480833333,
+  "alloc": 618.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 134.385363611111,
+  "alloc": 135.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2019A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 95.3797519444445,
+  "alloc": 100.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2018B",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 61.2381791666667,
+  "alloc": 82.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2018B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 655.909073333333,
+  "alloc": 689.0
+ },
+ {
+  "proposal": "KEY2018B-001",
+  "title": "LCO/Swift/multi-mission intensive accretion disk reverberation mapping of AGN",
+  "semester": "2018B",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 81.8916775,
+  "alloc": 102.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2018A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 79.5783216666667,
+  "alloc": 90.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2018A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 509.849005833333,
+  "alloc": 675.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2018A",
+  "instrument": "2M0-FLOYDS-SCICAM",
+  "used": 147.189193611111,
+  "alloc": 200.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2017AB",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 234.118888888889,
+  "alloc": 419.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2017AB",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 921.935,
+  "alloc": 1050.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2016B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 789.799722222,
+  "alloc": 821.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2016B",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 141.491388889,
+  "alloc": 185.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2016A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 795.324722222,
+  "alloc": 795.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2016A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 204.113333333,
+  "alloc": 265.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2015B",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 403.765555556,
+  "alloc": 427.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2015B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 300.101388889,
+  "alloc": 425.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2015A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 246.0,
+  "alloc": 290.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2015A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 613.0,
+  "alloc": 765.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2014B",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 281.0,
+  "alloc": 340.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2014B",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 601.0,
+  "alloc": 600.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2014A",
+  "instrument": "2M0-SCICAM-SPECTRAL",
+  "used": 93.0,
+  "alloc": 340.0
+ },
+ {
+  "proposal": "KEY2014A-002",
+  "title": "Echo Mapping of AGN Accretion Flows",
+  "semester": "2014A",
+  "instrument": "1M0-SCICAM-SINISTRO",
+  "used": 221.0,
+  "alloc": 500.0
+ }
+]

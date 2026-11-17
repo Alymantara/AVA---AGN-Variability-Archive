@@ -329,3 +329,49 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - Aperture choice verified per catalogue (APERDIAM, else count 10 / 12-16); other counts -> frame_qc
   `error:ValueError` (visible in `backfill_status.py --apertures`).
 
+## LCO time-usage plots (17 Nov 2026; `ava/lco/usage.py`, `scripts/lco_usage.py`)
+
+- Port of the legacy `ava_lco_update.py`. **The legacy script was not available on the Mac** (only opened over
+  rsub from a remote host). The figure was rebuilt from two saved legacy outputs (`~/lco_usage_2024A.png`,
+  `~/lco_usage_2024B.png`) and the Live Updates page text: one `lco_usage_<semester>.png` per semester,
+  cumulative hours per instrument class, each axis scaled to its allocation, dashed even-pace line. Check against
+  the script if it turns up.
+- **Input format (decided by Claude, to confirm):** one CSV per proposal, `mjd` + **one column per LCO
+  instrument class** (`1M0-SCICAM-SINISTRO`, `2M0-FLOYDS-SCICAM`, `2M0-SCICAM-MUSCAT`, ...), hours charged per
+  row (not cumulative). Classes rather than telescopes, because FLOYDS and MuSCAT3 share the 2-m telescopes but
+  have separate allocations and curves. Spec: `data/lco_usage/README.md`.
+- **Daily curves estimated from the lcodb databases (user's idea, 17 Nov 2026):** daily exposure hours per
+  proposal and instrument class (each exposure once: `exp_key` across reduction levels, MuSCAT channels merged;
+  FLOYDS arcs/flats included) times charged/exposure per (proposal, semester, class) from `allocations.json`.
+  Rewritten every run (`lco_usage.estimate_from_lcodb`), `data/lco_usage/estimated/` + `factors.txt`.
+  Factors since 2018B are stable (1-m 1.55–1.65, FLOYDS 1.45–1.5, MuSCAT 0.6–1.2); 2014–2018A swing (0.7–7.6):
+  the database is incomplete there, so the shapes of those semesters are rough (end points are exact).
+  Check against the legacy 2024B plot (17 Oct 2024): 1-m ≈ 315 h vs 320 h, FLOYDS 48 % vs 47 %.
+  Exposures in a semester with nothing charged to that proposal/class are dropped (e.g. KEY2018B-001 frames in
+  2018A); 1-m MuSCAT frames (ep60, 2026B) are counted as 1-m time.
+- **Dummy data:** `data/lco_usage/dummy/` (random split of the semester totals) is no longer used; kept as an
+  example of the format. Dummy plots are watermarked and not published unless `lco_usage.publish_dummy`.
+- **Publishing:** every run copies changed plots to `<web.data_dir>/usage/` (`lco_usage.publish: true`), and
+  `web.usage_src` points at `data/lco_usage/plots` so `-w` copies them too.
+- **Snapshots (user's idea, 17 Nov 2026; built offline, dry run):** each live run records the portal's charged
+  totals (`timeallocation_set`, std + rr + tc, as the report) in `data/lco_usage/snapshots.csv`; the differences
+  between runs are LCO's own charges per 6 h (overheads, failed blocks, refunds as negative rows). They take over
+  from each key's first snapshot; the estimate before it is rescaled to that total. Charges recorded after a
+  semester's end are drawn on its last minute. Allocations from the latest snapshot. Live only with
+  `lco_usage.snapshots.mode: live` or `--live-snapshot` (one paged GET of `/api/proposals/`; `ava.lcodb.api.Client`).
+  **Not yet run live:** check the first live snapshot against the report numbers before relying on it.
+- **New semester:** the current semester is always drawn (new plot from the first run after the boundary); the
+  previous one is redrawn during the first `finalise_days` (7) of the new one, then frozen.
+- **Overheads in the estimate:** spread in proportion to exposure time within a semester (one factor per
+  proposal, semester and class). Better: fit charged = a·exposure + b·n_exposures + c·n_blocks per class over
+  the 2018B+ semesters, so short-exposure and FLOYDS-acquisition days carry their real overhead. MuSCAT: keep
+  the longest channel of an exposure, not the first (factor 0.98 in 2026B suggests a small overcount). Both open.
+- **Plot style (user, 17 Nov 2026):** `lco_usage.style: percent`: every curve on one axis, % of its allocation,
+  calendar dates, no MJD axis, legend outside the plot with used/allocated hours, website fonts and axis colours.
+  Curve colours: the legacy ones (user: "keep the original colours"). The legacy layout (one y axis per class) and
+  `panels` remain as options. The key project's filler programmes (`KEY....f`; legacy "New" curves) are labelled
+  "(filler)" and drawn dashed.
+
+- **LCO token (user, 17 Nov 2026):** the `lco.api_token` config key and its fallback in `ava/config.py` are removed;
+  a token is never read from the config file. Sources: `LCO_API_TOKEN` / `LCO_TOKEN` env var, then `lco.token_file`
+  (`~/.lco_token`).

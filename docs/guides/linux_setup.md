@@ -417,6 +417,14 @@ When the backfill is done, switch on the daily jobs (`docs/guides/deployment_gui
 0 5 * * *  cd $HOME/code/AVA && AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml LCODB_CONFIG=/data3/jvhs1/ava/config/lcodb_config.yaml $HOME/miniforge3/envs/ava/bin/python scripts/cleanup.py >> /data3/jvhs1/ava/logs/cleanup.log 2>&1
 ```
 
+Also add the LCO time-usage plots, every 6 hours (`deployment_guide.md` §7.5):
+
+```bash
+0 */6 * * *  cd $HOME/code/AVA && AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml $HOME/miniforge3/envs/ava/bin/python scripts/lco_usage.py >> /data3/jvhs1/ava/logs/lco_usage.log 2>&1
+```
+
+Each run estimates the usage from the archive databases, draws the plot and copies it to the website folder.
+
 (If conda was already installed, the environment's Python is in that conda's `envs/ava/bin/python`: find it
 with `conda activate ava && which python`.) Set `spectroscopy.download.select` back to `"new"`. The clean-up
 line is a **dry run** (it only reports) until you add `--live`; do that once its log looks right.

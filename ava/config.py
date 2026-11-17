@@ -265,8 +265,8 @@ class AVAConfig:
 
     @property
     def lco_token(self) -> Optional[str]:
-        """LCO API token: env var LCO_API_TOKEN takes precedence, then
-        the file named by paths.lco.token_file, then lco.api_token."""
+        """LCO API token: env var LCO_API_TOKEN (or LCO_TOKEN) takes precedence, then the file named by
+        lco.token_file (default ~/.lco_token).  The token is never read from the config file itself."""
         env = os.environ.get("LCO_API_TOKEN") or os.environ.get("LCO_TOKEN")   # same variables as lcodb
         if env:
             return env.strip()
@@ -276,8 +276,7 @@ class AVAConfig:
             tok = tf.read_text().strip()
             if tok:
                 return tok
-        fallback = self._raw.get("lco", {}).get("api_token", "")
-        return fallback.strip() or None
+        return None
 
     @property
     def lco_username(self) -> Optional[str]:

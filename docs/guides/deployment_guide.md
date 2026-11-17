@@ -262,6 +262,7 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 | after 2 | **3. Process and publish** — catalogues, calibration, PyTICS, spectra reduction and products, database updates, website | yes (Prefect steps) |
 | 05:00 daily | **4. Delete raw frames AVA has finished with** (photometry images, FLOYDS nights) | yes (`scripts/cleanup.py`) |
 | weekly | 5. Back up databases and products (section 10) | **TO BUILD** |
+| every 6 h | **6. LCO time-usage plots** (website Live Updates page) | yes (`scripts/lco_usage.py`; estimated from the lcodb databases until real files exist) |
 
 ## 7.1 Job 1 — update the archive tables (01:00)
 
@@ -378,6 +379,40 @@ deletes. A file is deleted only when all its checks pass:
   night). **Do the MuSCAT re-extraction with the larger apertures during the backfill**, before the MuSCAT
   images are deleted.
 
+## 7.5 Job 6 — LCO time-usage plots (every 6 hours)
+
+```
+0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py >> /srv/ava/logs/lco_usage.log 2>&1
+```
+
+`scripts/lco_usage.py` (`ava/lco/usage.py`, settings `lco_usage:` in the AVA config; port of the legacy
+`ava_lco_update.py`) draws `lco_usage_<semester>.png` for the current semester: the hours charged so far per
+instrument class (1-m, 2-m FLOYDS, 2-m MuSCAT3, and the key project's filler programmes), as a percentage of
+the allocation, against an even pace. **Every run copies the changed plots to `<web.data_dir>/usage/`**
+(`lco_usage.publish`), which the Live Updates page shows. The publish step `-w` also copies them
+(`web.usage_src`). `--all` redraws every semester (once, after installing). Run time ~15 s.
+
+- **Input today: estimated from the lcodb databases** (`lco_usage.estimate_from_lcodb: true`). Each run reads
+  `photometry.sqlite` and `spectra.sqlite` (read only) and gives each day the exposure hours of each proposal
+  and instrument class. It scales them per semester so they add up to the time LCO charged
+  (`data/lco_usage/allocations.json`; factors ≈ 1.6 on the 1-m, ≈ 1.5 for FLOYDS, because charged time includes
+  overheads). The current semester grows with job 1's daily sync. The plot says it is an estimate.
+  **No LCO request is made.**
+- **Later: real per-proposal files** (`mjd` + hours per instrument class; format in `data/lco_usage/README.md`):
+  set `input_dir: data/lco_usage/proposals` and `estimate_from_lcodb: false`. Probably not needed once
+  the snapshots below run live.
+- **Snapshots of LCO's charged totals (built, in dry run).** With `lco_usage.snapshots.mode: live`, each run
+  first makes **one read-only request** to the observation portal (`GET /api/proposals/`, paged; token from
+  `~/.lco_token`) and appends every `KEY*` proposal's charged and allocated hours per semester and instrument
+  class to `data/lco_usage/snapshots.csv`. The change between two runs is the time LCO charged in those 6 hours,
+  overheads included, and replaces the estimate from the first snapshot on. Allocations then come from the
+  snapshots. In `dry_run` (the default) the job only logs the request it would make. Switch to `live` once the
+  VM runs the job; until then `allocations.json` is updated by hand each semester (a new semester without it
+  is scaled with the median factors).
+- **New semester:** the job always draws the current semester, so the first run after 1 Feb / 1 Aug (00:00 UT)
+  starts the new plot. During the first `finalise_days` (7) it also redraws the previous semester, which picks up
+  its last charges, and then leaves it. The website lists the semesters itself (`web/includes/live.php`).
+
 # 8. Website
 
 - `web/` is plain PHP (no framework) reading **a copy** of the data: the publish step (`-w`) writes a
@@ -439,3 +474,4 @@ pipeline while both run: schedule the backfill away from its downloads.
 | Backup job | 10 |
 | Measure SExtractor time, banzai-floyds memory, and daily run time on the VM | 3.2, 7.3 |
 | Website hosting, domain and HTTPS | 8 |
+| LCO usage plots: switch `lco_usage.snapshots.mode` to `live` (one portal request per run) | 7.5 |

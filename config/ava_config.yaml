@@ -106,7 +106,6 @@ lco:
   # Preferred: store ONLY the token in ~/.lco_token (chmod 600)
   # or set env var LCO_API_TOKEN.  Do NOT paste the token here.
   token_file: "~/.lco_token"
-  api_token: ""             # fallback if token_file is absent
 
   # LCO archive / portal account name (not secret).  Passwords are never
   # stored anywhere: all API access uses the token above.
@@ -593,7 +592,7 @@ web:
   # Published copy the website reads (ava.web.publish; pipeline step -w/--web).
   # Relative paths are from ava_root. The site's AVA_WEB_DATA must point here.
   data_dir: "web/data"
-  usage_src: null          # folder with lco_usage_<semester>.png (null = skip)
+  usage_src: "data/lco_usage/plots"   # folder with lco_usage_<semester>.png (scripts/lco_usage.py; null = skip)
   prune: false             # remove published plots the pipeline no longer makes
   # Public per-target downloads (merged light curve, 1-d spectra zip, PrepSpec zip) and the Download
   # button on target pages. false: no files built, the button is hidden and published files are not served.
@@ -634,3 +633,46 @@ cleanup:
   retention_days: 7
   photometry: true
   spectra: true
+
+
+# ============================================================
+#  LCO TIME USAGE  (scripts/lco_usage.py, every 6 hours; ava.lco.usage — port of ava_lco_update.py)
+# ============================================================
+# One plot per semester, lco_usage_<semester>.png: cumulative hours charged per instrument class against the
+# allocation (website Live Updates page). Input: one CSV per proposal in input_dir (format:
+# data/lco_usage/README.md).
+# Until the real daily breakdown exists, every run ESTIMATES it from the lcodb databases (estimate_from_lcodb):
+# daily exposure hours per proposal and instrument class, scaled per semester to the charged totals in
+# allocations (read only, no LCO request). Real files later: input_dir "data/lco_usage/proposals" and
+# estimate_from_lcodb false. data/lco_usage/dummy/ (random split of the totals) is kept for tests only.
+lco_usage:
+  input_dir: "data/lco_usage/estimated"      # rewritten each run while estimate_from_lcodb is true
+  estimate_from_lcodb: true
+  allocations: "data/lco_usage/allocations.json"   # proposal, semester, instrument, alloc, used (hours)
+  plots_dir: "data/lco_usage/plots"
+  formats: ["png"]
+  # percent: every curve on one axis, % of its allocation (chosen 17 Nov 2026); legacy: one y axis per class
+  # scaled to its allocation (old script); panels: one panel per class, in hours.
+  style: "percent"
+  # Snapshots of LCO's charged totals (observation portal, ONE read-only paged GET of /api/proposals/ per run).
+  # Each live run appends them to `file`; the change between runs is the time charged in that window (overheads
+  # included), which replaces the estimate from the first snapshot on. Allocations then come from the snapshots.
+  snapshots:
+    mode: "dry_run"        # dry_run: only log what would be requested | live (or scripts/lco_usage.py --live-snapshot)
+    file: "data/lco_usage/snapshots.csv"   # append-only log: utc, mjd, proposal, semester, instrument, alloc, used
+    prefix: "KEY"          # proposals kept (key projects and their f fillers)
+  # In the first finalise_days of a new semester the previous one is redrawn too (its last charges), then left.
+  finalise_days: 7
+  # Every run copies the changed plots to <web.data_dir>/usage/ (Live Updates page); also -w via web.usage_src.
+  publish: true
+  # Publish plots drawn from DUMMY files (watermarked "DUMMY DATA").
+  publish_dummy: false
+  # Curves, in drawing order. filler: true = the key project's filler programme (proposal ending in "f"), dashed.
+  # Colours: the legacy plot's (1-m green, FLOYDS red, MuSCAT3 purple, filler FLOYDS orange).
+  series:
+    - {instrument: "1M0-SCICAM-SINISTRO", filler: false, label: "1m",                 color: "#6aa84f", marker: "s"}
+    - {instrument: "2M0-FLOYDS-SCICAM",   filler: false, label: "2m/Floyds",          color: "#e06666", marker: "o"}
+    - {instrument: "2M0-SCICAM-MUSCAT",   filler: false, label: "2m/MuSCAT3",         color: "#8e44ad", marker: "^"}
+    - {instrument: "2M0-SCICAM-SPECTRAL", filler: false, label: "2m/Spectral",        color: "#3d85c6", marker: "v"}
+    - {instrument: "2M0-FLOYDS-SCICAM",   filler: true,  label: "2m/Floyds (filler)", color: "#f1a10f", marker: "D", ls: "--"}
+    - {instrument: "1M0-SCICAM-SINISTRO", filler: true,  label: "1m (filler)",        color: "#38761d", marker: "P", ls: "--"}
