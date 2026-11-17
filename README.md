@@ -3,6 +3,16 @@
 Reverberation mapping pipeline for LCO (Las Cumbres Observatory) data.
 Handles FLOYDS spectroscopy and multi-band photometry for AGN monitoring campaigns.
 
+## Pipeline overview
+
+[![AVA pipeline: data flow and deployment](docs/figures/ava_pipeline_overview.svg)](docs/figures/ava_pipeline_overview.svg)
+
+External services, scheduled jobs, on-demand tools, data stores, what lives on the VM versus GitHub, and the
+website. Click the image for the full-size version. An interactive copy, with a description of every box, is
+in `docs/figures/ava_pipeline_overview.html` (open it locally). Regenerate both with
+`python tools/make_pipeline_diagram.py`. Deployment details: [deployment guide](docs/guides/deployment_guide.md)
+and [Linux set-up](docs/guides/linux_setup.md).
+
 ## Quick start
 
 ```bash
