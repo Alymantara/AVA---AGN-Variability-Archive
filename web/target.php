@@ -260,10 +260,15 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
           <tr><th>Redshift</th><td class="num"><?= fmt_z($t['redshift']) ?></td><td></td>
               <td class="ref"><?= ads_link($t['red_url'], $t['red_cite'] ?: ($t['red_url'] ? 'reference' : '')) ?></td></tr>
           <?php $nh = is_pos($t['nh'] ?? null) ? (float) $t['nh'] : null; $nhExp = $nh ? (int) floor(log10($nh)) : 0; ?>
-          <tr><th>E(B−V)<?php if ($nh): ?><span class="mjd">Galactic N<sub>H</sub></span><?php endif; ?></th>
-              <td class="num"><?= fmt_num($t['ebv'], 3) ?><?php if ($nh): ?><span class="mjd"><?= number_format($nh / 10 ** $nhExp, 2) ?> × 10<sup><?= $nhExp ?></sup></span><?php endif; ?></td>
-              <td>mag<?php if ($nh): ?><span class="mjd">cm⁻²</span><?php endif; ?></td>
-              <td class="ref"><?= ads_link('2011ApJ...737..103S', 'Schlafly & Finkbeiner (2011)') ?><?php if ($nh): ?><span class="mjd"><?= ads_link('2016A&A...594A.116H', 'HI4PI Collaboration (2016)') ?></span><?php endif; ?></td></tr>
+          <tr><th><?php if ($nh): ?><button type="button" class="ava-rowtoggle collapsed" data-bs-toggle="collapse"
+                data-bs-target="#nhRow" aria-expanded="false" aria-controls="nhRow">E(B−V)</button><?php else: ?>E(B−V)<?php endif; ?></th>
+              <td class="num"><?= fmt_num($t['ebv'], 3) ?></td><td>mag</td>
+              <td class="ref"><?= ads_link('2011ApJ...737..103S', 'Schlafly & Finkbeiner (2011)') ?></td></tr>
+          <?php if ($nh): ?>
+          <tr class="collapse ava-subrow" id="nhRow"><th>Galactic N<sub>H</sub></th>
+              <td class="num"><?= number_format($nh / 10 ** $nhExp, 2) ?> × 10<sup><?= $nhExp ?></sup></td><td>cm⁻²</td>
+              <td class="ref"><?= ads_link('2016A&A...594A.116H', 'HI4PI Collaboration (2016)') ?></td></tr>
+          <?php endif; ?>
           <tr><th>Black hole mass</th><td class="num"><?= pm_num($t['logm'], $massErr, 2) ?></td><td>log M<sub>☉</sub></td>
               <td class="ref"><?= ads_link($t['logm_url'], $t['logm_cite']) ?></td></tr>
           <?php if (is_numeric($lit['tau_hbeta_days'] ?? null)): ?>

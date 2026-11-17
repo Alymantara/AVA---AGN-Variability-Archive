@@ -481,3 +481,12 @@ html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 .ava-notes[open] > summary::before { transform: rotate(45deg); }
 .ava-notes > summary:hover { color: var(--ava-strong); }
 .ava-notes p { margin: .5rem 0 0; max-width: 90ch; }
+
+/* Foldable sub-row in an info table (E(B−V) → Galactic N_H) */
+.ava-rowtoggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; }
+.ava-rowtoggle::after { content: ""; width: .4rem; height: .4rem; border-right: 2px solid var(--ava-muted);
+  border-bottom: 2px solid var(--ava-muted); transform: rotate(45deg) translateY(-2px); transition: transform .15s; }
+.ava-rowtoggle.collapsed::after { transform: rotate(-45deg); }
+.ava-rowtoggle:hover, .ava-rowtoggle:focus-visible { color: var(--ava-link); }
+.ava-rowtoggle:focus-visible { outline: 2px solid var(--ava-link); outline-offset: 2px; }
+.ava-subrow th { padding-left: 1.5rem; font-weight: 400; color: var(--ava-muted); }
