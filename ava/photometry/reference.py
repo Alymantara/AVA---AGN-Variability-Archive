@@ -322,6 +322,21 @@ def field_ebv_sf11(ra: float, dec: float) -> float:
     return float(t["ext SandF mean"][0])
 
 
+def field_nh_hi4pi(ra: float, dec: float, timeout: float = 60) -> float | None:
+    """Galactic N_H (cm^-2) from the HEASARC nH tool, HI4PI map (HI4PI Collaboration 2016): weighted
+    average within 0.1 deg of (ra, dec) [deg, J2000]; None if the service gives no value."""
+    import re
+
+    import requests
+
+    r = requests.get("https://heasarc.gsfc.nasa.gov/cgi-bin/Tools/w3nh/w3nh.pl",
+                     params={"Entry": f"{ra:.6f},{dec:.6f}", "NR": "GRB/SIMBAD+Sesame/NED", "CoordSys": "Equatorial",
+                             "equinox": "2000", "radius": "0.1", "usemap": "0"}, timeout=timeout)
+    r.raise_for_status()
+    m = re.search(r"HI4PI\.fits\s*&gt;&gt;\s*Weighted average nH \(cm\*\*-2\)\s*([0-9.Ee+-]+)", r.text)
+    return float(m.group(1)) if m else None
+
+
 # ---------------------------------------------------------------------------
 # Extinction
 # ---------------------------------------------------------------------------

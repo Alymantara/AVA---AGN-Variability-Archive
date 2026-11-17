@@ -469,3 +469,15 @@ html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 .ava-pubs2 .m { font-size: .8rem; color: var(--ava-muted); }
 .ava-pubs2__tag { padding: .05rem .4rem; border-radius: 999px; background: var(--ava-pill-bg); color: var(--ava-copper-text); }
 @media (max-width: 575.98px) { .ava-pubyear { grid-template-columns: 1fr; } }
+.ava-info thead th .ava-band { text-transform: none; font-size: .9rem; letter-spacing: 0; }
+
+/* ---------- Notes toggles (target page) ------------------------------- */
+.ava-notes { margin: .25rem 0 1rem; font-size: .85rem; color: var(--ava-muted); }
+.ava-notes > summary { display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; list-style: none;
+  font-size: .78rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ava-muted); }
+.ava-notes > summary::-webkit-details-marker { display: none; }
+.ava-notes > summary::before { content: ""; width: .45rem; height: .45rem; border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.ava-notes[open] > summary::before { transform: rotate(45deg); }
+.ava-notes > summary:hover { color: var(--ava-strong); }
+.ava-notes p { margin: .5rem 0 0; max-width: 90ch; }

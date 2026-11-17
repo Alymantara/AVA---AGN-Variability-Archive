@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from ava.lcodb import ava as avamod  # noqa: E402
 from ava.lcodb.config import load_config  # noqa: E402
 
-FILTERS = {'B': 'B', 'V': 'V', 'u': 'up', 'g': 'gp', 'r': 'rp', 'i': 'ip', 'z': 'zs'}
+FILTERS = {'B': 'B', 'V': 'V', 'u': 'up', 'g': 'gp', 'r': 'rp', 'i': 'ip', 'z': 'zs', 'Y': 'Y'}
 
 
 def cadence(mjds):
