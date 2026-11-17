@@ -393,9 +393,16 @@ def update_estimated(cfg, out_dir: Path, totals_date: date | None = None, log=pr
     lc = load_config(cfg.lcodb_config_path)
     phot, spec = lc.db_path("photometry"), lc.db_path("spectra")
     alloc = load_allocations(st["allocations"])
-    d = totals_date or datetime.fromtimestamp(st["allocations"].stat().st_mtime).date()
+    snaps = read_snapshots(st["snapshot_file"])
+    if totals_date is not None:
+        t = mjd_of(totals_date)
+    elif len(snaps):                    # charged totals of the latest snapshot, and its time
+        alloc, t = merge_allocations(alloc, snaps), float(snaps["mjd"].max())
+    else:
+        t = mjd_of(datetime.fromtimestamp(st["allocations"].stat().st_mtime, timezone.utc))
+    d = date.fromordinal(MJD0.toordinal() + int(t))
     ex = exposures_from_lcodb(phot, spec)
-    est, fac = estimate_charged(ex, alloc, totals_mjd=mjd_of(d))
+    est, fac = estimate_charged(ex, alloc, totals_mjd=t)
     out_dir = Path(out_dir)
     for old in out_dir.glob("*.csv"):
         old.unlink()
@@ -441,11 +448,24 @@ def parse_proposals(proposals: list[dict], prefix: str = "KEY") -> list[dict]:
     return rows
 
 
-def append_snapshot(path: Path, rows: list[dict], when: datetime) -> int:
-    """Append one snapshot (all rows stamped ``when``) to the log. Returns the number of rows written."""
+def append_snapshot(path: Path, rows: list[dict], when: datetime, keep_all: bool = False) -> int:
+    """Append one snapshot (rows stamped ``when``) to the log. Returns the number of rows written.
+
+    To keep the log small (it is kept in git) only these rows are written, unless ``keep_all``: every row of the
+    semester in progress at ``when`` (the record that the run happened), and any other row that is new or whose
+    alloc / used changed since the last time it was logged (late charges or refunds of a past semester).
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(rows, columns=SNAPSHOT_COLS[2:])
+    if not keep_all and len(df):
+        last = read_snapshots(path)
+        if len(last):
+            last = last.groupby(_KEYS, as_index=False).last()[_KEYS + ["alloc", "used"]]
+            m = df.merge(last, on=_KEYS, how="left", suffixes=("", "_last"))
+            changed = (m["used_last"].isna() | ((m["used"] - m["used_last"]).abs() > 1e-6)
+                       | ((m["alloc"] - m["alloc_last"]).abs() > 1e-6))
+            df = df[(changed | (m["semester"] == semester_of(when))).to_numpy()]
     df.insert(0, "mjd", round(mjd_of(when), 5))
     df.insert(0, "utc", when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     df.to_csv(path, mode="a", header=not path.exists() or path.stat().st_size == 0, index=False,
@@ -468,10 +488,11 @@ def read_snapshots(path: Path) -> pd.DataFrame:
 
 def snapshot_increments(snaps: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(increments: proposal, semester, instrument, mjd, hours — the change since the previous snapshot of the
-    same key, refunds negative, zeros dropped, kept inside the key's semester; anchors: proposal, semester, instrument, t0, used0 — the first
-    snapshot of each key)."""
+    same key, refunds negative, zeros dropped, kept inside the key's semester; anchors: proposal, semester,
+    instrument, t0, used0, t_last — the first snapshot of each key and the time of its last)."""
     if snaps.empty:
-        return (pd.DataFrame(columns=_KEYS + ["mjd", "hours"]), pd.DataFrame(columns=_KEYS + ["t0", "used0"]))
+        return (pd.DataFrame(columns=_KEYS + ["mjd", "hours"]),
+                pd.DataFrame(columns=_KEYS + ["t0", "used0", "t_last"]))
     s = snaps.sort_values(_KEYS + ["mjd"])
     s = s.assign(hours=s.groupby(_KEYS)["used"].diff())
     # a charge recorded after the semester ended (late accounting) stays in its own semester: last minute of it
@@ -479,15 +500,17 @@ def snapshot_increments(snaps: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     inc = s[s["hours"].notna() & (s["hours"].abs() > 1e-9)][_KEYS + ["mjd", "hours"]]
     first = s.groupby(_KEYS, as_index=False).first()
     anchors = first.rename(columns={"mjd": "t0", "used": "used0"})[_KEYS + ["t0", "used0"]]
+    anchors["t_last"] = s.groupby(_KEYS)["mjd"].max().reindex(pd.MultiIndex.from_frame(anchors[_KEYS])).to_numpy()
     return inc.reset_index(drop=True), anchors
 
 
 def join_snapshots(usage: pd.DataFrame, snaps: pd.DataFrame) -> pd.DataFrame:
-    """Usage (proposal, mjd, instrument, hours) with the snapshots taking over from their first one.
+    """Usage (proposal, mjd, instrument, hours) with the snapshots taking over between their first and last one.
 
     For each (proposal, semester, class) with snapshots: rows before the first snapshot ``t0`` are rescaled to
     add up to the charged total at ``t0`` (or, if there are none, that total is one row at ``t0``); rows from
-    ``t0`` on are replaced by the snapshot increments.  Keys without snapshots are unchanged.
+    ``t0`` to the last snapshot are replaced by the snapshot increments; rows after the last snapshot are kept
+    (the estimate fills the time since, e.g. before production starts).  Keys without snapshots are unchanged.
     """
     if snaps.empty:
         return usage
@@ -498,7 +521,7 @@ def join_snapshots(usage: pd.DataFrame, snaps: pd.DataFrame) -> pd.DataFrame:
     for a in anchors.itertuples(index=False):
         m = ((u["proposal"] == a.proposal) & (u["semester"] == a.semester) & (u["instrument"] == a.instrument)).to_numpy()
         before = m & (u["mjd"] < a.t0).to_numpy()
-        keep &= ~(m & ~before)                                       # drop rows from t0 on
+        keep &= ~(m & ~before & (u["mjd"] < a.t_last).to_numpy())   # replaced by the increments
         total = float(u.loc[before, "hours"].sum())
         if total > 0:
             u.loc[before, "hours"] *= a.used0 / total

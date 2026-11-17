@@ -360,6 +360,13 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   semester's end are drawn on its last minute. Allocations from the latest snapshot. Live only with
   `lco_usage.snapshots.mode: live` or `--live-snapshot` (one paged GET of `/api/proposals/`; `ava.lcodb.api.Client`).
   **Not yet run live:** check the first live snapshot against the report numbers before relying on it.
+- **Snapshot log in git (user, 17 Nov 2026):** `data/lco_usage/snapshots.csv` is tracked; seeded with the report's
+  totals of 14 Nov 2026 22:38 UTC (81 rows, = allocations.json). Production: `--live-snapshot` in the 6-hourly cron,
+  `scripts/push_lco_snapshots.sh` daily (stages only that file; deploy key with write access). CSV, not JSON or
+  SQLite: append-only lines give small, readable git diffs; a binary DB would be re-stored whole on each push.
+  Only rows of the semester in progress or changed rows are written (~0.6 MB/yr). The estimate now fills the
+  time after the last snapshot (before production starts it carries 2026B on from 14 Nov), and its scaling uses
+  the latest snapshot's totals and time (not the allocations file's modification time, which git loses).
 - **New semester:** the current semester is always drawn (new plot from the first run after the boundary); the
   previous one is redrawn during the first `finalise_days` (7) of the new one, then frozen.
 - **Overheads in the estimate:** spread in proportion to exposure time within a semester (one factor per

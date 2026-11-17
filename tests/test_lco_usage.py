@@ -310,16 +310,15 @@ def test_snapshot_increments(tmp_path):
 
 def test_join_snapshots_anchors_estimate(tmp_path):
     d0 = U.mjd_of(date(2026, 11, 10))
-    usage = pd.DataFrame({"proposal": ["KEY2026B-007"] * 3, "mjd": [d0, d0 + 1, d0 + 7.5],
-                          "instrument": ["1M0-SCICAM-SINISTRO"] * 3, "hours": [30.0, 10.0, 99.0]})
+    usage = pd.DataFrame({"proposal": ["KEY2026B-007"] * 4, "mjd": [d0, d0 + 1, d0 + 6.1, d0 + 8],
+                          "instrument": ["1M0-SCICAM-SINISTRO"] * 4, "hours": [30.0, 10.0, 99.0, 4.0]})
     path = _snaps(tmp_path, [(_dt(2026, 11, 16, 0), 100.0, 20.0, "2026B"),
                              (_dt(2026, 11, 16, 6), 102.0, 20.0, "2026B")])
     j = U.join_snapshots(usage, U.read_snapshots(path))
     one = j[j["instrument"] == "1M0-SCICAM-SINISTRO"].sort_values("mjd")
-    # before the first snapshot: 30:10 rescaled to its 100 h; after it: only the +2 h increment (the 99 h
-    # estimated row after t0 is replaced)
-    assert one["hours"].tolist() == pytest.approx([75.0, 25.0, 2.0])
-    assert one["hours"].sum() == pytest.approx(102.0)
+    # before the first snapshot: 30:10 rescaled to its 100 h; between the snapshots: only the +2 h increment (the
+    # 99 h estimated row is replaced); after the last snapshot the estimate (4 h) is kept
+    assert one["hours"].tolist() == pytest.approx([75.0, 25.0, 2.0, 4.0])
     fl = j[j["instrument"] == "2M0-FLOYDS-SCICAM"]
     assert fl["hours"].tolist() == [20.5] and fl["mjd"].iloc[0] == pytest.approx(U.mjd_of(_dt(2026, 11, 16, 0)))
 
@@ -382,3 +381,18 @@ def test_take_snapshot_live_mocked(tmp_path, monkeypatch):
     assert U.take_snapshot(cfg, live=False, log=lambda *_: None) == 0 and not (tmp_path / "snap.csv").exists()
     assert U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 6), log=lambda *_: None) == 2
     assert U.read_snapshots(tmp_path / "snap.csv")["utc"].tolist() == ["2026-11-17T06:00:00Z"] * 2
+
+
+def test_append_snapshot_keeps_log_small(tmp_path):
+    """Past-semester rows are logged again only when they change; the semester in progress every run."""
+    path = tmp_path / "s.csv"
+    base = U.parse_proposals(_portal(100.0, 20.0, "2026A")) + U.parse_proposals(_portal(10.0, 2.0, "2026B"))
+    assert U.append_snapshot(path, base, _dt(2026, 11, 17, 0)) == 4                 # first: everything
+    assert U.append_snapshot(path, base, _dt(2026, 11, 17, 6)) == 2                 # 2026B only
+    late = U.parse_proposals(_portal(100.5, 20.0, "2026A")) + U.parse_proposals(_portal(10.0, 2.0, "2026B"))
+    assert U.append_snapshot(path, late, _dt(2026, 11, 17, 12)) == 3                # + the late 2026A charge
+    assert U.append_snapshot(path, base, _dt(2026, 11, 17, 18), keep_all=True) == 4
+    inc, _ = U.snapshot_increments(U.read_snapshots(path))
+    old = inc[inc["semester"] == "2026A"]
+    assert sorted(old["hours"].round(3)) == [-0.5, 0.5]                             # late charge, then refund
+    assert (old["mjd"] < U.semester_bounds("2026A")[1]).all()                       # drawn inside 2026A

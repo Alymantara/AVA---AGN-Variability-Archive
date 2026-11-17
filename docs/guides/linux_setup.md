@@ -417,13 +417,33 @@ When the backfill is done, switch on the daily jobs (`docs/guides/deployment_gui
 0 5 * * *  cd $HOME/code/AVA && AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml LCODB_CONFIG=/data3/jvhs1/ava/config/lcodb_config.yaml $HOME/miniforge3/envs/ava/bin/python scripts/cleanup.py >> /data3/jvhs1/ava/logs/cleanup.log 2>&1
 ```
 
-Also add the LCO time-usage plots, every 6 hours (`deployment_guide.md` §7.5):
+Also add the LCO time-usage plots, every 6 hours, and the daily push of their snapshot log to GitHub
+(`deployment_guide.md` §7.5):
 
 ```bash
-0 */6 * * *  cd $HOME/code/AVA && AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml $HOME/miniforge3/envs/ava/bin/python scripts/lco_usage.py >> /data3/jvhs1/ava/logs/lco_usage.log 2>&1
+0 */6 * * *  cd $HOME/code/AVA && AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml $HOME/miniforge3/envs/ava/bin/python scripts/lco_usage.py --live-snapshot >> /data3/jvhs1/ava/logs/lco_usage.log 2>&1
+0 7 * * *    $HOME/code/AVA/scripts/push_lco_snapshots.sh >> /data3/jvhs1/ava/logs/lco_snapshots_push.log 2>&1
 ```
 
-Each run estimates the usage from the archive databases, draws the plot and copies it to the website folder.
+Each run asks LCO once for the time charged so far, adds it to `data/lco_usage/snapshots.csv`, draws the
+plot and copies it to the website folder. The second line sends that file to GitHub once a day. For that,
+your `~/code/AVA` must be able to push:
+
+```bash
+cd ~/code/AVA
+git remote -v
+```
+
+If the address starts with `https://`, pushing will ask for a password and fail in cron. Make an SSH key
+(`ssh-keygen -t ed25519`), add the contents of `~/.ssh/id_ed25519.pub` to the repository on GitHub
+(Settings → Deploy keys → Add, tick **Allow write access**), and switch the address:
+
+```bash
+git remote set-url origin git@github.com:Alymantara/AVA---AGN-Variability-Archive.git
+```
+
+Test it once by hand: `~/code/AVA/scripts/push_lco_snapshots.sh` (it says "no new snapshots" until the first
+6-hourly run has added a line).
 
 (If conda was already installed, the environment's Python is in that conda's `envs/ava/bin/python`: find it
 with `conda activate ava && which python`.) Set `spectroscopy.download.select` back to `"new"`. The clean-up

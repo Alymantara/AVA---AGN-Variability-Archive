@@ -15,7 +15,7 @@ new semester), chosen semesters, or all of them.  The only LCO request is the sn
     python scripts/lco_usage.py --live-snapshot         # also record LCO's charged totals (one portal request)
 
 Cron (every 6 hours), e.g.:
-    0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py >> /srv/ava/logs/lco_usage.log 2>&1
+    0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py --live-snapshot >> /srv/ava/logs/lco_usage.log 2>&1
 """
 
 from __future__ import annotations

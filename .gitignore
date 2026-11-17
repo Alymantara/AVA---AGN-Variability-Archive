@@ -65,12 +65,14 @@ data/literature/*
 !data/literature/mass_conflicts.csv
 !data/literature/build/
 data/literature/build/__pycache__/
-# LCO time-usage plots (scripts/lco_usage.py): format spec, allocations and the dummy input files; not the plots
+# LCO time-usage plots (scripts/lco_usage.py): format spec, allocations, dummy files, snapshot log; not the plots
 !data/lco_usage/
 data/lco_usage/*
 !data/lco_usage/README.md
 !data/lco_usage/allocations.json
 !data/lco_usage/dummy/
+# snapshot log of LCO's charged totals: appended by the production job, pushed back daily (scripts/push_lco_snapshots.sh)
+!data/lco_usage/snapshots.csv
 
 # Poster (large, separate deliverable)
 poster/

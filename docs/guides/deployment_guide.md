@@ -173,12 +173,13 @@ Settings to change for production (all in `config/ava_config.yaml` unless noted)
 
 | Host | Used for |
 |---|---|
-| `archive-api.lco.global`, `observe.lco.global` | frame lists, headers, downloads (signed URLs to LCO's S3 storage — allow its download host) |
+| `archive-api.lco.global`, `observe.lco.global` | frame lists, headers, downloads (signed URLs to LCO's S3 storage — allow its download host); charged-time snapshots (job 6) |
 | `cds.unistra.fr`, `vizier.cds.unistra.fr` (+ mirrors in `photometry.reference.vizier_servers`) | Gaia DR3 / GSPC reference stars, SIMBAD/Sesame names |
 | `irsa.ipac.caltech.edu`, `ned.ipac.caltech.edu` | extinction, redshifts (when adding targets) |
 | `catalogs.mast.stsci.edu`, SDSS SkyServer | Pan-STARRS / SDSS comparison photometry |
 | `ui.adsabs.harvard.edu` | publications page (optional) |
-| `github.com`, `pypi.org`, `conda.anaconda.org` | installation only |
+| `github.com` | installation; **daily push** of `data/lco_usage/snapshots.csv` (job 7, SSH deploy key with write access) |
+| `pypi.org`, `conda.anaconda.org` | installation only |
 
 **LCO rate limits:** the archive blocks clients for hours above ~4 requests/s. The code limits itself
 (`download.rate_per_s: 1`, lcodb `header_rate_per_s: 4`, `sync_rate_per_s`). Do not raise these, and do
@@ -262,7 +263,8 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 | after 2 | **3. Process and publish** — catalogues, calibration, PyTICS, spectra reduction and products, database updates, website | yes (Prefect steps) |
 | 05:00 daily | **4. Delete raw frames AVA has finished with** (photometry images, FLOYDS nights) | yes (`scripts/cleanup.py`) |
 | weekly | 5. Back up databases and products (section 10) | **TO BUILD** |
-| every 6 h | **6. LCO time-usage plots** (website Live Updates page) | yes (`scripts/lco_usage.py`; estimated from the lcodb databases until real files exist) |
+| every 6 h | **6. LCO time-usage plots** (website Live Updates page): snapshot of LCO's charged totals, plot, publish | yes (`scripts/lco_usage.py --live-snapshot`) |
+| 07:00 daily | **7. Push the usage snapshot log to GitHub** | yes (`scripts/push_lco_snapshots.sh`) |
 
 ## 7.1 Job 1 — update the archive tables (01:00)
 
@@ -379,39 +381,48 @@ deletes. A file is deleted only when all its checks pass:
   night). **Do the MuSCAT re-extraction with the larger apertures during the backfill**, before the MuSCAT
   images are deleted.
 
-## 7.5 Job 6 — LCO time-usage plots (every 6 hours)
+## 7.5 Jobs 6 and 7 — LCO time-usage plots (every 6 hours) and the snapshot log
 
 ```
-0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py >> /srv/ava/logs/lco_usage.log 2>&1
+0 */6 * * *  cd /opt/ava/AVA && /opt/ava/env/bin/python scripts/lco_usage.py --live-snapshot >> /srv/ava/logs/lco_usage.log 2>&1
+0 7 * * *    /opt/ava/AVA/scripts/push_lco_snapshots.sh >> /srv/ava/logs/lco_snapshots_push.log 2>&1
 ```
 
 `scripts/lco_usage.py` (`ava/lco/usage.py`, settings `lco_usage:` in the AVA config; port of the legacy
-`ava_lco_update.py`) draws `lco_usage_<semester>.png` for the current semester: the hours charged so far per
-instrument class (1-m, 2-m FLOYDS, 2-m MuSCAT3, and the key project's filler programmes), as a percentage of
-the allocation, against an even pace. **Every run copies the changed plots to `<web.data_dir>/usage/`**
-(`lco_usage.publish`), which the Live Updates page shows. The publish step `-w` also copies them
-(`web.usage_src`). `--all` redraws every semester (once, after installing). Run time ~15 s.
+`ava_lco_update.py`) does three things on each run (~15 s):
 
-- **Input today: estimated from the lcodb databases** (`lco_usage.estimate_from_lcodb: true`). Each run reads
-  `photometry.sqlite` and `spectra.sqlite` (read only) and gives each day the exposure hours of each proposal
-  and instrument class. It scales them per semester so they add up to the time LCO charged
-  (`data/lco_usage/allocations.json`; factors ≈ 1.6 on the 1-m, ≈ 1.5 for FLOYDS, because charged time includes
-  overheads). The current semester grows with job 1's daily sync. The plot says it is an estimate.
-  **No LCO request is made.**
-- **Later: real per-proposal files** (`mjd` + hours per instrument class; format in `data/lco_usage/README.md`):
-  set `input_dir: data/lco_usage/proposals` and `estimate_from_lcodb: false`. Probably not needed once
-  the snapshots below run live.
-- **Snapshots of LCO's charged totals (built, in dry run).** With `lco_usage.snapshots.mode: live`, each run
-  first makes **one read-only request** to the observation portal (`GET /api/proposals/`, paged; token from
-  `~/.lco_token`) and appends every `KEY*` proposal's charged and allocated hours per semester and instrument
-  class to `data/lco_usage/snapshots.csv`. The change between two runs is the time LCO charged in those 6 hours,
-  overheads included, and replaces the estimate from the first snapshot on. Allocations then come from the
-  snapshots. In `dry_run` (the default) the job only logs the request it would make. Switch to `live` once the
-  VM runs the job; until then `allocations.json` is updated by hand each semester (a new semester without it
-  is scaled with the median factors).
+1. **Snapshot** (`--live-snapshot`): **one read-only request** to the observation portal (`GET /api/proposals/`,
+   paged; token from `~/.lco_token`). It appends every `KEY*` proposal's charged and allocated hours per
+   semester and instrument class to `data/lco_usage/snapshots.csv`. To keep the log small, each run writes the
+   rows of the semester in progress, plus any other row that changed (late charges, refunds).
+2. **Curves**: the change between two snapshots is the time LCO charged in those 6 hours, overheads included.
+   Before a curve's first snapshot, and after its last, the daily curve is **estimated** from the lcodb
+   databases (`lco_usage.estimate_from_lcodb`; read only). The estimate is each day's exposure hours, scaled so
+   the curve meets the charged totals. Allocations come from the latest snapshot, so a new semester needs no
+   manual update.
+3. **Plot and publish**: `lco_usage_<semester>.png` for the current semester: hours charged so far per
+   instrument class (1-m, 2-m FLOYDS, 2-m MuSCAT3, and the key project's filler programmes), as a percentage of
+   the allocation, against an even pace. Changed plots are copied to `<web.data_dir>/usage/` on every run
+   (`lco_usage.publish`) for the Live Updates page. The `-w` publish step also copies them (`web.usage_src`).
+   `--all` redraws every semester (once, after installing).
+
+- **The snapshot log is kept in git.** The repository's copy starts with the totals the LCO usage report
+  fetched on 14 Nov 2026 (22:38 UTC; the same numbers as `allocations.json`). The production job continues
+  appending to it, and **job 7** commits that one file and pushes it once a day
+  (`scripts/push_lco_snapshots.sh`: only `snapshots.csv` is staged; `pull --rebase` first; nothing to do if no
+  new rows). So the history can always be downloaded from GitHub, and a new VM resumes from the last pushed
+  snapshot. Set-up: the VM's checkout must be a `git clone` whose `origin` it can push to (an SSH **deploy key
+  with write access** on the GitHub repository, for the service user). **Append only on the VM:** do not run
+  `--live-snapshot` on other machines (they run in dry run and only log the request they would make), and
+  do not edit `snapshots.csv` by hand.
+- **Dry run elsewhere.** `lco_usage.snapshots.mode` stays `dry_run` in the repository's config; only the
+  production cron line passes `--live-snapshot`. The request is a single paged GET and does not compete
+  with the archive jobs' rate limits.
 - **New semester:** the job always draws the current semester, so the first run after 1 Feb / 1 Aug (00:00 UT)
-  starts the new plot. During the first `finalise_days` (7) it also redraws the previous semester, which picks up
-  its last charges, and then leaves it. The website lists the semesters itself (`web/includes/live.php`).
+  starts the new plot. During the first `finalise_days` (7) it also redraws the previous semester, which picks
+  up its last charges, and then leaves it. The website lists the semesters itself (`web/includes/live.php`).
+- **Format of the log and of optional per-proposal usage files:** `data/lco_usage/README.md`.
+  `allocations.json` (the report's numbers) is only a fallback for semesters with no snapshot.
 
 # 8. Website
 
@@ -474,4 +485,4 @@ pipeline while both run: schedule the backfill away from its downloads.
 | Backup job | 10 |
 | Measure SExtractor time, banzai-floyds memory, and daily run time on the VM | 3.2, 7.3 |
 | Website hosting, domain and HTTPS | 8 |
-| LCO usage plots: switch `lco_usage.snapshots.mode` to `live` (one portal request per run) | 7.5 |
+| LCO usage snapshots: deploy key with write access for job 7; check the first live snapshot against the report | 7.5 |
