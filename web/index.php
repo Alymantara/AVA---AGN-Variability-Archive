@@ -8,20 +8,44 @@ $targets = ava_targets();
 $featured = array_filter($targets, fn($t) => ava_status($t)['key'] === 'active' && ava_image_stem($t));
 usort($featured, fn($a, $b) => (int) $b['db_lco_images'] <=> (int) $a['db_lco_images']);
 $featured = array_slice($featured, 0, 6);
+// Hero background: a slow cross-fade through target images (active first), heavily diluted.
+$heroPool = array_values(array_filter($targets, fn($t) => ava_image_stem($t) && is_file(AVA_ROOT . '/assets/agn/' . ava_image_stem($t) . '_1200.webp')));
+usort($heroPool, fn($a, $b) => (ava_status($b)['key'] === 'active') <=> (ava_status($a)['key'] === 'active') ?: (int) $b['db_lco_images'] <=> (int) $a['db_lco_images']);
+$hero = array_slice($heroPool, 0, 10);
+shuffle($hero);
 
 ava_page_start('home', 'Home');
 ?>
 <section class="ava-hero">
-  <div class="container-xxl">
+  <?php if ($hero): ?>
+  <div class="ava-hero__bg" aria-hidden="true">
+    <?php foreach ($hero as $i => $t): $src = asset('assets/agn/' . ava_image_stem($t) . '_1200.webp'); ?>
+      <img <?= $i === 0 ? 'class="is-on" src' : 'data-src' ?>="<?= h($src) ?>" alt="" data-name="<?= h($t['name']) ?>" data-href="target.php?id=<?= (int) $t['id'] ?>"<?= $i === 0 ? ' fetchpriority="high"' : '' ?>>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+  <div class="container-xxl ava-hero__content">
+    <div class="ava-hero__logos">
+      <a href="https://www.st-andrews.ac.uk/physics-astronomy/" title="University of St Andrews">
+        <img class="ava-logo-d" src="<?= asset('assets/img/standrews_colour_dark.png') ?>" alt="University of St Andrews" width="638" height="120">
+        <img class="ava-logo-l" src="<?= asset('assets/img/standrews_colour_light.png') ?>" alt="" width="638" height="120">
+      </a>
+      <a href="https://lco.global/" title="Las Cumbres Observatory">
+        <img class="ava-logo-d" src="<?= asset('assets/img/lco_colour_dark.png') ?>" alt="Las Cumbres Observatory" width="709" height="120">
+        <img class="ava-logo-l" src="<?= asset('assets/img/lco_colour_light.png') ?>" alt="" width="709" height="120">
+      </a>
+    </div>
     <p class="ava-eyebrow">University of St Andrews · Las Cumbres Observatory</p>
     <h1><span class="gold">AGN</span> Variability<br class="d-none d-sm-inline"> Archive</h1>
-    <p class="ava-lead">Reverberation mapping of AGN with the Las Cumbres Observatory.
-      A long-baseline, multi-band record of how accretion discs around supermassive black holes flicker and echo.</p>
-    <div class="d-flex flex-wrap gap-3">
-      <a class="btn btn-ava btn-ava-gold" href="targets.php">Browse Targets</a>
-      <a class="btn btn-ava btn-ava-outline" href="data.php">Access Data</a>
+    <div class="ava-hero__row">
+      <p class="ava-lead">Reverberation mapping of AGN with the Las Cumbres Observatory.
+        A long-baseline, multi-band record of how accretion discs around supermassive black holes flicker and echo.</p>
+      <a class="btn btn-ava btn-ava-gold ava-hero__cta" href="targets.php">Browse Targets <span aria-hidden="true">→</span></a>
     </div>
   </div>
+  <?php if ($hero): ?>
+    <a class="ava-hero__credit" id="heroCredit" href="target.php?id=<?= (int) $hero[0]['id'] ?>"><span>In the background</span> <?= h($hero[0]['name']) ?></a>
+  <?php endif; ?>
 </section>
 
 <section class="ava-stats" aria-label="Archive in numbers">
@@ -64,4 +88,4 @@ ava_page_start('home', 'Home');
 </section>
 <?php endif; ?>
 
-<?php ava_page_end(); ?>
+<?php ava_page_end(['assets/js/hero.js']); ?>

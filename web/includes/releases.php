@@ -89,7 +89,7 @@ function ava_release_panel(array $t): void
       <p class="small text-secondary">
         <?php if ($m['doi']): ?>DOI <a href="https://doi.org/<?= h($m['doi']) ?>"><?= h($m['doi']) ?></a>. <?php endif; ?>
         <?php if ($m['url']): ?><a href="<?= h($m['url']) ?>">Release notes</a>. <?php endif; ?>
-        File formats: <a href="data.php#format">Data &amp; Access</a>. Released under
+        File formats: <a href="data.php#format">Data</a>. Released under
         <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; please
         <a href="about.php#cite">cite AVA</a>.</p>
       <?php endforeach;

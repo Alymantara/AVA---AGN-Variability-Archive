@@ -374,7 +374,7 @@ def stat_row(pairs, y_s):
     return lbl_y + lbl_h
 
 y = stat_row([("12",    "years of data",      CXL),
-              ("71",    "AGN monitored",       CXR)], y) + MED
+              ("65",    "AGN monitored",       CXR)], y) + MED
 
 draw.line([(PX0+int(PW*0.08), y), (PX1-int(PW*0.08), y)],
           fill=(30,50,80), width=1)

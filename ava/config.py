@@ -11,10 +11,11 @@ Usage
     from ava.config import cfg
 
     # Raw dot-access to any section
-    cfg.paths.photometry_root     # -> "/data3/jvhs1/agn"
+    cfg.paths.photometry_root     # -> "photometry" (relative to paths.archive_root)
     cfg.photometry.seeing_limit_arcsec  # -> 9.0
 
     # Convenience resolved-path helpers
+    cfg.archive_root           # pathlib.Path  (paths.archive_root, absolute)
     cfg.phot_root              # pathlib.Path  (photometry_root, absolute)
     cfg.spec_root              # pathlib.Path  (spectra_root, absolute)
     cfg.phot_raw(target)       # Path to raw frames for one target
@@ -125,6 +126,11 @@ class AVAConfig:
         q = Path(p).expanduser()
         return q if q.is_absolute() else (self.root / q).resolve()
 
+    def _resolve_archive(self, p: str) -> Path:
+        """Absolute Path for a data path: relative paths are taken from ``paths.archive_root``."""
+        q = Path(p).expanduser()
+        return q if q.is_absolute() else (self.archive_root / q).resolve()
+
     def _path_key(self, *keys: str) -> str:
         """Walk the raw dict by dot-separated keys."""
         d = self._raw
@@ -137,24 +143,33 @@ class AVAConfig:
     # -------------------------------------------------------------------
 
     @property
+    def archive_root(self) -> Path:
+        """Where the archive's data lives (``paths.archive_root``, relative to ava_root).
+
+        The photometry / spectroscopy trees, their raw_data, the Swift table and the
+        templates are relative to it unless given as absolute paths. Unset: ava_root.
+        """
+        return self._resolve(self._raw.get("paths", {}).get("archive_root") or ".")
+
+    @property
     def phot_root(self) -> Path:
-        """Root of the photometry data tree: /data3/jvhs1/agn on production."""
-        return self._resolve(self._path_key("paths", "photometry_root"))
+        """Root of the photometry data tree (``paths.photometry_root``, relative to archive_root)."""
+        return self._resolve_archive(self._path_key("paths", "photometry_root"))
 
     @property
     def spec_root(self) -> Path:
-        """Root of the spectroscopy data tree: /data2/jvhs1/agn on production."""
-        return self._resolve(self._path_key("paths", "spectra_root"))
+        """Root of the spectroscopy data tree (``paths.spectra_root``, relative to archive_root)."""
+        return self._resolve_archive(self._path_key("paths", "spectra_root"))
 
     @property
     def template_dir(self) -> Path:
-        """Template directory (SExtractor configs etc.)."""
-        return self._resolve(self._path_key("paths", "template_dir"))
+        """Template directory (SExtractor configs etc.), relative to archive_root."""
+        return self._resolve_archive(self._path_key("paths", "template_dir"))
 
     @property
     def swift_db(self) -> Path:
-        """Swift/UVOT merged database CSV."""
-        return self._resolve(self._path_key("paths", "swift_db"))
+        """Swift/UVOT merged database CSV, relative to archive_root."""
+        return self._resolve_archive(self._path_key("paths", "swift_db"))
 
     # -------------------------------------------------------------------
     # Per-target path helpers

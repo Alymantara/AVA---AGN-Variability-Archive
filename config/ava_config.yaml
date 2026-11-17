@@ -13,7 +13,8 @@
 #  Sensitive values (API tokens, passwords) must NEVER be written here.
 #  Set them as environment variables instead (see the comments on each key).
 #
-#  Relative paths are resolved from ava_root.
+#  Relative paths are resolved from ava_root, except the data paths
+#  (photometry, spectroscopy, Swift, templates), which are relative to paths.archive_root.
 #  Absolute paths are used as-is.
 # ============================================================
 
@@ -34,27 +35,31 @@ paths:
   # from the location of this config file).
   ava_root: ""
 
+  # ---- Archive data root ----------------------------------
+  # Where the archive's data lives. The photometry and spectroscopy trees (with their
+  # raw_data), the Swift table and the templates below are relative to it unless absolute.
+  # Absolute, or relative to ava_root. The website's copy is separate (web.data_dir) and may
+  # live elsewhere.
+  # For now: data/test_archive, the dry-run execution stage.
+  archive_root: "data/test_archive"
+
   # ---- Spectroscopy data (FLOYDS) -------------------------
-  # Where FLOYDS raw and reduced FITS files live.
-  # On the production machine: /data2/jvhs1/agn/
   # Sub-structure expected:
   #   <spectra_root>/raw_data/<target_slug>/YYYYMMDD/*.fits.fz   (raw)
   #   <spectra_root>/<target_slug>/                               (products)
-  spectra_root: "/data2/jvhs1/agn"
+  spectra_root: "spectroscopy"
 
   # Raw FLOYDS frames (absolute, or relative to spectra_root)
   spectra_raw: "raw_data"
 
   # ---- Photometry data ------------------------------------
-  # Where photometric FITS files, SExtractor catalogues, and
-  # calibrated light-curve pickles live.
-  # On the production machine: /data3/jvhs1/agn/
+  # Photometric FITS files, SExtractor catalogues, calibrated light curves.
   # Sub-structure expected:
   #   <photometry_root>/raw_data/<target_slug>/YYYYMMDD/*.fits.fz
   #   <photometry_root>/<target_slug>/sextractor_ava/*_cat.fits
   #   <photometry_root>/<target_slug>/lco_latest.pkl
   #   <photometry_root>/<target_slug>/lco_latest_stan.pkl
-  photometry_root: "/data3/jvhs1/agn"
+  photometry_root: "photometry"
 
   # Raw photometry frames (absolute, or relative to photometry_root)
   photometry_raw: "raw_data"
@@ -64,13 +69,11 @@ paths:
   #   <photometry_root>/<target>/<target_plots_subdir>/
   target_plots_subdir: "plots"
 
-  # Swift/UVOT merged database (absolute path to CSV).
-  swift_db: "/data3/jvhs1/agn/ava_swift_updated.csv"
+  # Swift/UVOT merged table (CSV; relative to archive_root). Swift has re-entered: legacy data only.
+  swift_db: "swift/ava_swift_updated.csv"
 
-  # Template directory: SExtractor configs, filter_dict.txt, etc.
-  # Copied to each per-target directory at initialisation.
-  # On the production machine: /data3/jvhs1/agn/template_pipeline/
-  template_dir: "/data3/jvhs1/agn/template_pipeline"
+  # Template directory (SExtractor configs etc.; relative to archive_root).
+  template_dir: "template_pipeline"
 
   # ---- AVA code / archive ---------------------------------
   # Path to the banzai-floyds working copy (for spectroscopy pipeline).
@@ -564,6 +567,26 @@ plots:
 
 
 # ============================================================
+#  DERIVED AGN PROPERTIES  (ava.database.derived → table agn_derived)
+# ============================================================
+# Computed from the curated agn columns (logm, l_5100, logl, redshift); never written back to them.
+# Refreshed for every AGN by the publish step (-w) and by tools/derive_agn_properties.py.
+derived:
+  # Bolometric correction at 5100 A, Netzer (2019, MNRAS 488, 5185): k_bol = c (L5100 / 1e42 erg/s)^d
+  kbol_c: 40.0
+  kbol_d: -0.2
+  ledd_per_msun: 1.26e38    # L_Edd = ledd_per_msun * (M / Msun) erg/s
+  # Thin-disc lags, Fausnaugh et al. (2016, ApJ 821, 56, eq. 2):
+  #   tau = (1/c) (X k lambda / h c)^(4/3) [(G M / 8 pi sigma)(L_Edd / eta c^2)(3 + kappa) mdot_Edd]^(1/3)
+  disc_X: 4.97              # Wien-law value (lambda_max T = hc / 4.965 k), as used with Tie & Kochanek (2018);
+                            # Fausnaugh+16 use 2.49 (flux-weighted radius) and note 3.37 (variable irradiation)
+  disc_kappa: 1.0           # ratio of external (irradiation) to internal heating
+  disc_eta: 0.1             # radiative efficiency
+  # Lag pairs (filter names in plots.filter_dict); observed frame: rest wavelengths lambda/(1+z), lag x (1+z)
+  lag_pairs: [["u", "g"], ["g", "z"]]
+
+
+# ============================================================
 #  WEBSITE
 # ============================================================
 web:
@@ -572,6 +595,16 @@ web:
   data_dir: "web/data"
   usage_src: null          # folder with lco_usage_<semester>.png (null = skip)
   prune: false             # remove published plots the pipeline no longer makes
+  # Public per-target downloads (merged light curve, 1-d spectra zip, PrepSpec zip) and the Download
+  # button on target pages. false: no files built, the button is hidden and published files are not served.
+  # true for testing; the Data page still describes products as Key Project only until release.
+  downloads: true
+  # Manuals copied to <data_dir>/manuals/ (listed on the About page); build the PDFs from docs/*.tex.
+  manuals:
+    - "docs/ava_system_manual.pdf"
+    - "docs/photometry_manual.pdf"
+    - "docs/spectroscopy_manual.pdf"
+    - "docs/reports/pytics_update/report_pytics_update.pdf"
   host: "0.0.0.0"
   port: 5000
   debug: false

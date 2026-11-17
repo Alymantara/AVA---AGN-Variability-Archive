@@ -28,6 +28,25 @@ function ads_link(?string $bib, ?string $label): string
     return '<a href="' . ADS . h(rawurlencode($bib)) . '/abstract">' . h($label !== '' ? $label : $bib) . '</a>';
 }
 
+/** "7.59 ± 0.07" (error omitted when absent). */
+function pm_num(mixed $v, mixed $e, int $dp): string
+{
+    if (!is_numeric($v)) {
+        return '—';
+    }
+    return number_format((float) $v, $dp) . (is_numeric($e) && (float) $e > 0 ? ' ± ' . number_format((float) $e, $dp) : '');
+}
+
+/** Redshift with up to 5 decimals, trailing zeros dropped (0.0160540007 → 0.01605, 0.064 → 0.064). */
+function fmt_z(mixed $z): string
+{
+    if (!is_numeric($z)) {
+        return '—';
+    }
+    $d = (float) $z < 0.01 ? 6 : 5;
+    return rtrim(rtrim(number_format((float) $z, $d, '.', ''), '0'), '.');
+}
+
 /** Value present and positive (the legacy DB uses 0 / negative for "none"). */
 function is_pos(mixed $v): bool
 {
@@ -80,7 +99,7 @@ $cites = array_values(array_filter(array_map(null,
 // Photometry: the merged (intercalibrated) light curves when they exist — merged full
 // light curve first, so it is the default view; the per-telescope LCO plots only otherwise.
 $photoTabs = [];
-foreach ([['merged', 'merged_last6', 'merged_pytics'], ['lco', 'last6']] as $group) {
+foreach ([['merged', 'merged_season', 'merged_last6', 'merged_pytics'], ['lco', 'season', 'last6']] as $group) {
     foreach ($group as $k) {
         if ($u = ava_plot_url($t, $k)) {
             $photoTabs[$k] = [AVA_PLOT_KINDS[$k][1], $u];
@@ -102,13 +121,18 @@ foreach (array_keys(AVA_SKY_FILTERS) as $f) {
 $zoom = ava_plot_url($t, 'zoom');
 $stan = ava_plot_url($t, 'stan');
 $specTabs = [];
-foreach (['spec', 'hbeta', 'hbeta_fit', 'spec_avg'] as $k) {
+foreach (['spec', 'spec_avg', 'hbeta', 'hbeta_fit'] as $k) {
     if ($u = ava_plot_url($t, $k)) {
         $specTabs[$k] = [AVA_PLOT_KINDS[$k][1], $u];
     }
 }
 $lineVar = ava_line_variability((string) $t['data_id']);
 $bandVar = ava_band_variability((string) $t['data_id']);
+$derived = ava_derived((string) $t['data_id']);
+$lit = ava_literature((string) $t['data_id']);
+// mass error only when the shown mass is the literature value it belongs to
+$massErr = is_numeric($lit['log_MBH'] ?? null) && is_numeric($t['logm']) && abs((float) $lit['log_MBH'] - (float) $t['logm']) < 0.005
+    ? ($lit['log_MBH_err'] ?? null) : null;
 $plotsUpdated = ava_plots_updated($t);
 
 /** "6.17 ± 0.12 × 10⁻¹³" with a shared exponent. */
@@ -176,14 +200,38 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <li class="breadcrumb-item active" aria-current="page">AVA #<?= (int) $t['id'] ?></li>
       </ol></nav>
       <h1 class="mb-1"><?= h($t['name']) ?> <span class="ava-badge static ava-badge--<?= $st['key'] ?>"><?= $st['label'] ?></span></h1>
-      <p class="ava-links mb-0">
+      <div class="ava-links mb-0">
         <a href="https://simbad.cds.unistra.fr/simbad/sim-id?Ident=<?= h(rawurlencode($simbadId)) ?>">SIMBAD</a>
         <a href="https://ned.ipac.caltech.edu/byname?objname=<?= h(rawurlencode($simbadId)) ?>">NED</a>
         <?php if (is_pos($t['bentz_id'])): ?>
           <a href="http://www.astro.gsu.edu/AGNmass/details.php?varname=<?= (int) $t['bentz_id'] ?>">Bentz DB</a>
         <?php endif; ?>
         <a href="<?= h($lcoArchive) ?>">LCO Archive (raw images)</a>
-      </p>
+        <?php if (ava_downloads_enabled()): $dl = ava_downloads((string) $t['data_id']); $group = null; ?>
+        <span class="dropdown ava-download">
+          <button class="btn btn-sm btn-ava btn-ava-gold dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+            Download
+          </button>
+          <ul class="dropdown-menu ava-dropdown">
+            <?php foreach ($dl as [$g, $label, $url, $bytes]): ?>
+              <?php if ($g !== $group): $group = $g; ?>
+                <li><h6 class="dropdown-header"><?= h($g) ?></h6></li>
+              <?php endif; ?>
+              <li>
+                <?php if ($url): ?>
+                  <a class="dropdown-item" href="<?= h($url) ?>" download><?= h($label) ?> <span class="ava-dl-size"><?= fmt_bytes($bytes) ?></span></a>
+                <?php else: ?>
+                  <span class="dropdown-item disabled" aria-disabled="true"><?= h($label) ?> <span class="ava-dl-size">not available</span></span>
+                <?php endif; ?>
+              </li>
+            <?php endforeach; ?>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item small" href="data.php#format">File formats</a></li>
+          </ul>
+        </span>
+        <?php endif; ?>
+      </div>
     </div>
     <a class="btn btn-sm btn-ava btn-ava-outline" href="targets.php">← Back</a>
   </div>
@@ -202,24 +250,33 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       <h2 class="ava-h">Basic information</h2>
       <table class="table ava-info">
         <tbody>
-          <tr><th>Redshift</th><td class="num"><?= h((string) $t['redshift']) ?></td><td></td>
+          <tr><th>Redshift</th><td class="num"><?= fmt_z($t['redshift']) ?></td><td></td>
               <td class="ref"><?= ads_link($t['red_url'], $t['red_cite'] ?: ($t['red_url'] ? 'reference' : '')) ?></td></tr>
           <tr><th>E(B−V)</th><td class="num"><?= fmt_num($t['ebv'], 3) ?></td><td>mag</td>
               <td class="ref"><?= ads_link('2011ApJ...737..103S', 'Schlafly & Finkbeiner (2011)') ?></td></tr>
-          <tr><th>Black hole mass</th><td class="num"><?= h((string) $t['logm']) ?></td><td>log M<sub>☉</sub></td>
+          <tr><th>Black hole mass</th><td class="num"><?= pm_num($t['logm'], $massErr, 2) ?></td><td>log M<sub>☉</sub></td>
               <td class="ref"><?= ads_link($t['logm_url'], $t['logm_cite']) ?></td></tr>
+          <?php if (is_numeric($lit['tau_hbeta_days'] ?? null)): ?>
+          <tr><th>Hβ lag</th><td class="num"><?= pm_num($lit['tau_hbeta_days'], $lit['tau_hbeta_err'], 1) ?></td><td>days (rest)</td>
+              <td class="ref"><?= ads_link($lit['tau_ref'], $lit['tau_cite']) ?></td></tr>
+          <?php endif; ?>
           <?php if (is_pos($t['l_5100'])): ?>
-          <tr><th>log L<sub>5100</sub></th><td class="num"><?= h((string) $t['l_5100']) ?></td><td>erg s⁻¹</td>
+          <tr><th>log L<sub>5100</sub></th><td class="num"><?= fmt_num($t['l_5100'], 2) ?></td><td>erg s⁻¹</td>
               <td class="ref"><?= ads_link($t['l_5100_url'], $t['l_5100_cite']) ?></td></tr>
           <?php endif; ?>
-          <tr><th>log L<sub>Bol</sub></th><td class="num"><?= fmt_num($t['logl'], 2) ?></td><td>erg s⁻¹</td>
-              <td class="ref"><?= is_pos($t['l_5100'])
-                  ? db_markup($t['logl_comment']) . ', ' . ads_link('2019MNRAS.488.5185N', 'Netzer (2019)')
-                  : ads_link($t['logl_url'], $t['logl_cite']) ?></td></tr>
-          <tr><th>L / L<sub>Edd</sub></th><td class="num"><?= fmt_num($t['ledd'], 3) ?></td><td></td><td class="ref text-secondary">(caution)</td></tr>
+          <tr><th>log L<sub>Bol</sub></th><td class="num"><?= fmt_num(ava_log_lbol($t, $derived), 2) ?></td><td>erg s⁻¹</td>
+              <td class="ref"><?php if (($derived['lbol_source'] ?? '') === 'l_5100'): ?><em>k</em><sub>bol</sub> = <?= fmt_num($derived['kbol'], 1) ?>, <?= ads_link('2019MNRAS.488.5185N', 'Netzer (2019)') ?>
+                  <?php else: ?><?= ads_link($t['logl_url'], $t['logl_cite']) ?><?php endif; ?></td></tr>
+          <tr><th>L / L<sub>Edd</sub></th><td class="num"><?= fmt_num($derived['eddington_ratio'] ?? $t['ledd'], 3) ?></td><td></td><td class="ref text-secondary">(caution)</td></tr>
+          <?php foreach (['ug' => ['u', 'g'], 'gz' => ['g', 'z']] as $k => [$a, $b]):
+              $lag = $derived["lag_{$k}_days"] ?? null; if (!is_numeric($lag)) { continue; } ?>
+          <tr><th>Lag <em><?= $a ?></em>–<em><?= $b ?></em></th><td class="num"><?= fmt_num($lag, 2) ?></td><td>days</td>
+              <td class="ref"><span class="text-secondary">(theoretical)</span> <?= ads_link('2016ApJ...821...56F', 'Fausnaugh et al. (2016)') ?></td></tr>
+          <?php endforeach; ?>
           <tr><th>Mean <em>g</em></th><td class="num"><?= fmt_num($t['Vmag'], 2) ?></td><td>mag</td><td class="ref text-secondary">LCO</td></tr>
           <?php if (trim((string) $t['AGN_type']) !== ''): ?>
-          <tr><th>Type</th><td class="num"><?= h($t['AGN_type']) ?></td><td></td><td></td></tr>
+          <tr><th>Type</th><td class="num"><?= h($t['AGN_type']) ?></td><td></td>
+              <td class="ref"><?= ($lit['agn_type'] ?? null) === $t['AGN_type'] ? ads_link($lit['type_ref'], $lit['type_cite']) : '' ?></td></tr>
           <?php endif; ?>
           <?php if (trim((string) $t['Comments']) !== ''): ?>
           <tr><th>Comments</th><td colspan="3"><?= h($t['Comments']) ?></td></tr>
@@ -309,9 +366,10 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <ul class="ava-cites">
           <?php foreach ($cites as [$n, $u]): ?><li><?= ads_link($u, $n) ?></li><?php endforeach; ?>
         </ul>
-        <p class="small text-secondary">Please use these references if you use this object's data.</p>
+        <p class="small text-secondary">Please use these references if you use this object's data, and also cite AVA
+          and PyTICS — see <a href="about.php#cite">how to cite data from AVA</a>.</p>
       <?php else: ?>
-        <p class="text-secondary">No publication yet — please cite AVA (see <a href="data.php#cite">how to cite</a>).</p>
+        <p class="text-secondary">No publication yet — please cite AVA (see <a href="about.php#cite">how to cite</a>).</p>
       <?php endif; ?>
     </div>
 
@@ -351,7 +409,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         }
         if ($specTabs) {
             ob_start();
-            tabs('sp', array_map(fn($p) => [$p[0], plot_img($p[1], $t['name'] . ' FLOYDS ' . strip_tags($p[0]))], $specTabs), 'pills');
+            tabs('sp', array_map(fn($p) => [$p[0], plot_img($p[1], $t['name'] . ' FLOYDS ' . html_entity_decode(strip_tags($p[0])))], $specTabs), 'pills');
             $top['spec'] = ['Spectroscopy', ob_get_clean()];
         }
 
@@ -384,10 +442,10 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <tr><th>F<sub>var</sub> (merged)</th><?php foreach ($breakdownCols as $f): $r = $bandVar[$f] ?? null; ?>
           <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs, F_max/F_min ' . fmt_num($r['rmax'], 2) . '"' : '' ?>><?=
             $r && is_numeric($r['fvar']) ? number_format(100 * (float) $r['fvar'], 1) . '<span class="mjd">± '
-              . number_format(100 * (float) $r['fvar_err'], (float) $r['fvar_err'] < 0.001 ? 2 : 1) . ' %</span>' : '—' ?></td>
+              . ((float) $r['fvar_err'] < 0.0005 ? '&lt;0.1' : number_format(100 * (float) $r['fvar_err'], 1)) . ' %</span>' : '—' ?></td>
         <?php endforeach; ?></tr>
         <?php elseif (is_pos($t['merged'])): ?>
-        <tr><th>Fractional variability</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_numeric($t["frac_$f"]) && (float) $t["frac_$f"] == 0 ? '—' : h((string) $t["frac_$f"]) ?></td><?php endforeach; ?></tr>
+        <tr><th>Fractional variability</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= fmt_pct($t["frac_$f"] ?? null) ?></td><?php endforeach; ?></tr>
         <?php endif; ?>
       </tbody>
     </table>

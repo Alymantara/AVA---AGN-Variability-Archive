@@ -84,8 +84,9 @@ def main(targets, dest, apass_source, reset):
     raw = copy.deepcopy(cfg._raw)
     raw["paths"]["ava_root"] = str(cfg.root)
     raw["paths"].update(
-        photometry_root=str(dest / "photometry"),
-        spectra_root=str(dest / "spectroscopy"),
+        archive_root=str(dest),
+        photometry_root="photometry",
+        spectra_root="spectroscopy",
         logs=str(dest / "logs"),
         database=str(db_copy),
     )

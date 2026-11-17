@@ -6,15 +6,18 @@
   lcodb airmass
   lcodb match       science->standards and spectrum->arcs/lamp flats (alias: standards)
   lcodb link        LCO target names -> AVA ids (frames.ava_id, table target_link)
+  lcodb stats       per-AGN LCO statistics in the AVA DB (agn_lco), via tools/ava_crossmatch.py
   lcodb reextract
-  lcodb daily       = sync + standards harvest + headers + airmass + matching + link
+  lcodb daily       = sync + standards harvest + headers + airmass + matching + link + stats
   lcodb status
 """
 import argparse
 import logging
+import subprocess
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 from . import airmass, ava, calibs, db, headers, ingest, standards
 from .api import Client
@@ -123,6 +126,11 @@ def cmd_link(cfg, a):
     n, nl, nr = ava.link(cons, cfg.resolve(src), c.get('radius_arcsec', 30.0),
                          c.get('radius_footprint_arcsec', 180.0), cfg.resolve(c.get('overrides_csv')))
     log.info('link: %d LCO targets, %d linked to AVA, %d flagged for review (see target_link.review)', n, nl, nr)
+    if c.get('db'):   # observing flag agn.ava from the freshly linked frames
+        from ava.database import activity
+        ch = activity.update_observing(cfg.resolve(c['db']), activity.last_frames(
+            (k, cfg.db_path(k)) for k in activity.SCIENCE_OBSTYPES), int(c.get('observing_days', 30)))
+        log.info('observing flag: %d change(s)%s', len(ch), ''.join(f'\n  {d}: {o} -> {w} (last {l})' for d, o, w, l in ch))
     return nl, 0
 
 
@@ -145,7 +153,26 @@ def cmd_daily(cfg, a):
     cmd_airmass(cfg, a)
     cmd_match(cfg, a)
     cmd_link(cfg, a)
+    cmd_stats(cfg, a)
     return n, u
+
+
+CROSSMATCH = Path(__file__).resolve().parents[2] / 'tools' / 'ava_crossmatch.py'
+
+
+def cmd_stats(cfg, a):
+    """Refresh the per-AGN LCO statistics in the AVA database (agn_lco: frames, visits, cadence, spans) from the
+    freshly linked frames, via tools/ava_crossmatch.py (backs up the DB first; never touches `agn`)."""
+    if not (cfg.get('ava') or {}).get('db'):
+        log.warning('stats: no `ava.db` in config.yaml; skipped')
+        return 0, 0
+    r = subprocess.run([sys.executable, str(CROSSMATCH), '--config', str(cfg.path)],
+                       capture_output=True, text=True)
+    out = (r.stdout or '').splitlines()
+    log.info('stats: %s', next((l for l in out if 'refreshed' in l), out[0] if out else ''))
+    if r.returncode:
+        raise RuntimeError(f'ava_crossmatch.py failed ({r.returncode}): {(r.stderr or "").strip()[-2000:]}')
+    return 0, 0
 
 
 def cmd_status(cfg, a):
@@ -196,7 +223,7 @@ def main(argv=None):
     s.add_argument('--retry-failed', action='store_true')
     s = sub.add_parser('calib-sync', help='only the observatory calibration programmes (standards.calib_proposals)')
     s.add_argument('--full', action='store_true')
-    for name in ('airmass', 'match', 'standards', 'link', 'reextract', 'status'):
+    for name in ('airmass', 'match', 'standards', 'link', 'stats', 'reextract', 'status'):
         sub.add_parser(name)
     a = p.parse_args(argv)
 

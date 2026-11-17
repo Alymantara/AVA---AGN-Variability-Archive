@@ -11,8 +11,10 @@ require_once __DIR__ . '/config.php';
 /** kind => [file suffix, label] */
 const AVA_PLOT_KINDS = [
     'lco' => ['', 'LCO'],
+    'season' => ['_season', 'LCO last season'],
     'last6' => ['_last6', 'LCO last 60 d'],
     'merged' => ['_merged', 'LCO merged'],
+    'merged_season' => ['_merged_season', 'LCO merged, last season'],
     'merged_pytics' => ['_merged_pytics', 'LCO merged (PyTICS)'],
     'merged_last6' => ['_merged_last6', 'LCO merged, last 60 d'],
     'swift' => ['_swift', 'Swift'],
@@ -21,7 +23,7 @@ const AVA_PLOT_KINDS = [
     'spec' => ['_spec', 'Latest spectrum'],
     'hbeta' => ['_hbeta', 'H&beta; light curve'],
     'hbeta_fit' => ['_hbeta_fit', 'H&beta; fit'],
-    'spec_avg' => ['_spec_avg', 'Mean spectrum'],
+    'spec_avg' => ['_spec_avg', 'Mean &amp; RMS spectrum'],
 ];
 
 /** Sky diagnostics: site filter label => LCO filter code used in the file name. */
@@ -59,4 +61,45 @@ function ava_plots_updated(array $t): ?int
 {
     $files = glob(AVA_DATA_DIR . '/plots/' . basename((string) $t['data_id']) . '/*.png') ?: [];
     return $files ? max(array_map('filemtime', $files)) : null;
+}
+
+/** Per-target downloads published by ava.web.publish (data/downloads/<data_id>/). */
+const AVA_DOWNLOADS = [
+    'phot'     => ['Photometry', 'Merged light curve (CSV)', '%s_LCO_merged_lightcurve.csv'],
+    'spec'     => ['Spectra', '1-d FLOYDS spectra (FITS, zip)', '%s_FLOYDS_1d.zip'],
+    'prepspec' => ['Spectra', 'PrepSpec input (zip)', '%s_FLOYDS_prepspec.zip'],
+];
+
+/** Downloads switch (web.downloads in the AVA config, published to data/site.json). Off when unknown. */
+function ava_downloads_enabled(): bool
+{
+    static $on = null;
+    if ($on === null) {
+        $j = @file_get_contents(AVA_DATA_DIR . '/site.json');
+        $on = (bool) (($j !== false ? json_decode($j, true) : null)['downloads'] ?? false);
+    }
+    return $on;
+}
+
+/** [key => [group, label, url|null, bytes|null]] for one target; url null = not available yet. */
+function ava_downloads(string $dataId): array
+{
+    $out = [];
+    foreach (AVA_DOWNLOADS as $k => [$group, $label, $pat]) {
+        $name = sprintf($pat, $dataId);
+        $f = AVA_DATA_DIR . '/downloads/' . $dataId . '/' . $name;
+        $ok = $dataId !== '' && !str_contains($dataId, '/') && is_file($f);
+        $out[$k] = [$group, $label, $ok ? AVA_DATA_URL . '/downloads/' . rawurlencode($dataId) . '/' . rawurlencode($name) : null,
+            $ok ? filesize($f) : null];
+    }
+    return $out;
+}
+
+function fmt_bytes(?int $b): string
+{
+    if ($b === null) return '';
+    foreach (['B', 'kB', 'MB', 'GB'] as $i => $u) {
+        if ($b < 1024 ** ($i + 1) || $u === 'GB') return ($i ? number_format($b / 1024 ** $i, $b < 10 * 1024 ** $i ? 1 : 0) : $b) . ' ' . $u;
+    }
+    return '';
 }

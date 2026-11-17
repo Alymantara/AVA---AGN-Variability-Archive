@@ -19,9 +19,9 @@ const AVA_BS_JS = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstra
 const AVA_NAV = [
     'home' => ['index.php', 'Home'],
     'targets' => ['targets.php', 'Targets'],
-    'data' => ['data.php', 'Data &amp; Access'],
+    'data' => ['data.php', 'Data'],
     'live' => ['live.php', 'Live Updates'],
-    'publications' => ['publications.php', 'Publications'],
+    'science' => ['science.php', 'Science'],
     'about' => ['about.php', 'About'],
 ];
 
@@ -50,6 +50,15 @@ function ava_page_start(string $active, string $title, string $description = '')
   <title><?= h($full) ?></title>
   <meta name="description" content="<?= h($description) ?>">
   <meta name="theme-color" content="#0A1628">
+  <script>
+    // Colour mode before first paint: saved choice, else dark (the AVA default).
+    (function () {
+      var t = 'dark';
+      try { t = localStorage.getItem('ava-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+      document.documentElement.setAttribute('data-bs-theme', t);
+      document.querySelector('meta[name=theme-color]').content = t === 'light' ? '#F7F6F2' : '#0A1628';
+    })();
+  </script>
   <link rel="icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,10 +77,16 @@ function ava_page_start(string $active, string $title, string $description = '')
         <span class="ava-wordmark__ava">AVA</span>
         <span class="ava-wordmark__sub">AGN Variability Archive</span>
       </a>
+      <div class="ava-header-end">
+        <button class="ava-theme-toggle" type="button" id="avaTheme" aria-label="Switch to light mode" title="Switch to light mode">
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#avaNav"
               aria-controls="avaNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
+      </div>
       <div class="collapse navbar-collapse" id="avaNav">
         <ul class="navbar-nav mx-xl-auto">
           <?php foreach (AVA_NAV as $key => [$href, $label]): ?>
@@ -81,14 +96,6 @@ function ava_page_start(string $active, string $title, string $description = '')
             </li>
           <?php endforeach; ?>
         </ul>
-        <div class="ava-inst-logos">
-          <a href="https://www.st-andrews.ac.uk/physics-astronomy/" title="University of St Andrews">
-            <img src="<?= asset('assets/img/standrews_white.png') ?>" alt="University of St Andrews" width="500" height="156">
-          </a>
-          <a href="https://lco.global/" title="Las Cumbres Observatory">
-            <img src="<?= asset('assets/img/lco_logo_white.png') ?>" alt="Las Cumbres Observatory" width="640" height="114">
-          </a>
-        </div>
       </div>
     </div>
   </nav>
@@ -116,14 +123,24 @@ function ava_page_end(array $scripts = []): void
           School of Physics &amp; Astronomy, University of St Andrews<br>
           Las Cumbres Observatory global telescope network
         </p>
+        <div class="ava-footer__logos">
+          <a href="https://www.st-andrews.ac.uk/physics-astronomy/" title="University of St Andrews">
+            <img class="ava-logo-d" src="<?= asset('assets/img/standrews_colour_dark.png') ?>" alt="University of St Andrews" width="638" height="120">
+            <img class="ava-logo-l" src="<?= asset('assets/img/standrews_colour_light.png') ?>" alt="" width="638" height="120">
+          </a>
+          <a href="https://lco.global/" title="Las Cumbres Observatory">
+            <img class="ava-logo-d" src="<?= asset('assets/img/lco_colour_dark.png') ?>" alt="Las Cumbres Observatory" width="709" height="120">
+            <img class="ava-logo-l" src="<?= asset('assets/img/lco_colour_light.png') ?>" alt="" width="709" height="120">
+          </a>
+        </div>
       </div>
       <div class="col-6 col-md-3">
         <h2 class="ava-footer__h">Archive</h2>
         <ul class="list-unstyled small">
           <li><a href="targets.php">Targets</a></li>
-          <li><a href="data.php">Data &amp; Access</a></li>
-          <li><a href="data.php#cite">How to cite</a></li>
-          <li><a href="publications.php">Publications</a></li>
+          <li><a href="data.php">Data</a></li>
+          <li><a href="about.php#cite">How to cite</a></li>
+          <li><a href="science.php">Science</a></li>
         </ul>
       </div>
       <div class="col-6 col-md-4">
@@ -144,12 +161,21 @@ function ava_page_end(array $scripts = []): void
 </footer>
 
 <script src="<?= AVA_BS_JS ?>" defer></script>
+<script src="<?= asset('assets/js/theme.js') ?>" defer></script>
 <?php foreach ($scripts as $s): ?>
 <script src="<?= asset($s) ?>" defer></script>
 <?php endforeach; ?>
 </body>
 </html>
 <?php
+}
+
+/** mailto link with the address written as HTML character references (less easy to harvest). */
+function ava_mailto(string $email, string $subject = ''): string
+{
+    $enc = fn(string $s) => implode('', array_map(fn($c) => '&#' . ord($c) . ';', str_split($s)));
+    $href = 'mailto:' . $email . ($subject !== '' ? '?subject=' . rawurlencode($subject) : '');
+    return '<a href="' . $enc($href) . '">' . $enc($email) . '</a>';
 }
 
 /** Number formatting helpers. */

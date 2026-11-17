@@ -51,9 +51,9 @@ def main() -> None:
     )
     for c in s.changes:
         print(("[dry-run] " if a.dry_run else "") + c)
-    print(f"{'[dry-run] ' if a.dry_run else ''}published to {s.dest}: {s.agn} AGN, "
+    print(f"{'[dry-run] ' if a.dry_run else ''}published to {s.dest}: {s.agn} catalogue entries, "
           f"{s.plots_copied} plot(s) updated for {s.targets_with_plots} target(s), "
-          f"{s.plots_pruned} pruned, {s.usage_copied} usage plot(s)")
+          f"{s.plots_pruned} pruned, {s.usage_copied} usage plot(s), {s.manuals_copied} manual(s), {s.filters_copied} filter curve(s)")
 
 
 if __name__ == "__main__":
