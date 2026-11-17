@@ -1,0 +1,61 @@
+# Nearby AGN with LCO data that were missing from the AVA database (added 2026-11-17 with tools/add_ava_targets.py).
+# Selected from the target list tools/new_targets/lco_epoch_list_2026-11-16.tsv (see
+# docs/reports/target_list_crossmatch_2026-11-17.md): AGN at z < 0.1 with LCO frames in AVA's proposals.
+# name: AVA display name; resolve: the name NED/SIMBAD know (default: name); data_id: folder name; lco_id: the LCO
+# OBJECT spelling with most frames (URL-encoded on the site). Not added (no LCO frames in AVA's proposals):
+# Mrk 668, Mrk 374, Fairall 1139, CBS 74.
+targets:
+  - name: "RX J2044.0+2833"           # LCO "RXSJ20440+28"
+    data_id: "RXJ2044.0+2833"
+    lco_id: "RXSJ20440+28"
+  - name: "RBS 1303"                  # also logged as "k2f6-01" (K2 C6)
+    data_id: "RBS_1303"
+    lco_id: "RBS1303"
+  - name: "NGC 4748"
+    data_id: "NGC_4748"
+    lco_id: "NGC4748"
+  - name: "PG 2214+139"               # = Mrk 304
+    data_id: "PG_2214+139"
+    lco_id: "PG2214+139"
+  - name: "RBS 1917"
+    data_id: "RBS_1917"
+    lco_id: "RBS1917"
+  - name: "PG 2209+184"               # = II Zw 171
+    data_id: "PG_2209+184"
+    lco_id: "PG2209+184"
+  - name: "Mrk 315"
+    data_id: "Mrk_315"
+    lco_id: "Mrk315"
+  - name: "NPM1G +27.0587"            # LCO "NPM1G+27.058"
+    data_id: "NPM1G+27.0587"
+    lco_id: "NPM1G+27.058"
+  - name: "Mrk 684"
+    data_id: "Mrk_684"
+    lco_id: "Mrk684"
+  - name: "Mrk 1392"
+    data_id: "Mrk_1392"
+    lco_id: "Mrk1392"
+  - name: "SBS 1518+593"
+    data_id: "SBS_1518+593"
+    lco_id: "SBS1518+593"
+  - name: "Mrk 662"
+    data_id: "Mrk_662"
+    lco_id: "Mrk662"
+  - name: "Mrk 1501"
+    data_id: "Mrk_1501"
+    lco_id: "Mrk1501"
+  - name: "NGC 3516"
+    data_id: "NGC_3516"
+    lco_id: "NGC3516"
+  - name: "Mrk 352"
+    data_id: "Mrk_352"
+    lco_id: "Mrk352"
+  - name: "Pox 52"                    # LCO "POX052" and "Pox 52"
+    data_id: "Pox_52"
+    lco_id: "POX052"
+  - name: "3C 445"
+    data_id: "3C_445"
+    lco_id: "3c445"
+  - name: "NGC 5273"                  # LCO "NGC5273" (243 frames) and "NGC 5273" (spectra)
+    data_id: "NGC_5273"
+    lco_id: "NGC5273"

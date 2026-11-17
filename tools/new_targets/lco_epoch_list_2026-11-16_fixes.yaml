@@ -1,0 +1,26 @@
+# Corrections to lco_epoch_list_2026-11-16.tsv, applied by tools/target_list_crossmatch.py (17 Nov 2026).
+# duplicate_of: the entry is another spelling or a bad position of that list entry (its position is copied from it).
+# ra/dec:       corrected position in degrees (the list value is kept in orig_ra/orig_dec).
+# resolve:      name to give the NED/Sesame resolver.
+# keep_list_position: the resolver returns a different object; trust the list position (Gaia-confirmed).
+fixes:
+  # duplicates: same LCO object, bad or offset positions
+  k2f601:            {duplicate_of: "k2f6-01", note: "Dec sign typo (+14.64 for -14.64); same 343 phot frames as k2f6-01"}
+  k2f604:            {duplicate_of: "k2f6-04", note: "wrong position (18.05,-0.29); same 235 phot frames as k2f6-04"}
+  k2f605:            {duplicate_of: "k2f6-05", note: "wrong position (156.84,+10.97); same 255 phot frames as k2f6-05"}
+  k2f6-01:           {duplicate_of: "RBS1303", note: "K2 C6 name of RBS 1303"}
+  HS0817+1215:       {duplicate_of: "HS0817+1315", note: "name typo, identical position"}
+  J08152+1855:       {duplicate_of: "SDSS J08512+1855", note: "name typo (0815 for 0851), 27\" offset pointing"}
+  2MASSJ09218+1758:  {duplicate_of: "2MASS J09218+1758", note: "position 39' off (old/offset pointing)"}
+  SDSSJ09090+1330:   {duplicate_of: "SDSS J09090+1330", note: "position 44' off (old/offset pointing)"}
+  Q2237+0305_offs:   {duplicate_of: "Q2237+0305", note: "offset pointing"}
+  # lensed quasars listed at offset pointings: positions from NED, nucleus/brightest image from Gaia DR3
+  HE00471756:        {resolve: "HE 0047-1756", ra: 12.615931, dec: -17.669214, note: "list position 1.4' off"}
+  Q0142-100_offs:    {resolve: "Q 0142-100", ra: 26.319149, dec: -9.754796, note: "UM 673; list position is a 125\" offset pointing"}
+  RXJ11311231:       {ra: 172.964935, dec: -12.532693, note: "RX J1131-1231 (Gaia DR3 3586098508760213248); list position 2.1' off; NED does not resolve the name"}
+  WFIJ20334723:      {resolve: "WFI J2033-4723", ra: 308.42535, dec: -47.395375, note: "list position 1.8' off"}
+  HE04351223:        {resolve: "HE 0435-1223", ra: 69.561603, dec: -12.287482, note: "list position 2.1' off"}
+  # resolver picks a different object; list position matches a Gaia source
+  NPM1G+27.058:      {keep_list_position: true, note: "NED resolves the name to an object 85 deg away"}
+  1224+04:           {keep_list_position: true, note: "NED resolves to 4C +04.43, 51' away"}
+  1346+09:           {keep_list_position: true, note: "NED resolves to PKS 1346+09, 43' away"}
