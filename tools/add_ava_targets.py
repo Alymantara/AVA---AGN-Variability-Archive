@@ -10,6 +10,7 @@ For each target:
   VizieR I/355/gaiadr3, servers from ``photometry.reference.vizier_servers``): its position becomes ra/dec, its id
   ``agn_gaia_dr3_id``;
 * E(B-V) along the line of sight (IRSA, Schlafly & Finkbeiner 2011) as ``ebv``;
+* Galactic N_H (HEASARC nH tool, HI4PI 2016) as ``nh`` in cm^-2, looked up once here;
 * literature values (l_5100, logl, logm and their citations) from the YAML;
 * ``ava`` = 2 (observing) if the target has LCO frames in the last 30 days, else 0; public = -1; lco_active = 1.
 Vmag is left empty (to be filled from the merged g-band light curve).  After ``--write``, run
@@ -166,15 +167,20 @@ def build(entry, gaia_radius, today):
         notes.append(f"z SIMBAD {s['z']:.5f} ({s['z_ref']}) vs NED {n['z']:.5f} ({n['z_ref']})")
     g = gaia_counterpart(pos["ra"], pos["dec"], gaia_radius)
     ra, dec = (g["ra"], g["dec"]) if g else (pos["ra"], pos["dec"])
-    from ava.photometry.reference import field_ebv_sf11
+    from ava.photometry.reference import field_ebv_sf11, field_nh_hi4pi
 
     ebv = field_ebv_sf11(ra, dec)
+    try:
+        nh = field_nh_hi4pi(ra, dec)
+    except Exception as e:  # noqa: BLE001 — HEASARC down: fill later with tools/import_nh.py
+        print(f"  {name}: N_H lookup failed ({type(e).__name__}); run tools/import_nh.py later")
+        nh = None
     lco = lco_names_near(ra, dec)
     last = last_lco_day(lco) if lco else None
     recent = bool(last) and datetime.fromisoformat(str(last)) >= today - timedelta(days=30)
     ras, decs = sexa(ra, dec)
     row = {"name": name, "ra": ras, "dec": decs, "ra_deg": round(ra, 6), "dec_deg": round(dec, 6),
-           "redshift": round(z, 6) if z is not None else None, "red_url": zref, "ebv": ebv,
+           "redshift": round(z, 6) if z is not None else None, "red_url": zref, "ebv": ebv, "nh": nh,
            "simbad_name": entry.get("resolve", name), "agn_gaia_dr3_id": g["source_id"] if g else None}
     if "data_id" in entry:
         row.update(data_id=entry["data_id"], lco_id=urllib.parse.quote(entry.get("lco_id", name)),

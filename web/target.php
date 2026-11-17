@@ -160,7 +160,14 @@ function pct(mixed $v, mixed $e = null): string
     return number_format(100 * (float) $v, 1) . (is_numeric($e) ? ' ± ' . number_format(100 * (float) $e, 1) : '') . ' %';
 }
 
-$breakdownCols = ['B', 'V', 'u', 'g', 'r', 'i', 'z'];   // legacy column order
+$breakdownCols = ['u', 'B', 'g', 'V', 'r', 'i', 'z', 'Y'];   // by wavelength
+
+/** Filter name for a table header: SDSS u′ g′ r′ i′ in lower case, Pan-STARRS z<sub>s</sub>, Bessell/Y as is. */
+function band_label(string $f, bool $zs = true): string
+{
+    $sdss = ['u' => 'u′', 'g' => 'g′', 'r' => 'r′', 'i' => 'i′', 'z' => $zs ? 'z<sub>s</sub>' : 'z′'];
+    return '<span class="ava-band">' . ($sdss[$f] ?? h($f)) . '</span>';
+}
 
 ava_page_start('targets', $t['name'], 'AVA data summary, light curves and diagnostics for ' . $t['name'] . '.');
 
@@ -252,8 +259,11 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <tbody>
           <tr><th>Redshift</th><td class="num"><?= fmt_z($t['redshift']) ?></td><td></td>
               <td class="ref"><?= ads_link($t['red_url'], $t['red_cite'] ?: ($t['red_url'] ? 'reference' : '')) ?></td></tr>
-          <tr><th>E(B−V)</th><td class="num"><?= fmt_num($t['ebv'], 3) ?></td><td>mag</td>
-              <td class="ref"><?= ads_link('2011ApJ...737..103S', 'Schlafly & Finkbeiner (2011)') ?></td></tr>
+          <?php $nh = is_pos($t['nh'] ?? null) ? (float) $t['nh'] : null; $nhExp = $nh ? (int) floor(log10($nh)) : 0; ?>
+          <tr><th>E(B−V)<?php if ($nh): ?><span class="mjd">Galactic N<sub>H</sub></span><?php endif; ?></th>
+              <td class="num"><?= fmt_num($t['ebv'], 3) ?><?php if ($nh): ?><span class="mjd"><?= number_format($nh / 10 ** $nhExp, 2) ?> × 10<sup><?= $nhExp ?></sup></span><?php endif; ?></td>
+              <td>mag<?php if ($nh): ?><span class="mjd">cm⁻²</span><?php endif; ?></td>
+              <td class="ref"><?= ads_link('2011ApJ...737..103S', 'Schlafly & Finkbeiner (2011)') ?><?php if ($nh): ?><span class="mjd"><?= ads_link('2016A&A...594A.116H', 'HI4PI Collaboration (2016)') ?></span><?php endif; ?></td></tr>
           <tr><th>Black hole mass</th><td class="num"><?= pm_num($t['logm'], $massErr, 2) ?></td><td>log M<sub>☉</sub></td>
               <td class="ref"><?= ads_link($t['logm_url'], $t['logm_cite']) ?></td></tr>
           <?php if (is_numeric($lit['tau_hbeta_days'] ?? null)): ?>
@@ -278,15 +288,13 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
           <tr><th>Type</th><td class="num"><?= h($t['AGN_type']) ?></td><td></td>
               <td class="ref"><?= ($lit['agn_type'] ?? null) === $t['AGN_type'] ? ads_link($lit['type_ref'], $lit['type_cite']) : '' ?></td></tr>
           <?php endif; ?>
-          <?php if (trim((string) $t['Comments']) !== ''): ?>
-          <tr><th>Comments</th><td colspan="3"><?= h($t['Comments']) ?></td></tr>
-          <?php endif; ?>
-          <?php if (trim((string) $t['PI']) !== ''): ?>
-          <tr><th>PI</th><td colspan="3"><?= h($t['PI']) ?></td></tr>
-          <?php endif; ?>
-          <tr><th>Processing</th><td colspan="3"><?= h(ava_processing($t)) ?></td></tr>
         </tbody>
       </table>
+      <details class="ava-notes"><summary>Notes</summary>
+        <?php if (trim((string) $t['Comments']) !== ''): ?><p><strong>Comments:</strong> <?= h($t['Comments']) ?></p><?php endif; ?>
+        <?php if (trim((string) $t['PI']) !== ''): ?><p><strong>PI:</strong> <?= h($t['PI']) ?></p><?php endif; ?>
+        <p><strong>Processing:</strong> <?= h(ava_processing($t)) ?></p>
+      </details>
 
       <h2 class="ava-h">Photometric data summary</h2>
       <div class="table-responsive">
@@ -312,8 +320,8 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       </table>
       </div>
       <?php if (is_pos($v('db_lco_visits'))): ?>
-        <p class="small text-secondary">LCO: <?= fmt_int($v('db_lco_visits')) ?> visits, <?= fmt_num($v('db_lco_exp_h'), 1) ?> h exposure.
-          <?php if ($v('db_lco_proposals')): ?>Programmes: <?= h(str_replace(';', ', ', (string) $v('db_lco_proposals'))) ?>.<?php endif; ?></p>
+        <details class="ava-notes"><summary>Notes</summary><p>LCO: <?= fmt_int($v('db_lco_visits')) ?> visits, <?= fmt_num($v('db_lco_exp_h'), 1) ?> h exposure.
+          <?php if ($v('db_lco_proposals')): ?>Programmes: <?= h(str_replace(';', ', ', (string) $v('db_lco_proposals'))) ?>.<?php endif; ?></p></details>
       <?php endif; ?>
 
       <?php if (is_pos($fEpochs)): ?>
@@ -326,7 +334,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       </table>
       </div>
       <?php if (is_pos($v('db_floyds_frames'))): ?>
-        <p class="small text-secondary">FLOYDS: <?= fmt_int($v('db_floyds_frames')) ?> frames, <?= fmt_num($v('db_floyds_exp_h'), 1) ?> h exposure.</p>
+        <details class="ava-notes"><summary>Notes</summary><p>FLOYDS: <?= fmt_int($v('db_floyds_frames')) ?> frames, <?= fmt_num($v('db_floyds_exp_h'), 1) ?> h exposure.</p></details>
       <?php endif; ?>
       <?php endif; ?>
 
@@ -348,7 +356,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         </tbody>
       </table>
       </div>
-      <p class="small text-secondary">
+      <details class="ava-notes"><summary>Notes</summary><p>
         <?= fmt_int($any['n_spectra']) ?> spectra on <?= fmt_int($any['n_nights']) ?> nights
         (MJD <?= fmt_num($any['mjd_first'], 1) ?>–<?= fmt_num($any['mjd_last'], 1) ?>)<?php if (is_pos($any['fwhm_kms_median'])): ?>;
         median H&beta; FWHM <?= fmt_int(round((float) $any['fwhm_kms_median'])) ?> km s⁻¹<?php endif; ?>;
@@ -356,7 +364,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         fit <code><?= h($any['method']) ?></code>; updated <?= h(substr((string) $any['updated_utc'], 0, 10)) ?>.
         F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean (Vaughan et al. 2003);
         F<sub>max</sub>/F<sub>min</sub>: highest / lowest nightly flux (not corrected for errors).
-      </p>
+      </p></details>
       <?php endif; ?>
 
       <?php ava_release_panel($t); ?>
@@ -433,11 +441,11 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
   <div class="table-responsive">
     <table class="table ava-info ava-breakdown">
       <thead><tr><th>LCO</th>
-        <?php foreach ($breakdownCols as $f): ?><th class="num" style="--c: var(<?= ava_filter_var($f) ?>)"><span class="fdot"></span><?= h($f) ?></th><?php endforeach; ?>
+        <?php foreach ($breakdownCols as $f): ?><th class="num" style="--c: var(<?= ava_filter_var($f) ?>)"><span class="fdot"></span><?= band_label($f) ?></th><?php endforeach; ?>
       </tr></thead>
       <tbody>
         <tr><th>#Epochs</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= fmt_int($lcoFrames($f)) ?></td><?php endforeach; ?></tr>
-        <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_pos($t["avg_$f"]) ? fmt_num($t["avg_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
+        <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_pos($t["avg_$f"] ?? null) ? fmt_num($t["avg_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
         <?php if ($bandVar): ?>
         <tr><th>F<sub>var</sub> (merged)</th><?php foreach ($breakdownCols as $f): $r = $bandVar[$f] ?? null; ?>
           <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs, F_max/F_min ' . fmt_num($r['rmax'], 2) . '"' : '' ?>><?=
@@ -450,16 +458,11 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       </tbody>
     </table>
   </div>
-  <?php if ($bandVar): $bv0 = reset($bandVar); ?>
-    <p class="small text-secondary">F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean flux, of the PyTICS-merged light curve
-      (errors: <?= h((string) $bv0['error_model']) ?>), MJD <?= fmt_num($bv0['mjd_first'], 0) ?>–<?= fmt_num($bv0['mjd_last'], 0) ?>;
-      updated <?= h(substr((string) $bv0['updated_utc'], 0, 10)) ?>.</p>
-  <?php endif; ?>
-
+  <?php $bv0 = $bandVar ? reset($bandVar) : null; ?>
   <?php if (is_pos($t['lt_cadence'])): $lt = ['u', 'g', 'r', 'i', 'z']; ?>
   <div class="table-responsive">
     <table class="table ava-info ava-breakdown">
-      <thead><tr><th>LT — Liverpool Telescope</th><?php foreach ($lt as $f): ?><th class="num"><?= h($f) ?></th><?php endforeach; ?></tr></thead>
+      <thead><tr><th>LT — Liverpool Telescope</th><?php foreach ($lt as $f): ?><th class="num" style="--c: var(<?= ava_filter_var($f) ?>)"><span class="fdot"></span><?= band_label($f, false) ?></th><?php endforeach; ?></tr></thead>
       <tbody>
         <tr><th>#Epochs</th><?php foreach ($lt as $f): ?><td class="num"><?= fmt_int($t["lt_$f"]) ?></td><?php endforeach; ?></tr>
         <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($lt as $f): ?><td class="num"><?= is_pos($t["avg_lt_$f"]) ? fmt_num($t["avg_lt_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
@@ -468,10 +471,11 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
   </div>
   <?php endif; ?>
 
-  <?php if (is_pos($t['swift_w2'])): $sw = ['FX' => 'X-rays', 'w2' => 'UVW2', 'm2' => 'UVM2', 'w1' => 'UVW1', 'U' => 'U', 'B' => 'B', 'V' => 'V']; ?>
+  <?php if (is_pos($t['swift_w2'])): $sw = ['FX' => 'X-rays', 'w2' => 'UVW2', 'm2' => 'UVM2', 'w1' => 'UVW1', 'U' => 'U', 'B' => 'B', 'V' => 'V'];
+      $swDict = ['FX' => 'SX', 'w2' => 'UVW2', 'm2' => 'UVM2', 'w1' => 'UVW1', 'U' => 'Us', 'B' => 'Bs', 'V' => 'Vs'];   // filter_dict colours ?>
   <div class="table-responsive">
     <table class="table ava-info ava-breakdown">
-      <thead><tr><th>Swift</th><?php foreach ($sw as $label): ?><th class="num"><?= h($label) ?></th><?php endforeach; ?></tr></thead>
+      <thead><tr><th>Swift</th><?php foreach ($sw as $k => $label): ?><th class="num" style="--c: var(<?= ava_filter_var($swDict[$k]) ?>)"><span class="fdot"></span><?= h($label) ?></th><?php endforeach; ?></tr></thead>
       <tbody>
         <tr><th>#Epochs</th><?php foreach (array_keys($sw) as $k): ?><td class="num"><?= fmt_int($t["swift_$k"]) ?></td><?php endforeach; ?></tr>
         <tr><th>Mean mag (AB), last 10 d</th><?php foreach (array_keys($sw) as $k): ?><td class="num"><?= is_pos($t["avg_sw_$k"] ?? null) ? fmt_num($t["avg_sw_$k"], 2) : '—' ?></td><?php endforeach; ?></tr>
@@ -480,8 +484,13 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
   </div>
   <?php endif; ?>
 
-  <?php if ($v('db_updated')): ?>
-    <p class="small text-secondary">Observing summary updated <?= h($v('db_updated')) ?>.</p>
+  <?php if ($bv0 || $v('db_updated')): ?>
+    <details class="ava-notes"><summary>Notes</summary>
+      <?php if ($bv0): ?><p>F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean flux, of the PyTICS-merged
+        light curve (errors: <?= h((string) $bv0['error_model']) ?>), MJD <?= fmt_num($bv0['mjd_first'], 0) ?>–<?= fmt_num($bv0['mjd_last'], 0) ?>;
+        updated <?= h(substr((string) $bv0['updated_utc'], 0, 10)) ?>.</p><?php endif; ?>
+      <?php if ($v('db_updated')): ?><p>Observing summary updated <?= h($v('db_updated')) ?>.</p><?php endif; ?>
+    </details>
   <?php endif; ?>
 </div>
 
