@@ -9,6 +9,9 @@ declare(strict_types=1);
 const AVA_ADS = 'https://ui.adsabs.harvard.edu/abs/';
 
 const AVA_PUBLICATIONS = [
+    ['The Extended Mrk 817 Reverberation Mapping Campaign. I. Swift Monitoring', 'Edelson et al.', 'ApJ, submitted', 2026, null],
+    ['Broadband reverberation mapping of NGC 3783: a timescale-dependent optical lag spectrum', 'Vieliute et al.', 'MNRAS, submitted', 2026, null],
+    ['Intensive NICER and Swift monitoring of NGC 4151 reveals disrupted X-ray reprocessing via a variable obscuring disk wind', 'Partington et al.', 'ApJ, submitted', 2026, null],
     ['Continuum Reverberation Mapping of the Super-Eddington Accreting AGN PG 0844+349', 'Huang et al.', 'MNRAS, submitted', 2026, null],
     ['Accretion Disk Reverberation Mapping of the Obscured Narrow-Line Seyfert 1 Galaxy Mrk 1239', 'Kololgi et al.', 'MNRAS, submitted', 2026, null],
     ['Directly Tracking the Rebrightening of a Supermassive Black Hole Accretion Disk', 'Middei et al.', 'ApJ, 1004, 200', 2026, '2026ApJ..1004..200M'],
