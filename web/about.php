@@ -177,6 +177,8 @@ ava_page_start('about', 'About', 'About AVA: the team, LCO programmes, manuals, 
         <p>The AVA pipeline was created by <?= h(AVA_PI) ?>. Version 2 — the current photometric and spectroscopic
           pipeline and this website — is based on, and improves, that original pipeline. It was designed by
           <?= h(AVA_PI) ?>, with development assistance from Claude Opus 5.5 (Anthropic).</p>
+        <p>We thank Keith Horne for his continuous support and advice throughout the development of AVA, and
+          Stuart Norcross and CJ Davies for their help in developing it within the University of St Andrews.</p>
       </div>
     </div>
   </div>
