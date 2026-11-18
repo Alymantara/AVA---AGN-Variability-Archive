@@ -460,6 +460,22 @@ deletes. A file is deleted only when all its checks pass:
 - The web server only needs read access to `web.data_dir`; the pipeline user writes it.
 - HTTPS certificate (e.g. Let's Encrypt), and the university domain / DNS — **to arrange**.
 - The website can run on the same VM or another host that receives `web.data_dir` (e.g. `rsync`).
+- **Photometric calibration page** (`web/calibration.php`, linked from the Data page; breadcrumb Data ›
+  Photometric calibration). It reads `<web.data_dir>/calibration/calibration.json`, which the `-w` publish step
+  copies from `web.calibration_src` (default `data/products/calibration/calibration.json`). The page shows
+  only its static text until that file exists. Build or refresh the file **on demand** (not scheduled) after
+  new FLOYDS spectra are reduced, in the `stenv`-style environment (pandas + pyarrow + astropy + scipy) with
+  the synphot data tree for the Pickles library:
+
+  ```
+  export PYSYN_CDBS=/path/to/synphot/trds
+  python tools/abscal_validation/agn_sed_corrections.py --out <work>      # every target with reduced spectra
+  python tools/abscal_validation/abscal_ps1_apass.py <work>/ext          # star table (one ESA Gaia-archive query)
+  python tools/abscal_validation/export_web.py --sed <work> --ext <work>/ext
+  python scripts/run_pipeline.py -w                                      # or tools/publish_web.py
+  ```
+
+  The technical report `docs/reports/report_abscal.pdf` is in `web.manuals` and is linked from the page.
 
 # 9. First-time setup and backfill
 

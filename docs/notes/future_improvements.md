@@ -104,6 +104,34 @@ Newest decisions first within each section.
   Confirm the AGN u scale against Swift/UVOT U.
 - **APASS DR10 file check**: the legacy Mrk 817 DR10 file disagrees with SDSS by g +0.14, r −0.16,
   i −0.19 — compare a raw AAVSO download's column order on the production machine.
+- **Absolute-calibration accuracy (18 Nov 2026; report `docs/reports/abscal/report_abscal.md`, PDF `docs/reports/report_abscal.pdf`,
+  scripts `tools/abscal_validation/`)**:
+  - Stars (Mrk 817 field): AVA = GSPC to ≲ 3 mmag; vs SDSS DR16 / PS1 DR2 g r i z ≲ 3 mmag (z −7 vs SDSS), u −3 ± 8;
+    B/V only checkable to ~20–25 mmag (Jordi transforms). No trends with magnitude, airmass, seeing, season or camera
+    above ~5 mmag; the `absolute_*` settings move the ZP ≤ 3–5 mmag (keep defaults). APASS DR9 is off by
+    +0.03…+0.17 mag, so the `apass_model` fallback is not a precise zero point.
+  - **AGN: stellar colour terms at the AGN colour do not give its SDSS/Landolt magnitude.** From 166 fringe-corrected
+    FLOYDS spectra (shape only), true − AVA in mmag:
+    - Mrk 817: B −26, g −31, V +47, **r +138**, i +4;
+    - NGC 4151: B −24, g −45, **V +78**, **r −48**, i 0;
+    - Fairall 9: B −28, g −25, V +27, **r +181**, i 0.
+
+    Causes: Hα at the LCO r′ (6925 Å) / SDSS r (6730 Å) red edges, [O III] at the LCO V / Landolt V blue edges,
+    and the non-stellar continuum. Stable to 1–10 mmag from epoch to epoch; depends on z (figure: redshift scan)
+    and weakly on AGN state. Same-night photometry confirms the r term (r−i). u and z not reliable yet.
+  - **Decide (before DR1):** publish AGN magnitudes in the LCO natural AB system (zero point from GSPC; passbands
+    published); offer reference-system fluxes as a derived product with per-target / per-season spectral
+    corrections; add a pipeline step after the spectroscopy products.
+  - **Before that:** per-camera passbands (MuSCAT, SBIG, Spectral; mirrors); resolve the B/V/i synthetic-vs-empirical
+    colour-term mismatch (70–90 Å equivalent shifts); redo with all spectra reduced (the scripts find every target).
+  - **FLOYDS:** use the fringe-corrected `EXTRACTED` orders for photometry, never the merged `SPECTRUM` (not
+    fringe-corrected). Against same-night photometry, Mrk 817 spectra are 0.11 mag too blue between g/V and r/i
+    (not an order-splice step: overlap ratio 1.00). Check every night with both spectrum and photometry.
+  - **Website page** `web/calibration.php` (18 Nov 2026; Data › Photometric calibration, linked from the Data page's
+    filter and file-format sections): stars accuracy, LCO vs reference passbands, each AGN's spectrum with the
+    passbands, per-target corrections and the redshift scan, from `calibration.json` (`export_web.py` →
+    `web.calibration_src` → `-w`). Its status box says the natural-system switch is *under review*; update it with
+    the decision.
 
 ## Reference catalogue
 

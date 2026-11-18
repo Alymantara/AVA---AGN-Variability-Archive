@@ -146,6 +146,19 @@ def test_filters(tmp_path, src):
     assert publish(dest=dest, filters_src=fdir, **kw).filters_copied == 0
 
 
+def test_calibration_json(tmp_path, src):
+    kw, _ = src
+    dest = tmp_path / "out"
+    cal = tmp_path / "products" / "calibration.json"
+    s = publish(dest=dest, calibration_src=cal, **kw)            # not made yet: skipped
+    assert not s.calibration_copied and not (dest / "calibration").exists()
+    cal.parent.mkdir(parents=True)
+    cal.write_text('{"targets": []}')
+    assert publish(dest=dest, calibration_src=cal, **kw).calibration_copied
+    assert (dest / "calibration" / "calibration.json").read_text() == '{"targets": []}'
+    assert not publish(dest=dest, calibration_src=cal, **kw).calibration_copied   # unchanged
+
+
 def test_publish_download_copy_and_zip(tmp_path):
     import os
     import zipfile

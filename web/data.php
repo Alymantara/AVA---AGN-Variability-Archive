@@ -92,7 +92,8 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
           the network are put on a common, absolute (AB) scale by the PyTICS ensemble calibration
           (Vieliute et al. 2025, <a href="https://doi.org/10.1093/rasti/rzaf021">RASTI, rzaf021</a>), so no further
           intercalibration is needed. Only epochs that pass quality control are included. Please
-          <a href="#cite">cite PyTICS</a> together with AVA.</p>
+          <a href="#cite">cite PyTICS</a> together with AVA. Accuracy and filter-system details:
+          <a href="calibration.php">Photometric calibration</a>.</p>
         <table class="table ava-info">
           <thead><tr><th>Column</th><th>Content</th></tr></thead>
           <tbody>
@@ -146,6 +147,8 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
       <strong>Sinistro CCD response</strong> (the only instrument component — no telescope mirrors or other optics) and
       the <strong>atmosphere at airmass = 1</strong>, hence the telluric O<sub>2</sub> bands in r and i. These are the curves used for the absolute calibration of the merged light curves
       (<a href="#cite">PyTICS; Vieliute et al. 2025</a>). Each file has two columns: wavelength (Å) and transmission.</p>
+    <p class="mb-4" style="max-width:80ch"><a class="fw-semibold" href="calibration.php">How the photometry is calibrated, and why
+      AGN magnitudes depend on the filter system →</a></p>
     <div class="ava-chart-wrap mt-0"><?= ava_transmission_svg($filters) ?></div>
     <div class="ava-table-wrap mt-4" style="max-height:none">
       <table class="table ava-table">

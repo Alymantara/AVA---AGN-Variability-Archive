@@ -13,6 +13,8 @@ The website (``web/``) never reads pipeline paths. After each update the
   filters/lco_<band>.txt       LCO filter transmission curves (photometry.reference.lco_filters),
   filters/ava_lco_filters.zip  all of them, and filters/filters.json (per-band summary + a
                                thinned curve for the Data & Access plot)
+  calibration/calibration.json photometric-calibration study for calibration.php (``web.calibration_src``,
+                               made by tools/abscal_validation/export_web.py)
   site.json                    site switches read by the PHP pages (``downloads``: true/false)
   downloads/<data_id>/         per-target products, only when ``web.downloads`` is true:
       <t>_LCO_merged_lightcurve.csv   PyTICS-merged photometry
@@ -64,6 +66,7 @@ class PublishSummary:
     usage_copied: int = 0
     manuals_copied: int = 0
     filters_copied: int = 0
+    calibration_copied: bool = False
     downloads_updated: int = 0
     filter_dict_copied: bool = False
     changes: list[str] = field(default_factory=list)
@@ -135,6 +138,7 @@ def publish(
     usage_src: Path | None = None,
     manuals: Iterable[Path] = (),
     filters_src: Path | None = None,
+    calibration_src: Path | None = None,
     downloads_for: Callable[[str], dict[str, list[Path]]] | None = None,
     downloads: bool = True,
     prune: bool = False,
@@ -195,6 +199,10 @@ def publish(
 
     if filters_src is not None and Path(filters_src).is_dir():
         s.filters_copied = publish_filters(Path(filters_src), dest / "filters", dry_run, s)
+
+    if calibration_src is not None and Path(calibration_src).is_file():
+        s.calibration_copied = _copy_if_changed(Path(calibration_src), dest / "calibration" / "calibration.json",
+                                                dry_run, s)
 
     if not dry_run:
         import json
@@ -328,6 +336,7 @@ def publish_from_config(cfg, targets: Iterable[str] | None = None, dry_run: bool
         filters_src=cfg._resolve(web.get("filters_src") or
                                  ((cfg._raw.get("photometry", {}) or {}).get("reference", {}) or {}).get("lco_filters")
                                  or "data/reference/lco_filters"),
+        calibration_src=cfg._resolve(web["calibration_src"]) if web.get("calibration_src") else None,
         prune=bool(web.get("prune", False)),
         downloads_for=downloads_from_config(cfg),
         downloads=bool(web.get("downloads", False)),

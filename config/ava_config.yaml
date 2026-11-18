@@ -612,6 +612,8 @@ web:
   # Relative paths are from ava_root. The site's AVA_WEB_DATA must point here.
   data_dir: "web/data"
   usage_src: "data/lco_usage/plots"   # folder with lco_usage_<semester>.png (scripts/lco_usage.py; null = skip)
+  # Photometric-calibration study shown on calibration.php (tools/abscal_validation/export_web.py; null = skip)
+  calibration_src: "data/products/calibration/calibration.json"
   prune: false             # remove published plots the pipeline no longer makes
   # Public per-target downloads (merged light curve, 1-d spectra zip, PrepSpec zip) and the Download
   # button on target pages. false: no files built, the button is hidden and published files are not served.
@@ -623,6 +625,7 @@ web:
     - "docs/manuals/photometry_manual.pdf"
     - "docs/manuals/spectroscopy_manual.pdf"
     - "docs/reports/report_pytics_update.pdf"
+    - "docs/reports/report_abscal.pdf"
   host: "0.0.0.0"
   port: 5000
   debug: false
