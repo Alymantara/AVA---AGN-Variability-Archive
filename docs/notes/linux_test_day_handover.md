@@ -42,8 +42,8 @@ tell the user. Commit only when asked.
 
 ## State at hand-over
 
-The user keeps a tickable copy of this plan on a claude.ai page; you cannot update it from here, so tell the
-user which step finished.
+**The checklist is `docs/notes/linux_test_day_checklist.md`.** When a step finishes, tick it there (`[x]`) and add
+a one-line note (what it printed, what was decided). Commit it only when the user asks.
 
 Progress (updated 18 Nov 2026, from the Mac help-desk session):
 
