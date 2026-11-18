@@ -347,7 +347,7 @@ class Archive:
              proposal=None, max_airmass=None, max_seeing=None, min_exptime=None, columns=None, limit=None):
         """Photometric images (one row per exposure, BANZAI L91 or the old pipeline when no L91 exists).
 
-        filters: 'g' / 'gp' / ['B','V']; camera: 'fa14' or a type ('sinistro','spectral','muscat');
+        filters: 'g' / 'gp' / ['B','V']; camera: 'fa14' or a type ('sinistro','spectral','muscat','sbig');
         telescope: '1m010'; site: 'coj'; seeing in arcsec (needs headers); columns: list or 'all'."""
         w, p = ['is_best = 1'], []
         wt, pt = self._where_target(target)
@@ -364,7 +364,7 @@ class Archive:
                 p += list(val)
         if camera:
             cams = _list(camera)
-            types = [c for c in cams if c in ('sinistro', 'spectral', 'muscat')]
+            types = [c for c in cams if c in ('sinistro', 'spectral', 'muscat', 'sbig')]
             ids = [c for c in cams if c not in types]
             parts = []
             if types:

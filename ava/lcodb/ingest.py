@@ -30,6 +30,25 @@ def classify(instrument_id, cfg):
     return None
 
 
+def rejected(f, kind, cfg):
+    """Why a frame of a kept camera is not stored (None = keep).
+
+    * ``instruments.telescopes`` (prefix -> telescope_id prefixes): keep that camera only on those telescopes,
+      e.g. SBIG ``kb`` on the 1 m only (the 0.4 m SBIG cameras share the prefix but have another pixel scale);
+    * ``photometry_filters``: imaging filters kept in the photometry database (u B V g r i z Y).
+    """
+    inst = (f.get('instrument_id') or '').lower()
+    for prefix, tels in ((cfg['instruments'].get('telescopes') or {}).items()):
+        if inst.startswith(str(prefix).lower()):
+            tel = (f.get('telescope_id') or '').lower()
+            if not any(tel.startswith(str(t).lower()) for t in tels):
+                return f'telescope {tel or "?"}'
+    keep = cfg.get('photometry_filters')
+    if kind == 'photometry' and keep and f.get('primary_optical_element') not in keep:
+        return f'filter {f.get("primary_optical_element")}'
+    return None
+
+
 def discover_proposals(client, cfg):
     """Returns [(id, title, active, is_standard_source)]."""
     pc = cfg['proposals']
@@ -60,6 +79,7 @@ class Router:
         self.std_props = set(cfg.get('standard_proposals') or [])
         self.buf = {'spectra': [], 'photometry': []}
         self.unknown = {}
+        self.dropped = {}            # (instrument_id, reason) -> frames not stored (state.dropped_frames)
         self.n_new = self.n_upd = 0
         self.levels = {k: set(v) for k, v in cfg['reduction_levels'].items()}
 
@@ -68,13 +88,24 @@ class Router:
         if kind is None:
             self.unknown[f.get('instrument_id')] = self.unknown.get(f.get('instrument_id'), 0) + 1
             return
-        if kind == 'ignore' or (standards_only and kind != 'spectra'):
+        if standards_only and kind != 'spectra':
+            return
+        if kind == 'ignore':
+            self._drop(f, 'ignored prefix')
             return
         if f.get('reduction_level') not in self.levels[kind]:
+            return
+        why = rejected(f, kind, self.cfg)
+        if why:
+            self._drop(f, why)
             return
         self.buf[kind].append(db.frame_row(f, self.std_names, self.std_props))
         if len(self.buf[kind]) >= 2000:
             self.flush(kind)
+
+    def _drop(self, f, reason):
+        key = (f.get('instrument_id'), reason)
+        self.dropped[key] = self.dropped.get(key, 0) + 1
 
     def flush(self, kind=None):
         for k in ([kind] if kind else list(self.buf)):
@@ -90,6 +121,14 @@ class Router:
                     last_seen=excluded.last_seen""", (inst, n, ts))
             self.state.commit()
             self.unknown = {}
+        if not kind and self.dropped:
+            ts = db.now()
+            for (inst, why), n in self.dropped.items():
+                self.state.execute("""INSERT INTO dropped_frames VALUES (?,?,?,?)
+                    ON CONFLICT(instrument_id, reason) DO UPDATE SET n_frames=n_frames+excluded.n_frames,
+                    last_seen=excluded.last_seen""", (inst, why, n, ts))
+            self.state.commit()
+            self.dropped = {}
 
 
 def crawl_window(client, cfg, router, pid, start, end, standards_only):

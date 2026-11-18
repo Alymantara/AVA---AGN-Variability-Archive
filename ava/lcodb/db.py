@@ -49,7 +49,7 @@ def now():
     return datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
 
 
-CAMERA_TYPES = {'fa': 'sinistro', 'fl': 'sinistro', 'fs': 'spectral', 'ep': 'muscat', 'en': 'floyds'}
+CAMERA_TYPES = {'fa': 'sinistro', 'fl': 'sinistro', 'fs': 'spectral', 'ep': 'muscat', 'kb': 'sbig', 'en': 'floyds'}
 
 
 def camera_type(instrument_id):

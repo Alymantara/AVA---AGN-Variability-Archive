@@ -167,6 +167,36 @@ def imaging_prefixes() -> tuple[str, ...]:
 IMAGING_PREFIXES = imaging_prefixes()
 
 
+def camera_telescopes() -> dict[str, tuple[str, ...]]:
+    """Camera prefix -> telescope classes it is used on (photometry.camera_telescopes), e.g. SBIG kb -> 1m0:
+    the 0.4 m SBIG cameras share the prefix but have another pixel scale, so they are never extracted."""
+    try:
+        from ava.config import cfg
+
+        v = (cfg._raw.get("photometry", {}) or {}).get("camera_telescopes") or {}
+    except Exception:  # noqa: BLE001
+        v = {}
+    return {str(k).lower(): tuple(str(t).lower() for t in ts) for k, ts in v.items()}
+
+
+def imaging_frame_ok(name: str, telescope: str | None = None, prefixes=None, telescopes=None) -> bool:
+    """True if a frame belongs to the photometry: imaging camera prefix and, for cameras restricted in
+    ``photometry.camera_telescopes``, the right telescope class. ``name`` is an LCO basename
+    (``elp1m008-kb74-20140608-0035-e91``, telescope class taken from it) or an instrument id (``kb74``,
+    then ``telescope`` = the archive ``telescope_id``, e.g. ``1m0a``)."""
+    prefixes = IMAGING_PREFIXES if prefixes is None else tuple(prefixes)
+    telescopes = camera_telescopes() if telescopes is None else telescopes
+    parts = str(name).split("-")
+    inst = (parts[1] if len(parts) > 1 else parts[0]).lower()
+    if inst[:2] not in prefixes:
+        return False
+    allowed = telescopes.get(inst[:2])
+    if not allowed:
+        return True
+    tel = (telescope or (parts[0][3:6] if len(parts) > 1 else "")).lower()
+    return any(tel.startswith(t) for t in allowed)
+
+
 def match_settings() -> dict:
     """Catalogue-to-reference matching (photometry.matching): max_sep_arcsec, min_matches (below it the WCS is
     re-solved), recentre_radii_arcsec (wider searches for the frame offset), min_recentre_stars."""
@@ -214,7 +244,7 @@ def calibrate_target(data_id: str, *, catdir: Path, phot_dir: Path, ref: pd.Data
 
     done = store.read_frame_qc(frame_db, data_id)
     done = set(done.loc[done["pipeline_version"] == PIPELINE_VERSION, "frame"]) if not force else set()
-    cats = sorted(p for p in Path(catdir).glob("*_cat.fits") if p.name.split("-")[1][:2] in IMAGING_PREFIXES)
+    cats = sorted(p for p in Path(catdir).glob("*_cat.fits") if imaging_frame_ok(p.name))
     if frames is not None:
         keep = set(frames)
         cats = [p for p in cats if p.name[: -len("_cat.fits")] in keep]

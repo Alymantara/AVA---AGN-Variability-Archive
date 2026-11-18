@@ -69,11 +69,14 @@ def raw_dir(target: str, kind: str):
 
 def make_query(entry: dict, kind: str, proposals, start, end):
     from ava.lco.download import Query
+    from ava.photometry.process import camera_telescopes, imaging_prefixes
 
     dc = cfg.download
     return Query(
         names=list(entry.get("lco_names") or []), proposals=list(proposals), start=start, end=end, kind=kind,
         filters=list(cfg.photometry.filters) if kind == "phot" else None,
+        cameras=list(imaging_prefixes()) if kind == "phot" else None,
+        camera_telescopes=camera_telescopes() if kind == "phot" else None,
         window_days=int(dc.window_days), page_size=int(dc.page_size),
         params=dict(vars(dc.archive_params)),
     )

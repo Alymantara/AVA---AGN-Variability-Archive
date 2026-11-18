@@ -298,6 +298,16 @@ no header. `config/lcodb_config.yaml` → `headers.spectra.since: "2021-09-01"` 
 newer frames (a few dozen a day), so no backlog is fetched; those old spectra are matched by observing block,
 then nearest time. `tools/headers_backfill.sh` is no longer needed.
 
+**What the crawl keeps (18 Nov 2026).**
+- Imaging cameras: Sinistro (`fa`, `fl`), Spectral (`fs`), MuSCAT (`ep`), and SBIG (`kb`, 2014–16) on the
+  1 m only.
+- Imaging filters: u B V g r i z Y only (`photometry_filters`).
+- Everything else that is listed but not stored is counted in `state.sqlite` `dropped_frames`, and `lcodb
+  stats` reports it.
+- **Request budget:** the LCO archive allows **5000 requests per day per user**, UI and API together. Every
+  listing page, header and file download counts. The daily jobs use a few hundred at most; plan any
+  backfill around this limit.
+
 ## 7.2 Job 2 — download (02:00)
 
 **How the pipeline decides what to download** (checked in the code, 16 Nov 2026):

@@ -20,10 +20,11 @@ def cons(cfg):
 
 
 def frame(i, basename, inst='en12', obstype='SPECTRUM', rlevel=0, obj='Fairall9', prop='KEY2026B-007',
-          date='2026-10-10T12:00:00.000Z', block=1, md5='a', ra=20.9):
+          date='2026-10-10T12:00:00.000Z', block=1, md5='a', ra=20.9, filt=None, tel='2m0a'):
     return {'id': i, 'basename': basename, 'filename': basename + '.fits.fz', 'proposal_id': prop,
-            'instrument_id': inst, 'site_id': 'coj', 'telescope_id': '2m0a', 'observation_date': date,
-            'observation_day': date[:10], 'exposure_time': 600.0, 'primary_optical_element': 'air',
+            'instrument_id': inst, 'site_id': 'coj', 'telescope_id': tel, 'observation_date': date,
+            'observation_day': date[:10], 'exposure_time': 600.0,
+            'primary_optical_element': filt or ('air' if inst.startswith('en') else 'gp'),
             'configuration_type': obstype, 'reduction_level': rlevel, 'target_name': obj,
             'observation_id': block, 'request_id': 9, 'public_date': date,
             'version_set': [{'id': i * 10, 'md5': md5, 'extension': '.fits.fz'}], 'related_frames': [],
@@ -51,6 +52,7 @@ def test_classify(cfg):
     assert ingest.classify('sd04', cfg) == 'ignore'
     assert ingest.classify('nrs01', cfg) == 'ignore'
     assert ingest.classify('fl12', cfg) == 'photometry'
+    assert ingest.classify('kb74', cfg) == 'photometry'     # SBIG (1 m only, see test_sbig_1m_only...)
     assert ingest.classify('zz01', cfg) is None
 
 
@@ -318,3 +320,20 @@ def test_query_archive_end_to_end(cfg, cons, tmp_path):
     assert o.loc[0, 'phot_images'] == 3 and o.loc[0, 'spec_epochs'] == 1
     assert abs(to_mjd('2026-10-10') - 61323.0) < 1e-9
     a.close()
+
+
+def test_sbig_1m_only_filters_and_drops_counted(cfg, cons):
+    """SBIG kb frames are kept on the 1 m only; non-u..Y filters and ignored prefixes are counted, not lost."""
+    c, state = cons
+    r = ingest.Router(cfg, c, state)
+    r.add(frame(1, 'elp1m008-kb74-20140608-0035-e91', inst='kb74', obstype='EXPOSE', rlevel=91, tel='1m0a', filt='zs'))
+    r.add(frame(2, 'ogg0m406-kb82-20140608-0001-e91', inst='kb82', obstype='EXPOSE', rlevel=91, tel='0m4a', filt='gp'))
+    r.add(frame(3, 'coj1m011-fa12-20261010-0100-e91', inst='fa12', obstype='EXPOSE', rlevel=91, tel='1m0a', filt='w'))
+    r.add(frame(4, 'coj1m011-fa12-20261010-0101-e91', inst='fa12', obstype='EXPOSE', rlevel=91, tel='1m0a', filt='Y'))
+    r.add(frame(5, 'coj2m002-sd04-20261010-0001-x00', inst='sd04'))
+    r.flush()
+    rows = c['photometry'].execute('SELECT basename, camera_type FROM frames ORDER BY basename').fetchall()
+    assert [tuple(x) for x in rows] == [('coj1m011-fa12-20261010-0101-e91', 'sinistro'),
+                                        ('elp1m008-kb74-20140608-0035-e91', 'sbig')]
+    dropped = {(x['instrument_id'], x['reason']): x['n_frames'] for x in state.execute('SELECT * FROM dropped_frames')}
+    assert dropped == {('kb82', 'telescope 0m4a'): 1, ('fa12', 'filter w'): 1, ('sd04', 'ignored prefix'): 1}

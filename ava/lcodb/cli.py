@@ -199,6 +199,12 @@ def cmd_status(cfg, a):
         print('\nunclassified instruments (add their prefix to config.yaml `instruments`):')
         for r in unk:
             print(f'  {r["instrument_id"]:10s} {r["n_frames"]:8d}  last {r["last_seen"]}')
+    drop = state.execute('''SELECT reason, COUNT(*) n_inst, SUM(n_frames) n FROM dropped_frames
+                             GROUP BY reason ORDER BY n DESC''').fetchall()
+    if drop:
+        print('\nlisted but not stored on purpose (state.dropped_frames; `instruments`, `photometry_filters`):')
+        for r in drop:
+            print(f'  {r["reason"]:24s} {r["n"]:8d} frames  ({r["n_inst"]} instruments)')
     print('\nlast runs:')
     for r in state.execute('SELECT * FROM runs ORDER BY id DESC LIMIT 5'):
         print(f'  {r["started"]}  {r["command"]:40s} {r["status"]:6s} new={r["n_new"]} upd={r["n_updated"]} {r["message"] or ""}')

@@ -18,7 +18,9 @@ proposals:
   mode: auto
   include_regex: '^KEY'
   pi_only: true               # auto mode: keep only proposals where you are the PI (if the portal says)
-  ids: [KEY2018B-001, KEY2014A-002]   # always included (co-I projects); in auto mode added to the discovered ones
+  # always included (co-I projects); in auto mode added to the discovered ones.
+  # LCO2014A-001: NGC 5548 during AGN STORM 1 (2014-05 → 08, V band; 1 m SBIG + early Sinistro; public). 18 Nov 2026.
+  ids: [KEY2018B-001, KEY2014A-002, LCO2014A-001]
   exclude: []
 
 # Proposals crawled whole for spectrograph standards (science + arcs + lamp flats).
@@ -37,10 +39,19 @@ exclude_obstypes: [GUIDE, EXPERIMENTAL, CATALOG]   # filtered on the server; GUI
 # Instrument-id prefix -> database. Unknown prefixes are counted and reported, not stored.
 instruments:
   spectra: [en]               # FLOYDS (en05, en06, en12)
-  photometry: [fa, fl, fs, ep]   # Sinistro (fa; fl = early Sinistro naming), Spectral (fs), MuSCAT (ep)
+  # Sinistro (fa; fl = early Sinistro naming), Spectral (fs), MuSCAT (ep), SBIG (kb: the 1 m imagers of 2014-16)
+  photometry: [fa, fl, fs, ep, kb]
   # dropped on purpose: guide/acquisition (sd ak kf ef), NRES (nrs), SOAR Goodman (ghts),
-  # QHY (sq), SBIG (kb), other (mc). Move a prefix up to keep it.
-  ignore: [sd, ak, kf, ef, ghts, nrs, sq, kb, mc]
+  # QHY (sq), other (mc). Move a prefix up to keep it. Dropped frames are counted in state.dropped_frames.
+  ignore: [sd, ak, kf, ef, ghts, nrs, sq, mc]
+  # Keep a camera only on these telescopes (telescope_id prefix). SBIG: 1 m only (decided 18 Nov 2026);
+  # the 0.4 m SBIG cameras share the kb prefix but have another pixel scale and field.
+  telescopes:
+    kb: [1m0]
+
+# Imaging filters kept in the photometry database (archive names of u B V g r i z Y; user, 18 Nov 2026).
+# Frames in other filters (U R I w, narrow-band, air, ...) are listed but not stored (state.dropped_frames).
+photometry_filters: [up, B, V, gp, rp, ip, zs, Y]
 
 # --- crawling ---------------------------------------------------------------
 page_size: 1000               # anonymous access is capped at 100; the token allows 1000
@@ -51,6 +62,8 @@ request_timeout: 180
 header_workers: 4
 header_rate_per_s: 4        # sustained archive limit seen in Nov 2026; faster gets a multi-hour 429 block
 sync_rate_per_s: 2          # archive listing requests (sync, standards and calibration crawls); null = no limit
+# DAILY LIMIT (LCO archive docs): 5000 requests/day per logged-in user, UI and API together (3500 anonymous).
+# Every HTTP request counts: each listing page, header, search and file download. One token = one shared budget.
 
 # Which frames get their full FITS header downloaded (needed for AIRMASS, seeing, slit, ...).
 # Spectra: every frame (a few 10^4). Photometry: the BANZAI frames (all raw keywords plus

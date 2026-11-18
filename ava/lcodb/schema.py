@@ -230,4 +230,8 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS unknown_instruments (
     instrument_id TEXT PRIMARY KEY, n_frames INTEGER, last_seen TEXT
 );
+-- frames listed but not stored on purpose (ignored prefix, telescope, filter), so nothing is dropped silently
+CREATE TABLE IF NOT EXISTS dropped_frames (
+    instrument_id TEXT, reason TEXT, n_frames INTEGER, last_seen TEXT, PRIMARY KEY (instrument_id, reason)
+);
 """

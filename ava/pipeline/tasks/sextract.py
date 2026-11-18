@@ -47,16 +47,16 @@ from prefect import get_run_logger, task
 from ava.config import cfg
 
 
-from ava.photometry.process import IMAGING_PREFIXES  # noqa: E402  (photometry.imaging_camera_prefixes)
+from ava.photometry.process import imaging_frame_ok  # noqa: E402  (imaging_camera_prefixes, camera_telescopes)
 
 
 def frames_to_extract(target: str) -> tuple[list[Path], int, int]:
     """(frames without a catalogue, newest first; n frames; n catalogues)."""
     raw, catdir = cfg.phot_raw(target), cfg.sextractor_dir(target)
     frames = sorted(raw.glob("2*/*e91.fits.fz"), key=lambda p: p.name, reverse=True)
-    # imaging cameras only (Sinistro fa/fl, Spectral fs, MuSCAT ep) — FLOYDS (en) products are
-    # handled by the spectroscopy pipeline; the legacy glob extracted them too.
-    frames = [f for f in frames if f.name.split("-")[1][:2] in IMAGING_PREFIXES]
+    # imaging cameras only (Sinistro fa/fl, Spectral fs, MuSCAT ep, SBIG kb on the 1 m) — FLOYDS (en) products
+    # are handled by the spectroscopy pipeline; the legacy glob extracted them too.
+    frames = [f for f in frames if imaging_frame_ok(f.name)]
     have = {p.name[: -len("_cat.fits")] for p in catdir.glob("*_cat.fits")} if catdir.exists() else set()
     todo = [f for f in frames if f.name[: -len(".fits.fz")] not in have and f.stat().st_size > 0]
     # Re-extract catalogues made with a different aperture series than now configured for their

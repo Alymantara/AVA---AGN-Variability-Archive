@@ -72,6 +72,8 @@ def lookup(db: Path, sql: str) -> dict:
 
 
 def plan_photo(root: Path, db: Path, imaging: tuple) -> tuple[list, list, Counter]:
+    from ava.photometry.process import imaging_frame_ok
+
     known = lookup(db, "SELECT basename, ava_data_id FROM frames")
     jobs, problems, seen = [], [], set()
     for f in scan(root, photo_dirs, ("_cat.fits",)):
@@ -80,8 +82,8 @@ def plan_photo(root: Path, db: Path, imaging: tuple) -> tuple[list, list, Counte
             continue
         seen.add(frame)
         parts = frame.split("-")
-        if len(parts) < 3 or parts[1][:2] not in imaging:
-            problems.append((str(f), "not an imaging camera"))
+        if len(parts) < 3 or not imaging_frame_ok(frame, prefixes=imaging):
+            problems.append((str(f), "not an imaging camera"))      # incl. 0.4 m SBIG (photometry.camera_telescopes)
             continue
         hit = known.get(frame)
         if hit is None:

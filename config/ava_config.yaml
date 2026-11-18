@@ -176,8 +176,9 @@ photometry:
     - "spectral"   # fs-series, 2 m Faulkes telescopes
     - "muscat3"    # MuSCAT3, 2 m Haleakala
 
-  # Filters processed (LCO internal names).
-  filters: ["up", "gp", "rp", "ip", "zs", "B", "V", "R", "I"]
+  # Filters downloaded and processed (LCO internal names): u B V g r i z Y only (user, 18 Nov 2026; was
+  # up gp rp ip zs B V R I, which skipped Y and fetched R/I). Same list as lcodb `photometry_filters`.
+  filters: ["up", "B", "V", "gp", "rp", "ip", "zs", "Y"]
 
   # Reference catalogue for absolute calibration (built by `run_pipeline.py -o`;
   # see ava.photometry.reference).
@@ -242,6 +243,10 @@ photometry:
     # cameras keep choosing among the original 12 (numbers never change).
     extended_aperture_cameras: ["ep"]
     # Optional per-camera override (2-letter prefix -> px list); none in use.
+    # SBIG (kb, 1 m, 0.467"/px) deliberately has NO override (18 Nov 2026): the old pipeline already made SBIG
+    # catalogues with the pre-MJD 60909 10-aperture series (8 … 33 px), which has no 22 px. With the default
+    # series and the first 12 apertures, old (10) and new (16) SBIG catalogues all pick 21 px = 9.81",
+    # one consistent aperture; the 0.7" difference to Sinistro's 10.5" is the intercalibration's job.
     camera_apertures_px: {}
     # Re-extract catalogues whose APERDIAM differs from the current series,
     # for these cameras only.  OFF: the MuSCAT re-extraction is for a later date.
@@ -270,8 +275,13 @@ photometry:
   science_aperture_radius_arcsec: 5.25
   # Camera pixel scales (arcsec/px) by camera-name prefix or family; used for the science aperture,
   # FWHM in arcsec and the WCS repair.
-  pixel_scales: {fa: 0.389, fl: 0.389, sinistro: 0.389, fs: 0.304, spectral: 0.304, ep: 0.270, muscat: 0.270, muscat3: 0.270}
-  imaging_camera_prefixes: ["fa", "fl", "fs", "ep"]   # cameras whose frames are extracted
+  # kb = SBIG on the 1 m, 2x2 binned (PIXSCALE 0.467 in the BANZAI header, kb74 2014-06-08); the 0.4 m SBIG
+  # cameras are not ingested (lcodb `instruments.telescopes`).
+  pixel_scales: {fa: 0.389, fl: 0.389, sinistro: 0.389, fs: 0.304, spectral: 0.304, ep: 0.270, muscat: 0.270, muscat3: 0.270, kb: 0.467, sbig: 0.467}
+  imaging_camera_prefixes: ["fa", "fl", "fs", "ep", "kb"]   # cameras whose frames are extracted
+  # Cameras used only on some telescope classes (telescope_id / basename prefix). SBIG: 1 m only (18 Nov 2026);
+  # applied to downloads, extraction and calibration (ava.photometry.process.imaging_frame_ok).
+  camera_telescopes: {kb: ["1m0"]}
   # Catalogue-to-reference matching (ava.photometry.catalogs.match_to_reference)
   matching:
     max_sep_arcsec: 1.5        # a detection is a reference star within this
@@ -332,6 +342,10 @@ photometry:
     camera_defaults:
       fa: {saturate: 128000, naxis1: 4096, naxis2: 4096}
       fl: {saturate: 128000, naxis1: 4096, naxis2: 4096}
+      kb: {saturate: 64000, naxis1: 2045, naxis2: 2048}     # SBIG 1 m, 2x2: SATURATE 64400, kb74 2014-06-08
+      # Spectral 2 m, 2x2, gain 7.7 (lco.global): SATURATE 500000 (fs02 ogg) / 512006 (fs01 coj), 2016 headers;
+      # size varies (2009x2009 fs02, 2045x2013 fs01): the smaller, so the edge cut errs on the safe side.
+      fs: {saturate: 500000, naxis1: 2009, naxis2: 2009}
 
   # Frame QC (flags stored in frame_qc.qc_flags; qc_pass = no flag).
   qc:
@@ -345,6 +359,8 @@ photometry:
     # ~9 Gaia GSPC stars around Mrk 817 (median; Sinistro 26': ~134).
     per_camera:
       ep: {min_matched: 5}
+      kb: {min_matched: 15}      # SBIG 15.9' field (Sinistro 26'): ~1/3 of the reference stars; check on NGC 5548
+      fs: {min_matched: 5}       # Spectral 10.5' field (~1/6 of Sinistro's; ~15-20 stars), like MuSCAT's 9'
     per_filter:
       up: {min_matched: 10, max_zp_scatter: 0.08}
       zs: {max_zp_scatter: 0.12}
@@ -481,8 +497,11 @@ ensemble:
   absolute_max_rms_star: 0.05   # mag; stars more variable than this are not used for the ZP
   # --- flux-flux intercalibration of the AGN (ava.photometry.intercal) -------------
   # additive host-light offset of cameras whose aperture (arcsec) differs from Sinistro 10.5" (MuSCAT 8.9")
-  intercal_reference_cameras: ["fa"]   # camera prefixes forming the reference light curve
-  intercal_correct_cameras: ["ep"]     # camera prefixes corrected (F' = F - b, a = 1)
+  # Sinistro under both names (fl = 2014 - Sep 2018), so the early seasons have a reference too (18 Nov 2026).
+  intercal_reference_cameras: ["fa", "fl"]   # camera prefixes forming the reference light curve
+  # corrected cameras (F' = F - b, a = 1): science apertures differ from Sinistro's 10.5": MuSCAT 8.9",
+  # SBIG 9.81" (21 px), Spectral 10.03" (33 px) — each telescope+camera (scope) gets its own offset.
+  intercal_correct_cameras: ["ep", "kb", "fs"]
   intercal_max_gap_days: 3.0           # interpolate the reference across gaps shorter than this
   intercal_min_pairs: 10               # nights needed to fit a camera
   # One additive offset per observing season for the corrected cameras (MuSCAT r/i/z

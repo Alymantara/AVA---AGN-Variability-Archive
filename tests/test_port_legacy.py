@@ -38,14 +38,15 @@ def test_photometry_placed_by_frame_name_not_folder(tmp_path, new_layout):
     b = "lsc1m005-fa15-20250101-0002-e91"
     c = "ogg2m001-en06-20250101-0003-w91"
     d = "coj1m011-fa12-20250101-0004-e91"
-    for f in (a, b, c, d):
+    e = "ogg0m406-kb82-20160101-0005-e91"                                          # 0.4 m SBIG: not ported
+    for f in (a, b, c, d, e):
         _touch(old / "1H1934-063" / "sextractor_ava" / f"{f}_cat.fits")           # old folder name
     db = _db(tmp_path / "phot.sqlite", [(a, "1H_1934-063"), (b, None)], ["basename", "ava_data_id"])
-    jobs, probs, _ = PL.plan_photo(old, db, ("fa", "fl", "fs", "ep"))
+    jobs, probs, _ = PL.plan_photo(old, db, ("fa", "fl", "fs", "ep", "kb"))
     assert [(j[1].relative_to(new_layout).as_posix(), j[2]) for j in jobs] == [
         (f"photometry/1H_1934-063/sextractor_ava/{a}_cat.fits", "1H_1934-063")]
     assert sorted(w for _, w in probs) == ["frame not in the photometry database", "frame not linked to an AVA target",
-                                          "not an imaging camera"]
+                                          "not an imaging camera", "not an imaging camera"]
     out = PL.run("phot", jobs, probs, {}, write=True, link=False, workers=2)
     assert out == {"copied": 1} and jobs[0][1].exists()
     assert PL.run("phot", jobs, probs, {}, write=True, link=False, workers=2) == {"exists": 1}   # idempotent

@@ -400,6 +400,93 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   a token is never read from the config file. Sources: `LCO_API_TOKEN` / `LCO_TOKEN` env var, then `lco.token_file`
   (`~/.lco_token`).
 
+## LCO archive: frames missing from the lcodb mirror (18 Nov 2026; 23 read-only archive requests)
+
+- **SBIG (`kb*`) cameras were dropped by the crawl.** `config/lcodb_config.yaml` had `kb` under
+  `instruments.ignore`, and ignored prefixes are not counted in `unknown_instruments`, so the loss left no trace.
+  In 2014–16 many LCOGT 1 m telescopes imaged with SBIG cameras. Measured for the priority IBRM campaigns (cone
+  search, levels 90/91):
+  - NGC 5548 (AGN STORM 1, 2014-05-01 → 08-06): KEY2014A-002 kb 1 m, ugriz, 379 L90 (37 nights) + 130 L91.
+  - NGC 4593 (2016-05-31 → 08-12): KEY2014A-002 kb 1 m, 668 L91 + 15 L90 frames on 49 nights. This roughly doubles
+    the 707 frames in the mirror.
+  - NGC 4151 (2016-01-08/09): KEY2014A-002 kb, 18 L91 frames (2 nights).
+  - Mrk 509 (2016-06 → 2018-01): nothing missing.
+  Fix and backfill are handed to a separate session (prompt `prompt_sbig_kb_recovery.md` in the side-session notes).
+  The user agreed this is an oversight (18 Nov). Still open: keep the 0.4 m SBIG frames as well as the 1 m ones?
+- **Non-KEY proposal with IBRM data: `LCO2014A-001`** (NGC 5548, V band only). It has 1 m SBIG frames
+  (122 L90 / 61 L91, 67 nights) and early-Sinistro `fl` frames (75 L90, 52 nights), 2014-05-01 → 08-06, all public.
+  Ingest it by adding the id to `proposals.ids` in the lcodb config. Not done yet; needs the user's OK.
+- **The archive has no NGC 5548 frames before 2014-05-01** (cone and name searches from 2013-11 agree), so the
+  Dec 2013 – Apr 2014 part of STORM 1 was not observed by LCOGT, or is not in the archive.
+- Other hits were only engineering and EPO frames (`LCOEngineering`, `LCOEPO2014B-006`, `ENG2014A-003` FLOYDS
+  calibrations): not useful.
+- Filter rule (user, 18 Nov): only u B V g r i z Y imaging (`up B V gp rp ip zs Y`) goes into the photometry database. Other filters may be listed by the crawl but are dropped in post-processing.
+- Still to search: the other 12 IBRM priority targets, then the obscure targets.
+
+### SBIG 1 m frames: pipeline support (18 Nov 2026; code done, backfill not run)
+
+- **1 m only** (user, 18 Nov). The 0.4 m SBIG cameras share the `kb` prefix but have another pixel scale.
+  - lcodb: `instruments.telescopes: {kb: [1m0]}`;
+  - pipeline: `photometry.camera_telescopes: {kb: [1m0]}`, applied to download, extraction and calibration
+    (`ava.photometry.process.imaging_frame_ok`).
+- **Camera numbers.** The header of `elp1m008-kb74-20140608-0035-e91` (NGC 5548, `KEY2014A-002`; 2 archive
+  requests) gives 0.467″/px, 2×2 binning, 2045×2048, `SATURATE` 64400, read noise 13.5 e⁻, BANZAI 0.9.4, and
+  a WCS. lco.global gives 0.464″/px nominal, a 15.8′ field and gain 1.4 (the header gain is 1.0 after BANZAI).
+  - `pixel_scales.kb: 0.467`;
+  - `camera_defaults.kb` = {64000, 2045, 2048};
+  - `qc.per_camera.kb.min_matched: 15`, because the field is a third of the Sinistro field. Check this on
+    NGC 5548.
+- **Aperture: no SBIG override (revised 18 Nov 2026).** The old pipeline already made SBIG catalogues (e.g. NGC
+  4593 2016, `kb69`) with the pre-MJD 60909 series of 10 apertures (8 … 33 px) and no `APERDIAM`. An extra
+  22 px aperture for new catalogues would have split SBIG into 9.81″ (old) and 10.27″ (new), a host-light
+  step inside one camera. With the default series and `kb` not in `extended_aperture_cameras`, the old
+  10-aperture, 12-aperture and current 16-aperture catalogues all pick **21 px = 9.81″** (tested). The 0.7″
+  difference from Sinistro's 10.5″ is left to the intercalibration. To match 10.5″ instead, every SBIG
+  catalogue would have to be re-extracted from its image, old ones included.
+  - Still to check on Linux: whether any legacy SBIG catalogue was made from 1×1-binned images (0.232″/px,
+    4096 px wide); the 0.467″/px scale would then be wrong. `frame_qc.naxis1` will show it.
+  - The legacy port now uses the same camera and telescope rule, so 0.4 m SBIG catalogues are reported and
+    not copied.
+- **Intercalibration.**
+  - Reference cameras are now `fa` + `fl`. Before this, the Sinistro data of 2014 – Sep 2018 (`fl`) was not
+    in the reference.
+  - `kb` is added to the corrected cameras, like MuSCAT.
+  - NGC 4593 2016 overlaps Sinistro well.
+  - NGC 5548 2014 overlaps Sinistro only in V (`LCO2014A-001` `fl`), so u, g, r, i, z rely on the matched
+    aperture; check the V offset.
+- **Spectral (`fs`, both 2 m telescopes) checked the same way (18 Nov 2026).** It was already a kept imaging
+  camera. The mirror has `fs02` at `ogg` (11,153 frames, 2014-08 → 2020-06) and `fs01`/`fs03` at `coj`
+  (1,627 frames), over 17 AVA targets (Mrk 1044, NGC 4151 2016, NGC 4395, Mrk 876, Mrk 335, …).
+  - **Camera numbers.** Two headers (NGC 4593 2016; 2 archive requests): `fs02` and `fs01` are both 2×2
+    binned, 0.301 / 0.304″/px, with a WCS. Sizes are 2009×2009 and 2045×2013. `SATURATE` is 500000 /
+    512006 e⁻, and `fs01` also has `MAXLIN` 62900. BANZAI version 0.7.9.
+  - **lco.global:** 0.152″/px unbinned, 0.304″/px at the default 2×2, a 10.5′ field, gain 7.7, read noise
+    10.5, and a nonlinear gain.
+  - **Aperture:** consistent. Old (10), 12 and 16-aperture catalogues all pick 33 px = 10.03″ (tested).
+  - **QC:** it would have rejected nearly every Spectral frame. A 10.5′ field matches about 15–20 stars against
+    the general `min_matched: 30`. Added `qc.per_camera.fs.min_matched: 5`, like MuSCAT; no `fs` frame has been
+    processed yet.
+  - **No-image settings:** added `camera_defaults.fs` = {500000, 2009, 2009}.
+  - **Intercalibration:** `fs` is added to `intercal_correct_cameras` (10.03″ vs 10.5″). Each scope, meaning
+    each telescope and camera, gets its own offset. A camera with fewer than `intercal_min_pairs` (10) nights
+    overlapping Sinistro gets no fit and stays calibrated by the stars only. This applies, for example, to
+    SBIG on NGC 5548 in 2014 outside V.
+  - Still to check on real frames: the nonlinear gain near saturation (bright comparison stars), and whether
+    any 1×1-binned Spectral frame exists (`frame_qc.naxis1` ≈ 4000).
+- **Nothing is dropped silently.** Frames the crawl lists but does not store (ignored prefix, telescope,
+  filter) are counted in `state.sqlite` `dropped_frames`, and `lcodb stats` reports them.
+- **Filter rule enforced.**
+  - lcodb `photometry_filters: [up, B, V, gp, rp, ip, zs, Y]`.
+  - `photometry.filters`, the download list, was `up gp rp ip zs B V R I`: it skipped Y and fetched R and I.
+    It is now the same 8 filters.
+  - The mirror still holds 841 older rows in U, R, I, air and `zs*diffuser`. Deleting them needs the user's OK.
+- **`LCO2014A-001`** is added to `proposals.ids`.
+- **Next, after a backup and the user's OK:**
+  - re-list `KEY2014A-002` for 2014-01 → 2017-12 and `LCO2014A-001`, then `lcodb link`;
+  - download, extract and calibrate NGC 5548, NGC 4593 and NGC 4151.
+  - Budget: the archive allows 5000 requests a day per user. Listing pages hold 1000 rows, so the re-list
+    is about 10–50 requests; each file download counts as one request (~1300 frames).
+
 ## Linux install: old Anaconda contingency (18 Nov 2026)
 
 - The Linux host's Anaconda is old and runs the old pipeline. Decision: **never touch its `base`** (no
