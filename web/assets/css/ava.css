@@ -212,6 +212,13 @@ a:hover { color: var(--ava-strong); }
 /* ---------- Target cards ---------------------------------------------- */
 .ava-grid { display: grid; gap: clamp(.75rem, 2vw, 1.25rem); grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
 @media (min-width: 1800px) { .ava-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+/* one row of five (landing page: featured targets) */
+@media (min-width: 992px) {
+  .ava-grid--row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  /* the narrower cards keep all filter chips on one line: the chips share the width */
+  .ava-grid--row .ava-filters { flex-wrap: nowrap; gap: .2rem; }
+  .ava-grid--row .ava-filters li { flex: 1 1 0; min-width: 0; padding-inline: 0; }
+}
 .ava-card { border: 1px solid var(--ava-line); border-radius: var(--ava-radius); background: var(--ava-surface); overflow: hidden; transition: border-color .15s, transform .15s; }
 .ava-card:hover, .ava-card:focus-within { border-color: var(--ava-sky); transform: translateY(-2px); }
 .ava-card[hidden] { display: none; }

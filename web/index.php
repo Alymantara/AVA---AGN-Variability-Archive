@@ -7,7 +7,7 @@ $targets = ava_targets();
 // Featured: active targets with an image, most-observed first.
 $featured = array_filter($targets, fn($t) => ava_status($t)['key'] === 'active' && ava_image_stem($t));
 usort($featured, fn($a, $b) => (int) $b['db_lco_images'] <=> (int) $a['db_lco_images']);
-$featured = array_slice($featured, 0, 6);
+$featured = array_slice($featured, 0, 5);
 // Hero background: a slow cross-fade through target images (active first), heavily diluted.
 $heroPool = array_values(array_filter($targets, fn($t) => ava_image_stem($t) && is_file(AVA_ROOT . '/assets/agn/' . ava_image_stem($t) . '_1200.webp')));
 usort($heroPool, fn($a, $b) => (ava_status($b)['key'] === 'active') <=> (ava_status($a)['key'] === 'active') ?: (int) $b['db_lco_images'] <=> (int) $a['db_lco_images']);
@@ -81,7 +81,7 @@ ava_page_start('home', 'Home');
       </div>
       <a class="btn btn-ava btn-ava-outline" href="targets.php">All <?= count($targets) ?> targets →</a>
     </div>
-    <div class="ava-grid">
+    <div class="ava-grid ava-grid--row">
       <?php foreach ($featured as $t) { ava_target_card($t); } ?>
     </div>
   </div>

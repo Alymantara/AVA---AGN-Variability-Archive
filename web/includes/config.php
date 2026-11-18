@@ -43,4 +43,4 @@ const AVA_EXCLUDED = ['SDSS_RM201', 'SDSS_RM562'];
 const AVA_NON_AGN_TYPES = ['XRB'];
 
 // LCO broad-band filters shown on the site, in wavelength order.
-const AVA_LCO_FILTERS = ['u', 'B', 'g', 'V', 'r', 'i', 'z'];
+const AVA_LCO_FILTERS = ['u', 'B', 'g', 'V', 'r', 'i', 'z', 'Y'];   // a filter shows only for targets with frames in it
