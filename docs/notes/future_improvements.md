@@ -399,3 +399,12 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **LCO token (user, 17 Nov 2026):** the `lco.api_token` config key and its fallback in `ava/config.py` are removed;
   a token is never read from the config file. Sources: `LCO_API_TOKEN` / `LCO_TOKEN` env var, then `lco.token_file`
   (`~/.lco_token`).
+
+## Linux install: old Anaconda contingency (18 Nov 2026)
+
+- The Linux host's Anaconda is old and runs the old pipeline. Decision: **never touch its `base`** (no
+  `conda update`, no `conda-libmamba-solver` install there). `linux_setup.md` steps 2/5/6 now offer three plans:
+  A) conda ≥ 23.10 as is; B) Miniforge in `~/miniforge3` **without `conda init`**, activated by path;
+  C) a plain `python3 -m venv` + `pip install -e ".[dev]"` (all deps are on PyPI) if Miniforge cannot be downloaded.
+- `~/.bashrc` no longer auto-activates the AVA environment: it defines an `ava-env` alias, so terminals used for
+  the old pipeline keep their Python. `AVA_CONFIG` / `LCODB_CONFIG` are still exported (the old pipeline ignores them).

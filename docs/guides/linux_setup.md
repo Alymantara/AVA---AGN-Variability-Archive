@@ -44,17 +44,29 @@ install it into the conda environment after step 5:
 conda --version
 ```
 
-If you see a version number (e.g. `conda 24.x`), go to step 3. If you see `command not found`, install
-Miniforge (a small conda) into your home folder:
+What to do depends on the answer:
+
+| `conda --version` says | Do this |
+|---|---|
+| `conda 23.10` or newer | Use it. Go to step 3 (step 5, plan A). |
+| an older version (e.g. `conda 4.x`, `22.x`), or an Anaconda the old pipeline uses | Leave it alone and install Miniforge next to it (below), then use step 5, plan B. |
+| `command not found` | Install Miniforge (below), then use step 5, plan B. |
+
+**Do not update or add packages to the old Anaconda's `base`** (`conda update conda`, `conda install -n base ...`):
+the old pipeline runs from it, and changing `base` can break it. A separate Miniforge keeps the two apart.
+
+Install Miniforge (a small conda with the fast solver built in) into your home folder. It does **not** run
+`conda init`, so your terminal and the old pipeline keep using the old conda; the new one is used only through
+its own path:
 
 ```bash
 cd ~
 curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
 bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
-~/miniforge3/bin/conda init bash
+~/miniforge3/bin/conda --version
 ```
 
-Close the terminal, open a new one, and run `conda --version` again.
+The last line should print `conda 2x.x`. If the machine cannot download from GitHub, use step 5, plan C.
 
 # 3. Get the code
 
@@ -83,7 +95,10 @@ mkdir -p /data3/jvhs1/ava/{archive,lcodb,config,logs,web,releases}
 
 # 5. Create the Python environment
 
-This takes 5–15 minutes the first time.
+This takes 5–15 minutes the first time. Use **one** of the three plans, chosen in step 2. Each ends with
+the same check: `python -c "import ava, prefect; print(prefect.__version__)"` prints `3.x`.
+
+**Plan A: conda 23.10 or newer** (fast solver by default)
 
 ```bash
 cd ~/code/AVA
@@ -92,19 +107,42 @@ conda activate ava
 pip install -e .
 ```
 
-From now on, **every new terminal needs** `conda activate ava` before running AVA commands (step 6 adds it to
-your terminal start-up so it happens automatically).
+The command that activates the environment is `conda activate ava`.
 
-**If `conda env create` sits at "Solving environment" for more than ~5 minutes**, your conda is old (before
-23.10 it uses the slow "classic" solver). Stop it with `Ctrl+C`, then either switch to the fast solver:
+**Plan B: Miniforge in `~/miniforge3`** (old conda, or no conda)
 
 ```bash
-conda install -n base conda-libmamba-solver
-conda config --set solver libmamba
+cd ~/code/AVA
+~/miniforge3/bin/conda env create -f environment.yml
+source ~/miniforge3/bin/activate ava
+pip install -e .
 ```
 
-or install Miniforge (step 2, it has the fast solver built in) and use its `conda`. Then run the
-`conda env create` command again.
+The command that activates the environment is `source ~/miniforge3/bin/activate ava`. It works whatever conda
+the terminal already has, and touches nothing outside `~/miniforge3`. The environment's Python is
+`~/miniforge3/envs/ava/bin/python` (used by the cron jobs in step 17).
+
+**Plan C: no conda at all, a plain Python virtual environment** (if Miniforge cannot be downloaded).
+Every dependency is on PyPI (`pyproject.toml`); this needs a system Python 3.10 or newer:
+
+```bash
+python3 --version
+```
+
+```bash
+cd ~/code/AVA
+python3 -m venv ~/venvs/ava
+source ~/venvs/ava/bin/activate
+pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+The command that activates the environment is `source ~/venvs/ava/bin/activate`; its Python is
+`~/venvs/ava/bin/python`. If `python3` is older than 3.10, look for a newer one (`ls /usr/bin/python3.1*`)
+and use it in place of `python3`.
+
+**If `conda env create` sits at "Solving environment" for more than ~5 minutes**, the conda in use is the old
+one with the slow "classic" solver. Stop it with `Ctrl+C` and use plan B.
 
 # 6. Configuration for this machine
 
@@ -115,17 +153,25 @@ cp ~/code/AVA/config/ava_config.yaml /data3/jvhs1/ava/config/ava_config.yaml
 cp ~/code/AVA/config/lcodb_config.yaml /data3/jvhs1/ava/config/lcodb_config.yaml
 ```
 
-Tell AVA where they are, every time a terminal opens:
+Tell AVA where they are, every time a terminal opens. This also adds a short command, `ava-env`, that
+activates the AVA environment. The environment is **not** activated automatically, so a terminal used for the
+old pipeline keeps its usual Python. Type `ava-env` in a terminal before running AVA commands.
+
+Use the line for the plan you followed in step 5 (here plan B; for plan A write
+`alias ava-env='conda activate ava'`, for plan C `alias ava-env='source ~/venvs/ava/bin/activate'`):
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
 # --- AVA pipeline ---
-conda activate ava
+alias ava-env='source ~/miniforge3/bin/activate ava'
 export AVA_CONFIG=/data3/jvhs1/ava/config/ava_config.yaml
 export LCODB_CONFIG=/data3/jvhs1/ava/config/lcodb_config.yaml
 EOF
 source ~/.bashrc
+ava-env
 ```
+
+The two `export` lines are harmless to the old pipeline: it does not read them.
 
 Now edit the AVA configuration:
 
@@ -435,13 +481,14 @@ lco_usage:
 The log then lives outside `~/code/AVA`, so `git pull` never touches it. The first run copies the starting
 log from the repository there; after that it only grows on this machine and is not sent back to GitHub.
 
-(If conda was already installed, the environment's Python is in that conda's `envs/ava/bin/python`: find it
-with `conda activate ava && which python`.) Set `spectroscopy.download.select` back to `"new"`. The clean-up
+(The lines above use the plan B Python, `$HOME/miniforge3/envs/ava/bin/python`. For plan A or C use the
+Python of your environment: find it with `ava-env && which python`.) Set `spectroscopy.download.select` back to `"new"`. The clean-up
 line is a **dry run** (it only reports) until you add `--live`; do that once its log looks right.
 
 # Keeping up to date
 
 ```bash
+ava-env
 cd ~/code/AVA
 git pull
 pip install -e .
