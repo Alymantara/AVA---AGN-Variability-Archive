@@ -535,3 +535,33 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **Prefect on the host:** `PREFECT_HOME` must be on a local disk (`/data2/jvhs1/AVA/data/prefect`): with the
   default `~/.prefect` on the CIFS home the ephemeral API server timed out at start (SQLite on a network share).
   Also `PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90`.
+
+## QC-0002: reference positions rounded to 6 significant figures (18 Nov 2026; fixed in 0d3024f)
+
+- **Bug.** `reference_stars.csv` was written with `float_format="%.6g"`: RA ≥ 100° kept 3 decimals, so stars were
+  up to ±1.8″ off, against `photometry.matching.max_sep_arcsec` 1.5″. Evidence (turgon, write-up in
+  `AVA_QC/tests/QC-0002_…`):
+  - MR 2251-178's AGN row was 1.64″ from its Gaia DR3 position, so only 1,335 of 9,016 frames (14.8 %) matched
+    the AGN; the rest were `agn_missing`.
+  - Field stars of Mrk 110, Mrk 1298 and PG 2304+043 matched at medians of 0.6–0.9″, not the ~0.2–0.3″ the LCO WCS
+    gives, so stars near the limit were lost (`few_matched`).
+- **Fix.**
+  - The reference task writes `%.10g` (≤ 0.4 mas). The meta YAML already kept full precision.
+  - The FLOYDS nightly light curve writes MJD to 1e-6 d. `%.6g` had rounded it to 0.1 d.
+  - `tools/target_list_crossmatch.py` (`gaia_ra`/`gaia_dec`) and `tools/spec_validation/hbeta_arms.py` (MJD) were
+    fixed the same way.
+  - Round-trip tests are in `tests/test_reference.py` and `tests/test_spec_lines.py`.
+  - The other CSV writers use `%.4f`–`%.6f`, which is enough for MJD.
+- **To do on turgon (not run yet).** Existing catalogues are still rounded.
+  1. **MR 2251-178 first.** Rebuild its reference catalogue with `reference_catalog.fn("MR_2251-178", force=True)`.
+     The flow never passes `force`. This queries Gaia GSPC on VizieR, not the LCO archive. `star_id` is the Gaia
+     source id, so ids do not change and stored measurements stay compatible. Then re-run matching and calibration
+     with `calibrate.fn("MR_2251-178", force=True)`; `force` is needed because the frames are already at the
+     current `PIPELINE_VERSION`. Check that:
+     - the AGN-matched fraction goes from ~15 % to ≳ 97 %;
+     - field-star separations drop to ~0.2–0.3″.
+  2. **Then every target with RA ≥ 100°.** Rebuilding all catalogues is cheap (one VizieR cone per target). The
+     forced recalibration costs about 190 ms CPU per frame (Mrk 817 benchmark): roughly 1 CPU-hour per 20,000
+     frames, and it rewrites `frame_qc` and `measurements.parquet`. Then re-run PyTICS for those targets. Agree the
+     scope with the user before starting. Targets with RA < 100° kept ≥ 4 decimals (≤ 0.36″) and can wait.
+  3. **Afterwards**, re-check the `few_matched` and `agn_missing` rates per target.
