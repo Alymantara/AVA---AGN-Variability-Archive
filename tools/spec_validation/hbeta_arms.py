@@ -49,7 +49,8 @@ for arm in ARMS:
     t["ok"] = t["ok"].fillna(False).astype(bool)
     t, _ = L.oiii_calibrate(t, good=t.qc.eq("OK"))
     T[f"{arm}_hb_cal"] = t["hb_broad_cal"]
-T.to_csv(out / "hbeta_arms.csv", index=False, float_format="%.6g")
+T.assign(MJD=T["MJD"].map("{:.6f}".format)).to_csv(out / "hbeta_arms.csv", index=False,
+                                                float_format="%.6g")   # MJD to 1e-6 d (QC-0002)
 ok = T.blue_ok.astype(bool) & T.red_ok.astype(bool)
 
 

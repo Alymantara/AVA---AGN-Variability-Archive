@@ -40,6 +40,15 @@ CATALOGUE = "reference_stars.csv"
 META = "reference_stars_meta.yaml"
 RAW_DR10 = "apass_dr10_raw.csv"
 
+#: CSV float format. 10 significant figures keep RA/Dec to <= 1e-7 deg (0.4 mas) for any RA < 1000;
+#: "%.6g" kept only 3 decimals for RA >= 100 deg (up to 1.8" off; QC-0002, MR 2251-178 AGN 1.6" off).
+FLOAT_FORMAT = "%.10g"
+
+
+def write_catalogue(stars, path) -> None:
+    """Write the reference catalogue CSV at full positional precision."""
+    stars.to_csv(path, index=False, float_format=FLOAT_FORMAT)
+
 
 def _plain(obj):
     """Convert numpy scalars inside nested dicts/lists to plain Python for YAML."""
@@ -120,7 +129,7 @@ def reference_catalog(target: str, force: bool = False) -> dict:
     # Write both to temp files, then rename: a failure never leaves a
     # catalogue without its metadata (which would be skipped on retry).
     tmp_cat, tmp_meta = cat_path.with_suffix(".csv.tmp"), meta_path.with_suffix(".yaml.tmp")
-    stars.to_csv(tmp_cat, index=False, float_format="%.6g")
+    write_catalogue(stars, tmp_cat)
     tmp_meta.write_text(yaml.safe_dump(_plain(meta), sort_keys=False))
     tmp_cat.replace(cat_path)
     tmp_meta.replace(meta_path)

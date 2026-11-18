@@ -1,6 +1,7 @@
 """Hβ-region fit, [O III] calibration and variability (ava.spectroscopy.lines) on synthetic spectra."""
 import numpy as np
 import pandas as pd
+import pytest
 
 from ava.spectroscopy import lines as L
 
@@ -88,3 +89,19 @@ def test_oiii_lines_measured_independently():
     assert abs(n["oiii4959_int"] / (3e-13 / L.O3_RATIO) - 1) < 0.08
     assert n["oiii5007_int_err"] > 0 and n["oiii4959_int_err"] > 0
     assert np.isnan(L.narrow_line_fluxes(sp, {})["oiii5007_int"])        # no fit: nothing measured
+
+
+def test_lightcurve_csv_keeps_mjd(tmp_path):
+    """QC-0002: "%.6g" rounded MJD 60123.456 to 60123.5."""
+    import pandas as pd
+
+    from ava.spectroscopy.products import write_lightcurve_csv
+
+    out = pd.DataFrame({"target": ["X", "X"], "MJD": [60123.456789, 59000.123456], "night": ["20230701", "20200531"],
+                        "n_exp": [2, 1], "hbeta_flux": [1.234567e-13, 2.0e-13], "hbeta_flux_err": [1e-15, 2e-15],
+                        "cont5100": [3e-15, 4e-15], "cont5100_err": [1e-17, 1e-17], "oiii_calibrated": [True, True]})
+    path = tmp_path / "lc.csv"
+    write_lightcurve_csv(out, path, "header")
+    back = pd.read_csv(path, comment="#")
+    assert np.abs(back["MJD"].values - out["MJD"].values).max() <= 1e-5
+    assert back["hbeta_flux"].values == pytest.approx(out["hbeta_flux"].values, rel=1e-5)

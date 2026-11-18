@@ -403,7 +403,7 @@ def main():
     df["list_duplicates"] = dup
     df = df.sort_values(["category", "list_epochs", "list_name"], ascending=[True, False, True])
     dest = a.out or a.list.with_name(a.list.stem + "_xmatch.csv")
-    df.to_csv(dest, index=False, float_format="%.6g")
+    df.to_csv(dest, index=False, float_format="%.10g")   # RA/Dec to 0.4 mas (QC-0002)
     print(f"wrote {dest}")
     print(df.groupby("category").size().to_string())
 

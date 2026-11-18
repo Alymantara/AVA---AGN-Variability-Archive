@@ -213,12 +213,21 @@ def record(t: pd.DataFrame, night: pd.DataFrame, meta: dict, data_id: str, spect
         out["oiii_calibrated"] = bool(meta.get("oiii_calibrated"))
         out = out[["target", "MJD", "night", "n_exp", "hbeta_flux", "hbeta_flux_err", "cont5100", "cont5100_err",
                    "oiii_calibrated"]]
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(csv_path, "w") as fh:
-            fh.write(f"# {data_id}: FLOYDS broad Hbeta (erg/s/cm2) and 5100 A continuum (erg/s/cm2/A), nightly means;"
-                     f" [O III]-calibrated: {bool(meta.get('oiii_calibrated'))}; method {method}; {now}\n")
-            out.to_csv(fh, index=False, float_format="%.6g")
+        write_lightcurve_csv(out, csv_path,
+                             f"{data_id}: FLOYDS broad Hbeta (erg/s/cm2) and 5100 A continuum (erg/s/cm2/A), nightly "
+                             f"means; [O III]-calibrated: {bool(meta.get('oiii_calibrated'))}; method {method}; {now}")
     return summ
+
+
+def write_lightcurve_csv(out: pd.DataFrame, csv_path: Path, header: str) -> None:
+    """Nightly light-curve CSV: MJD to 1e-6 d, fluxes to 6 significant figures ("%.6g" alone rounded
+    MJD 60123.456 to 60123.5; QC-0002)."""
+    out = out.copy()
+    out["MJD"] = out["MJD"].map(lambda x: f"{x:.6f}" if np.isfinite(x) else "")
+    Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(csv_path, "w") as fh:
+        fh.write(f"# {header}\n")
+        out.to_csv(fh, index=False, float_format="%.6g")
 
 
 # ---------------------------------------------------------------------------

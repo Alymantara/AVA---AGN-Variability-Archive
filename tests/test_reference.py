@@ -97,3 +97,22 @@ def test_fetch_gaia_metallicity_column(monkeypatch, feh_col):
     assert g["gaia_mh"].tolist() == [0.0, -0.5, 0.1]
     assert g["gaia_teff"].iloc[1] == 4500.0
     assert g["gspc_u_sdss"].isna().all()
+
+
+def test_catalogue_csv_round_trip_keeps_positions(tmp_path):
+    """QC-0002: "%.6g" kept 3 decimals at RA >= 100 deg (MR 2251-178's AGN moved 1.6")."""
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    from ava.pipeline.tasks.reference import write_catalogue
+
+    stars = pd.DataFrame({"star_id": [2403142297848977920, IDS[0]], "is_agn": [True, False],
+                          "ra": [343.52452430, 5.12345678], "dec": [-17.58205578, -59.11884321],
+                          "g": [14.123456789, 15.5]})
+    path = tmp_path / "reference_stars.csv"
+    write_catalogue(stars, path)
+    back = pd.read_csv(path)
+    assert list(back["star_id"]) == list(stars["star_id"])
+    sep = SkyCoord(stars.ra.values * u.deg, stars.dec.values * u.deg).separation(
+        SkyCoord(back.ra.values * u.deg, back.dec.values * u.deg)).arcsec
+    assert sep.max() < 0.01
