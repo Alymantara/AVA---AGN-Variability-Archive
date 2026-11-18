@@ -105,7 +105,12 @@ Steps tagged **LCO** contact the archive: run them only while the old pipeline i
   - **Fixed (user's request, 14:10):** `lcodb daily` now crawls only the standards sources and active proposals
     matching `daily.include_regex: '^KEY2026'` (`ava/lcodb/ingest.py`, `cli.py`, `config/lcodb_config.yaml`, and the
     host copy `data/config/lcodb_config.yaml`; test added, `tests/test_lcodb.py` 19 passed). Takes effect from the
-    next run; this first run finishes as it started. **Commit pending** (user runs it, see the plan below).
+    next run; this first run finishes as it started. Committed by the user 14:30 (push pending).
+  - Finished 14:28: 560 new + 1,866 refreshed frames, 76 spectra headers, airmass for 546 frames, standards and arc/flat
+    matches done; then **`link` failed: "unable to open database file"**. Cause: the `ava:` paths in the host copy of
+    `lcodb_config.yaml` (`../data/ava.db`, CSVs) are relative to the config file, wrong once it lives in `data/config/`.
+    Fixed 14:31 (absolute paths). Re-run the two last parts only (offline): `python -m ava.lcodb link` and
+    `python -m ava.lcodb stats`.
   ```bash
   python -m ava.lcodb daily
   ```
@@ -113,6 +118,12 @@ Steps tagged **LCO** contact the archive: run them only while the old pipeline i
   - 14:08 first try failed: `Timed out while attempting to connect to ephemeral Prefect API server` (`~/.prefect` on
     the CIFS home). Fix: `PREFECT_HOME=/data2/jvhs1/AVA/data/prefect` and
     `PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90` in `~/.bashrc`, then re-run.
+  - 14:16 re-run: folders and spectroscopy summaries fine. Reference catalogues: by 14:24, 18 written (14 gspc,
+    4 apass_model fallback: MCG_08-11-011, 3C273, Mrk_1298, NGC_4395), 13 failed. Cause: the CDS VizieR query service
+    answers 404 (`/viz-bin/votable` and `/viz-bin/asu-tsv`; the CDS home page is up); the CfA mirror answers but lacks
+    Gaia DR3 / GSPC / parts of APASS; IUCAA, NAO, Cambridge and `vizier.u-strasbg.fr` do not answer from turgon (000).
+  - **Then:** re-run `-o -O` when CDS answers again (only missing catalogues are built). Decide whether to rebuild the
+    4 APASS fallbacks with gspc (move their `reference_stars.csv` + metadata aside first).
   ```bash
   python scripts/run_pipeline.py -o -O
   ls /data2/jvhs1/AVA/data/archive/photometry/*/reference_stars.csv | wc -l
@@ -198,6 +209,8 @@ Steps tagged **LCO** contact the archive: run them only while the old pipeline i
 - **Clone in place** when the target folder already has files: `git init` + `remote add` + `fetch` + `checkout -t`.
 - **Port before steps 10–11**: `port_legacy.py` needs only the lcodb databases; re-run after step 10 for newer frames.
   Run it with `python -u ... | tee` so the log is readable while it runs.
+- **`lcodb_config.yaml` paths are relative to the config file**: when the config is copied to `data/config/`, set
+  `db_dir` **and** `ava.db`, `ava.csv`, `ava.overrides_csv` to absolute paths (the `link` step failed otherwise).
 - **Prefect state (`PREFECT_HOME`) on a local disk**, not the network home, else the ephemeral server times out.
 - **`lcodb daily` scope**: check `daily.include_regex` before the first run; a first run on a new host crawls every
   proposal in `ids` that it has not seen.
