@@ -42,6 +42,29 @@ tell the user. Commit only when asked.
 
 ## State at hand-over
 
-Nothing has been run on Linux yet. The user expects an old conda (step 2 decides the plan). The user keeps a
-tickable copy of this plan on a claude.ai page; you cannot update it from here, so tell the user which step
-finished.
+The user keeps a tickable copy of this plan on a claude.ai page; you cannot update it from here, so tell the
+user which step finished.
+
+Progress (updated 18 Nov 2026, from the Mac help-desk session):
+
+- **Step 1 done.** SExtractor 2.25.0. Still to confirm which name runs it (`command -v source-extractor sex`);
+  that name goes into `binary:` in step 6.
+- **Step 2 done.** `conda 23.1.0`: older than 23.10 (classic solver), so **plan B**. Do not install
+  `conda-libmamba-solver` into the old Anaconda's `base`, even though 23.1 could take it.
+- **Next: Miniforge, then steps 3–5 (plan B).**
+
+```bash
+cd ~ && curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
+~/miniforge3/bin/conda --version          # expect conda 24.x or newer
+```
+
+If GitHub cannot be reached, use plan C (venv) instead. Then step 3 (clone, if not done), step 4 (folders), and:
+
+```bash
+cd ~/code/AVA && ~/miniforge3/bin/conda env create -f environment.yml
+source ~/miniforge3/bin/activate ava && pip install -e .
+python -c "import ava, prefect; print(prefect.__version__)"   # expect 3.x
+```
+
+Step 6's `~/.bashrc` block uses the plan B alias `alias ava-env='source ~/miniforge3/bin/activate ava'`.
