@@ -23,6 +23,13 @@ proposals:
   ids: [KEY2018B-001, KEY2014A-002, LCO2014A-001]
   exclude: []
 
+# --- what `lcodb daily` crawls ------------------------------------------------
+# The daily sync looks for new frames only in proposals the portal marks active whose id matches include_regex
+# (the standards sources are always kept). Inactive or older proposals are left alone: crawl one on request with
+# `lcodb sync --proposal ID`. (User, 18 Nov 2026: the daily run should look only at the current, 2026 proposals.)
+daily:
+  include_regex: '^KEY2026'
+
 # Proposals crawled whole for spectrograph standards (science + arcs + lamp flats).
 # Older standards live elsewhere (COJ_calib, OGG_calib, LCOEngineering, ...); those are
 # found by target name across ALL proposals using standards.names below.

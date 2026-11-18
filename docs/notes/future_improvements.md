@@ -495,3 +495,43 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   C) a plain `python3 -m venv` + `pip install -e ".[dev]"` (all deps are on PyPI) if Miniforge cannot be downloaded.
 - `~/.bashrc` no longer auto-activates the AVA environment: it defines an `ava-env` alias, so terminals used for
   the old pipeline keep their Python. `AVA_CONFIG` / `LCODB_CONFIG` are still exported (the old pipeline ignores them).
+
+## Linux host: code and data in one folder (18 Nov 2026, test day)
+
+- Decision (user): everything lives in `/data2/jvhs1/AVA`. Code is the git checkout there (in place of `~/code/AVA`);
+  the data folder is `/data2/jvhs1/AVA/data` (in place of `/data3/jvhs1/ava`), already git-ignored (`data/*`), with
+  `archive/`, `lcodb/`, `config/`, `logs/`, `web/`, `releases/`. `/data2` has 2.7 TB free.
+- The old pipeline's data (`/data3/jvhs1/agn`, `/data2/jvhs1/agn`) is **copied** by `port_legacy.py`, never moved:
+  the old pipeline keeps running.
+- `linux_setup.md` is unchanged (it is written for any machine, with `~/code` and `/data3/jvhs1/ava` as examples);
+  the checklist and hand-over carry the substitutions. `CLAUDE.md` updated.
+- Miniforge goes in `/data2/jvhs1/miniforge3`, not `~/miniforge3`: the home folder is a CIFS network share
+  (`//cfs.st-andrews.ac.uk/users/jvhs1`), where the install crawled and hit case-insensitive name clashes
+  (`ncurses` terminfo). **To do:** `linux_setup.md` steps 2/5 could tell the reader to check `df -h ~` and use a
+  local disk if home is a network mount. The shell also has `PYTHONPATH` set (old pipeline); `ava-env` should not
+  inherit it.
+- **SExtractor output columns now 16 apertures** (user, 18 Nov 2026): `data/reference/sextractor/default.param` had
+  `FLUX_APER(12)` / `FLUXERR_APER(12)` / `MAG_APER(12)` / `MAGERR_APER(12)` although `default.sex` lists 16 diameters
+  (36,39,43,48 appended), so SExtractor silently dropped the 4 largest while `APERDIAM` recorded 16 (found by
+  `check_install.py`: "12 apertures per source"). Changed to `(16)`. Affects new extractions only;
+  `reextract_on_aperture_change` stays off, ported catalogues are untouched. **To do:** `check_install.py` could
+  fail when the `default.param` vector size is smaller than the `default.sex` series.
+- **banzai-floyds on the Linux host** (user, 18 Nov 2026): fork `rm-improvements@3e8e796` (not the pinned `8897b99`)
+  because the sky-flat order solutions now ship with the package (`11f8ce4`); that settles "Sky flats belong in the
+  reduction package" above. Checkout `/data2/jvhs1/banzai-floyds`, conda env `banzai` (Python 3.12, torch 2.15.0+cpu,
+  banzai 1.36.2) in `/data2/jvhs1/miniforge3`; `/data2/jvhs1/benv` runs commands in a clean shell. Config:
+  `spectroscopy.reduction.{python,package,skyflats_dir}` and `paths.floyds_pipeline` set; `skyflats_dir` = the
+  shipped folder. **To check at the first `-R` run:** `ava.spectroscopy.reduce.ensure_calibration_db` still runs the
+  old `skyflats` step after `setup-db` (now optional, re-registers the shipped files), and `clean_env` sets
+  `CC=/usr/bin/clang` (Mac); harmless unless something compiles at run time, but both should become optional.
+- **`lcodb daily` crawls only the current proposals** (user, 18 Nov 2026). The first daily run on the host also
+  crawled KEY2023B-001/-001f (the portal still marks them active), KEY2018B-001 and KEY2014A-002 (`proposals.ids`
+  were forced active) and LCO2014A-001 from 2013 (new in `ids`, never crawled). Now: `ids` take their active flag
+  from the portal (an id it does not list is inactive), and `lcodb daily` keeps only the standards sources plus the
+  active proposals matching `daily.include_regex` (`'^KEY2026'` in `lcodb_config.yaml`); others are crawled on
+  request with `lcodb sync --proposal ID`. The standards-by-name and COJ/OGG calibration crawls stay in the daily
+  run (last `overlap_days` only): the spectra reduction needs the new standards. Test:
+  `test_daily_crawls_only_active_matching_proposals`. **To do:** extend the regex when a new key project starts.
+- **Prefect on the host:** `PREFECT_HOME` must be on a local disk (`/data2/jvhs1/AVA/data/prefect`): with the
+  default `~/.prefect` on the CIFS home the ephemeral API server timed out at start (SQLite on a network share).
+  Also `PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90`.

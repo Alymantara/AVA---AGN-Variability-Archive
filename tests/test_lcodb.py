@@ -337,3 +337,37 @@ def test_sbig_1m_only_filters_and_drops_counted(cfg, cons):
                                         ('elp1m008-kb74-20140608-0035-e91', 'sbig')]
     dropped = {(x['instrument_id'], x['reason']): x['n_frames'] for x in state.execute('SELECT * FROM dropped_frames')}
     assert dropped == {('kb82', 'telescope 0m4a'): 1, ('fa12', 'filter w'): 1, ('sd04', 'ignored prefix'): 1}
+
+
+class PortalClient:
+    """Fake portal: proposal list and profile only."""
+    def __init__(self, proposals, fail=False):
+        self._p, self._fail = proposals, fail
+
+    def profile(self):
+        return {'username': 'me'}
+
+    def proposals(self):
+        if self._fail:
+            raise RuntimeError('portal down')
+        return self._p
+
+
+def test_daily_crawls_only_active_matching_proposals(cfg):
+    cfg.raw['proposals'] = {'mode': 'auto', 'include_regex': '^KEY', 'pi_only': True,
+                            'ids': ['KEY2018B-001', 'LCO2014A-001'], 'exclude': []}
+    cfg.raw['daily'] = {'include_regex': '^KEY2026'}
+    me = [{'username': 'me'}]
+    portal = [{'id': 'KEY2026B-007', 'title': 'now', 'active': True, 'pis': me},
+              {'id': 'KEY2023B-001', 'title': 'old', 'active': True, 'pis': me},
+              {'id': 'KEY2020B-006', 'title': 'done', 'active': False, 'pis': me},
+              {'id': 'KEY2018B-001', 'title': 'co-I', 'active': False, 'pis': [{'username': 'other'}]}]
+    props = ingest.discover_proposals(PortalClient(portal), cfg)
+    active = {p[0]: p[2] for p in props}
+    # ids take their active flag from the portal; an id the portal does not list is inactive
+    assert active['KEY2018B-001'] == 0 and active['LCO2014A-001'] == 0
+    daily = [p[0] for p in ingest.daily_proposals(props, cfg)]
+    assert sorted(daily) == ['FLOYDS standards', 'KEY2026B-007']
+    # without the portal listing the ids keep the old behaviour (active)
+    props = ingest.discover_proposals(PortalClient(portal, fail=True), cfg)
+    assert {p[0]: p[2] for p in props}['LCO2014A-001'] == 1

@@ -11,8 +11,13 @@ tell the user. Commit only when asked.
 
 ## Decisions already made
 
-- **Isolated test.** AVA writes only under `/data3/jvhs1/ava`. `/data3/jvhs1/agn` and `/data2/jvhs1/agn` are only
-  read.
+- **Isolated test.** AVA writes only under `/data2/jvhs1/AVA/data`. `/data3/jvhs1/agn` and `/data2/jvhs1/agn` are
+  only read (copied, never moved).
+- **One folder (decided 18 Nov, on the host).** Code in `/data2/jvhs1/AVA` (not `~/code/AVA`), data in
+  `/data2/jvhs1/AVA/data` (not `/data3/jvhs1/ava`). Read the guide with those two substitutions.
+- **Miniforge on the local disk (decided 18 Nov, on the host).** Home (`~`) is a CIFS network share: slow and
+  case-insensitive. Miniforge is in `/data2/jvhs1/miniforge3`; read `~/miniforge3` in the guide as that path. The
+  `ava` environment's Python is `/data2/jvhs1/miniforge3/envs/ava/bin/python`.
 - **Old Anaconda.** Do not update or install into its `base`. Use plan B of step 5 (Miniforge in `~/miniforge3`,
   no `conda init`), or plan C (venv) if GitHub downloads fail. `~/.bashrc` gets the `ava-env` alias, not
   auto-activation.

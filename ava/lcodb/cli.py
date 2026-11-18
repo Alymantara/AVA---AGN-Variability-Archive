@@ -8,7 +8,8 @@
   lcodb link        LCO target names -> AVA ids (frames.ava_id, table target_link)
   lcodb stats       per-AGN LCO statistics in the AVA DB (agn_lco), via tools/ava_crossmatch.py
   lcodb reextract
-  lcodb daily       = sync + standards harvest + headers + airmass + matching + link + stats
+  lcodb daily       = sync (active proposals matching daily.include_regex only) + standards harvest + headers
+                      + airmass + matching + link + stats
   lcodb status
 """
 import argparse
@@ -49,7 +50,7 @@ def cmd_sync(cfg, a):
     cons, state = _open(cfg)
     c = _client(cfg)
     n, u = ingest.sync(c, cfg, cons, state, full=a.full, only=a.proposal,
-                       since=_date(a.since), until=_date(a.until))
+                       since=_date(a.since), until=_date(a.until), daily=getattr(a, 'daily', False))
     log.info('proposals: %d new, %d refreshed frames', n, u)
     db.mark_best(cons['photometry'])
     if not a.no_standards and not a.proposal:
@@ -147,6 +148,7 @@ def cmd_reextract(cfg, a):
 
 def cmd_daily(cfg, a):
     a.full = a.full if hasattr(a, 'full') else False
+    a.daily = True              # only active proposals matching daily.include_regex (ingest.daily_proposals)
     n, u = cmd_sync(cfg, a)
     a.db, a.limit, a.retry_failed = 'both', None, False
     cmd_headers(cfg, a)

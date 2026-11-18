@@ -50,13 +50,22 @@ def rejected(f, kind, cfg):
 
 
 def discover_proposals(client, cfg):
-    """Returns [(id, title, active, is_standard_source)]."""
+    """Returns [(id, title, active, is_standard_source)].
+
+    ``active`` comes from the observation portal for every proposal it lists, including the ones named in
+    ``proposals.ids`` (co-I or public programmes); an id the portal does not list counts as inactive (crawled once,
+    then only on request).  Without the portal listing (request failed) the ids count as active, as before."""
     pc = cfg['proposals']
     out = {}
+    try:
+        portal = {p['id']: p for p in client.proposals()}
+    except Exception as e:  # noqa: BLE001 - the portal is optional for the ids
+        log.warning('could not read the proposal list from the portal (%s): ids treated as active', e)
+        portal = None
     if pc.get('mode', 'auto') == 'auto':
         me = client.profile()['username']
         rx = re.compile(pc.get('include_regex') or '.*')
-        for p in client.proposals():
+        for p in (portal or {}).values():
             pis = [x.get('username') for x in p.get('pis', [])]
             if not rx.search(p['id']):
                 continue
@@ -64,12 +73,30 @@ def discover_proposals(client, cfg):
                 continue
             out[p['id']] = (p['id'], p.get('title', ''), int(bool(p.get('active'))), 0)
     for pid in pc.get('ids') or []:
-        out.setdefault(pid, (pid, '', 1, 0))
+        if pid in out:
+            continue
+        if portal is None:
+            out[pid] = (pid, '', 1, 0)
+        else:
+            p = portal.get(pid) or {}
+            out[pid] = (pid, p.get('title', ''), int(bool(p.get('active'))), 0)
     for pid in pc.get('exclude') or []:
         out.pop(pid, None)
     for pid in cfg.get('standard_proposals') or []:
         out[pid] = (pid, 'spectrophotometric standards', 1, 1)
     return list(out.values())
+
+
+def daily_proposals(props, cfg):
+    """The proposals ``lcodb daily`` crawls: the standard sources, plus the proposals the portal marks active whose id
+    matches ``daily.include_regex``.  The others are left alone (``lcodb sync --proposal ID`` crawls one on request)."""
+    rx = re.compile((cfg.get('daily') or {}).get('include_regex') or '.*')
+    keep, skip = [], []
+    for p in props:
+        (keep if p[3] or (p[2] and rx.search(p[0])) else skip).append(p)
+    if skip:
+        log.info('daily: skipped (inactive or not matching daily.include_regex): %s', ', '.join(p[0] for p in skip))
+    return keep
 
 
 class Router:
@@ -163,10 +190,12 @@ def crawl_window(client, cfg, router, pid, start, end, standards_only):
     return k
 
 
-def sync(client, cfg, cons, state, full=False, only=None, since=None, until=None):
+def sync(client, cfg, cons, state, full=False, only=None, since=None, until=None, daily=False):
     props = discover_proposals(client, cfg)
     if only:
         props = [p for p in props if p[0] in only] or [(pid, '', 1, 0) for pid in only]
+    elif daily:
+        props = daily_proposals(props, cfg)
     router = Router(cfg, cons, state)
     end = until or utcnow()
     for pid, title, active, is_std in props:

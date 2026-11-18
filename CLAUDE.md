@@ -33,7 +33,8 @@ Running decisions and to-do list: `docs/notes/future_improvements.md`.
 
 ## On the Linux host (runs the old pipeline too)
 
-- The new pipeline writes only under its own data folder (`/data3/jvhs1/ava`). The old pipeline's folders
+- The code is in `/data2/jvhs1/AVA`; the new pipeline writes only under its own data folder there
+  (`/data2/jvhs1/AVA/data`, git-ignored). The old pipeline's folders
   (`/data3/jvhs1/agn`, `/data2/jvhs1/agn`) are read-only for AVA; `tools/port_legacy.py` only reads them.
 - Leave the old Anaconda's `base` alone; AVA has its own environment (`ava-env` alias, guide steps 2, 5 and 6).
 - Both pipelines share one LCO account: run AVA downloads only while the old pipeline is not downloading.

@@ -128,10 +128,14 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
 
 - Fork: `https://github.com/Alymantara/banzai-floyds` (based on LCO's banzai-floyds; depends on
   `lco-banzai` 1.36.2 from GitHub, `torch`, `astroscrappy`, `scikit-image`, `scikit-learn`, `alembic`, …).
-  Deploy a **fixed commit** (currently `8897b99`); the version is recorded in every product.
+  Deploy a **fixed commit** (currently `3e8e796` on `rm-improvements`, 17 Nov 2026; was `8897b99`); the version is
+  recorded in every product. Install notes: the fork's `docs/INSTALL_RM.md`.
 - Python 3.12, own environment (e.g. `/opt/ava/env-banzai`). The fork has a `Dockerfile` that can be
   used instead.
-- Data: the sky flats of both FLOYDS sites (`spectroscopy.reduction.skyflats_dir`), registered once.
+  On Linux: install CPU-only PyTorch first (`pip install torch --index-url https://download.pytorch.org/whl/cpu`),
+  then `pip install -e ".[test]"`, from a clean shell (`env -i`, no `PYTHONPATH`).
+- Data: the sky-flat order solutions of both FLOYDS sites ship with the fork since `11f8ce4` (`banzai_floyds/data/orders/skyflats/`,
+  registered by `setup-db`); point `spectroscopy.reduction.skyflats_dir` at that folder.
 - AVA calls it as an external process; configure `spectroscopy.reduction.python`, `.package`,
   `.skyflats_dir` and `paths.floyds_pipeline` (currently `/Users/juan/...` paths — **must change**).
 
@@ -163,6 +167,10 @@ Settings to change for production (all in `config/ava_config.yaml` unless noted)
 | `web.data_dir` | | the website's data folder (section 8) |
 | `lco_usage.snapshots.file` | `data/lco_usage/snapshots.csv` (the seed) | on the data volume, e.g. `/srv/ava/lco_usage/snapshots.csv` (section 7.5) |
 | `releases.dir` | `releases` | on the data volume |
+
+**Prefect** keeps its state in `PREFECT_HOME` (default `~/.prefect`). Put it on a local disk (e.g. the data
+volume): on a network-mounted home the ephemeral API server times out at start. Set
+`PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90` as well.
 
 ## 5.2 Secrets
 
@@ -307,6 +315,10 @@ then nearest time. `tools/headers_backfill.sh` is no longer needed.
 - **Request budget:** the LCO archive allows **5000 requests per day per user**, UI and API together. Every
   listing page, header and file download counts. The daily jobs use a few hundred at most; plan any
   backfill around this limit.
+
+- `lcodb daily` looks for new frames only in the proposals the portal marks active whose id matches
+  `daily.include_regex` in `lcodb_config.yaml` (now `'^KEY2026'`; extend it when a new key project starts), plus the
+  standards sources. Older proposals are crawled on request: `lcodb sync --proposal ID`.
 
 ## 7.2 Job 2 — download (02:00)
 
