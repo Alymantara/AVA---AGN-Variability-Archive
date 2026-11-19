@@ -68,3 +68,5 @@
 
 .ava-cal-links li { margin-bottom: .6rem; line-height: 1.5; color: var(--ava-muted); font-size: .9rem; }
 .ava-cal-links a { font-weight: 600; }
+.ava-cal-stars .pt { fill: var(--c); fill-opacity: .55; stroke: var(--c); stroke-width: 1; }
+.ava-cal-stars .pt.off { fill: none; stroke-opacity: .6; }

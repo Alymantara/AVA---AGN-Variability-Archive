@@ -91,7 +91,8 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
         <p>One CSV file per AGN, <code>&lt;target&gt;_LCO_merged_lightcurve.csv</code>. All telescopes and cameras of
           the network are put on a common, absolute (AB) scale by the PyTICS ensemble calibration
           (Vieliute et al. 2025, <a href="https://doi.org/10.1093/rasti/rzaf021">RASTI, rzaf021</a>), so no further
-          intercalibration is needed. Only epochs that pass quality control are included. Please
+          intercalibration is needed. Only epochs that pass quality control are included: frames with poor seeing,
+          too few matched stars, a scattered or unusual zero point, a flagged AGN detection or an AGN close to saturation are left out. Please
           <a href="#cite">cite PyTICS</a> together with AVA. Accuracy and filter-system details:
           <a href="calibration.php">Photometric calibration</a>. The file starts with a few lines beginning with
           <code>#</code> that describe it (read it with, e.g., <code>pandas.read_csv(file, comment="#")</code>).</p>
@@ -103,7 +104,10 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
             <tr><th>filter</th><td>band: u, B, g, V, r, i, z, Y (see <a href="#filters">LCO filters</a>)</td></tr>
             <tr><th>telescope, camera</th><td>LCO telescope and camera codes of the frame</td></tr>
             <tr><th>flux_mJy, flux_err_mJy</th><td>calibrated flux density and its total per-epoch error (mJy;
-              1 mJy = AB 16.4): photometric ⊕ ensemble epoch scatter ⊕ per-camera systematic</td></tr>
+              1 mJy = AB 16.4). An error model fitted to back-to-back exposures: the SExtractor error (scaled by
+              ≈ 1.07) ⊕ a fraction of the ensemble's epoch scatter ⊕ a floor of ≈ 1 mmag ⊕ a per-camera systematic.
+              Checked to be Gaussian with the right width; see
+              <a href="calibration.php#errors">How good are the error bars?</a></td></tr>
             <tr><th>mag_AB, mag_AB_err</th><td>the same in AB magnitudes</td></tr>
             <tr><th>zp_err_mag</th><td>uncertainty of the band's absolute zero point (mag), the same for every
               epoch. A systematic shared by all points of a band: it does not affect lags or variability, so do

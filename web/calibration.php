@@ -30,6 +30,7 @@ ava_page_start('data', 'Photometric calibration',
     <a href="#method">How the zero point is set</a>
     <a href="#filters">Two filter systems</a>
     <a href="#stars">Accuracy for stars</a>
+    <a href="#errors">Error bars</a>
     <?php if ($cal): ?><a href="#agn">AGN and emission lines</a>
     <a href="#corrections">Per-target corrections</a>
     <a href="#redshift">Redshift dependence</a><?php endif; ?>
@@ -156,11 +157,81 @@ ava_page_start('data', 'Photometric calibration',
         <?php endif; ?>
       </div>
     </div>
+    <?php $sr = $cal['star_residuals'] ?? null; if ($sr): ?>
+    <h3 class="h6 mt-5 mb-2">Star by star</h3>
+    <p class="text-secondary small mb-3" style="max-width:80ch">Vertical axis: Gaia − AVA in mmag, for each comparison star in the <?= h(str_replace('_', ' ', (string) ($sr['target'] ?? ''))) ?>
+      field (Gaia synthetic magnitude minus AVA's mean calibrated magnitude). Open circles were rejected by the
+      zero-point fit's clipping; the line joins the medians in 1-mag bins. These are the stars the zero point is fitted
+      to, so the median sits near zero by construction: the test is that it stays there from bright to faint stars.
+      It does, within ≈ 5 mmag, except the faintest bin in <em>B</em> and <em>V</em> (10–15 mmag high, few stars and
+      the noisiest Gaia magnitudes; the trend is in the technical report).
+      The per-star scatter (σ, robust), about 10 mmag (<em>u</em> ≈ 30), is mostly the uncertainty of the Gaia
+      synthetic magnitudes themselves. The independent check is the table above. Points beyond ±50 mmag are drawn at
+      the edge.</p>
+    <div class="ava-cal-grid ava-cal-grid--z">
+      <?php foreach (['u', 'B', 'g', 'V', 'r', 'i', 'z'] as $b): if (empty($sr[$b])) continue; ?>
+        <div class="ava-chart-wrap m-0"><?= ava_cal_stars_svg($b, $sr[$b]) ?></div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+  </div>
+</section>
+
+<section class="ava-section" id="errors">
+  <div class="container-xxl">
+    <div class="row g-4 g-lg-5">
+      <div class="col-lg-6 ava-prose">
+        <p class="ava-eyebrow">Per-epoch errors</p>
+        <h2>How good are the error bars?</h2>
+        <p>Two exposures of the same AGN taken minutes apart with the same camera should differ only by noise. AVA uses
+          <?= number_format(89168) ?> such back-to-back pairs of 29 AGN, and 8.1 million pairs of comparison stars as a
+          control, to test the per-epoch errors and to fit them:</p>
+        <p class="text-center">σ² = (k σ<sub>phot</sub>)² + (β rms<sub>t</sub>)² + s<sub>0</sub>² + s<sub>cam</sub>²</p>
+        <ul>
+          <li><strong>k ≈ 1.07</strong>: SExtractor's photometric error is slightly underestimated.</li>
+          <li><strong>β ≈ 0.11</strong>: only a small part of the ensemble's epoch scatter (rms<sub>t</sub>) is noise
+            on the AGN; most of it is already in the photometric error.</li>
+          <li><strong>s<sub>0</sub> ≈ 1.1 mmag</strong>: a floor. Bright sources never scatter less than this, however
+            many photons are collected (left panel). It matters for the brightest AGN, whose photometric errors are
+            below 1 mmag.</li>
+          <li><strong>s<sub>cam</sub></strong>: a per-filter term for points from different cameras, fitted on pairs
+            taken by two cameras close in time.</li>
+        </ul>
+        <p>With these errors the normalised differences are Gaussian with width 1.00, for the AGN and for the stars
+          (right panel), and the fit holds on nights not used to fit it. About 1 % of pairs lie beyond 3σ against
+          0.3 % for a Gaussian. These tails come mostly from isolated events (cosmic rays, satellites, guiding),
+          then from very bright epochs and from the MuSCAT, SBIG and Spectral cameras.</p>
+      </div>
+      <div class="col-lg-6">
+        <figure class="ava-chart-wrap m-0">
+          <img src="<?= asset('assets/img/calibration/error_floor.png') ?>" class="img-fluid rounded bg-white p-2"
+               width="1283" height="573" loading="lazy"
+               alt="Left: observed scatter per epoch against photometric error for Sinistro, levelling off at about 1 mmag. Right: distribution of normalised pair differences for AGN and comparison stars, matching a unit Gaussian in the core.">
+          <figcaption class="small text-secondary mt-2">Sinistro cameras. Left: observed scatter per epoch against the
+            photometric error; the model (green) levels off at the floor (dotted). Right: pair differences divided by
+            the model errors, against a unit Gaussian (dashed).</figcaption>
+        </figure>
+        <h3 class="h6 mt-4 mb-2">The floor depends on the observation</h3>
+        <div class="ava-table-wrap" style="max-height:none">
+          <table class="table ava-table mb-0">
+            <thead><tr><th>Condition</th><th>Floor s<sub>0</sub></th></tr></thead>
+            <tbody>
+              <tr><td>exposure ≤ 30 s / ≥ 60 s</td><td>1.5 / 0.95 mmag</td></tr>
+              <tr><td>airmass 1.2 → 1.5–1.8</td><td>1.1 → 1.7 mmag</td></tr>
+              <tr><td>seeing ≤ 1.5″ → 3–4″</td><td>1.0 → 1.7 mmag</td></tr>
+              <tr><td>night to night (same camera)</td><td>± 0.4 mmag</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small text-secondary mt-2">Short exposures and high airmass point to atmospheric scintillation. The
+          light curves use the average floor; a per-epoch floor is under study.</p>
+      </div>
+    </div>
   </div>
 </section>
 
 <?php if ($cal): ?>
-<section class="ava-section" id="agn">
+<section class="ava-section ava-section--alt" id="agn">
   <div class="container-xxl">
     <p class="ava-eyebrow">AGN spectra</p>
     <h2 class="mb-2">AGN and emission lines</h2>
@@ -190,7 +261,7 @@ ava_page_start('data', 'Photometric calibration',
   </div>
 </section>
 
-<section class="ava-section ava-section--alt" id="corrections">
+<section class="ava-section" id="corrections">
   <div class="container-xxl">
     <p class="ava-eyebrow">Numbers</p>
     <h2 class="mb-2">Per-target corrections</h2>
@@ -228,7 +299,7 @@ ava_page_start('data', 'Photometric calibration',
   </div>
 </section>
 
-<section class="ava-section" id="redshift">
+<section class="ava-section ava-section--alt" id="redshift">
   <div class="container-xxl">
     <p class="ava-eyebrow">Redshift</p>
     <h2 class="mb-2">Redshift dependence</h2>
@@ -249,7 +320,7 @@ ava_page_start('data', 'Photometric calibration',
 </section>
 <?php endif; ?>
 
-<section class="ava-section ava-section--alt" id="status">
+<section class="ava-section" id="status">
   <div class="container-xxl">
     <div class="row g-4 g-lg-5">
       <div class="col-lg-7 ava-prose">
@@ -270,6 +341,10 @@ ava_page_start('data', 'Photometric calibration',
             intercalibration onto Sinistro, so the numbers here refer to Sinistro.</li>
           <li>The 6″ slit and the 10.5″ photometric aperture contain different amounts of host-galaxy light; not yet
             included.</li>
+          <li>Errors: in <em>B</em> and <em>z</em> the cross-camera term s<sub>cam</sub> is still slightly too small,
+            so points from different cameras scatter a little more than their error bars say.</li>
+          <li>Saturation: since November 2026 frames in which the AGN's peak reaches 80 % of the camera's saturation
+            level are dropped. This removes, for example, NGC 4151 on MuSCAT after its mirror was realuminised.</li>
         </ul>
       </div>
       <div class="col-lg-5">

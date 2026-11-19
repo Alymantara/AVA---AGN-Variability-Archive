@@ -260,3 +260,73 @@ function ava_cal_zscan_svg(string $band, array $zscan, array $targets): string
     $data = h(json_encode(['band' => $lab, 'z' => $zs, 'x0' => $ml, 'pw' => $pw, 'W' => $W, 'series' => $series]));
     return '<div class="ava-cal-zwrap" data-zscan="' . $data . '">' . implode('', $o) . '</div>';
 }
+
+/**
+ * One band of the test-field stars: Gaia GSPC − AVA per comparison star against GSPC magnitude, with the
+ * median per 1-mag bin. Filled points are the stars that set the zero point, open ones were clipped.
+ */
+function ava_cal_stars_svg(string $band, array $d): string
+{
+    $mag = $d['mag'] ?? [];
+    $res = array_map(fn($v) => 1000 * (float) $v, $d['res'] ?? []);
+    $used = $d['used'] ?? [];
+    $n = count($mag);
+    if ($n < 5) {
+        return '';
+    }
+    $W = 300; $H = 220; $ml = 44; $mr = 10; $mt = 24; $mb = 36;
+    $pw = $W - $ml - $mr; $ph = $H - $mt - $mb;
+    $lim = 50.0;
+    $x0 = floor(min($mag) * 2) / 2 - 0.25; $x1 = ceil(max($mag) * 2) / 2 + 0.25;
+    if ($x1 - $x0 < 2) { $x1 = $x0 + 2; }
+    $X = fn(float $m) => $ml + ($m - $x0) / ($x1 - $x0) * $pw;
+    $Y = fn(float $v) => $mt + (1 - (max(-$lim, min($lim, $v)) + $lim) / (2 * $lim)) * $ph;
+    $med = function (array $v): float { sort($v); $k = count($v); return $k % 2 ? $v[intdiv($k, 2)] : 0.5 * ($v[$k / 2 - 1] + $v[$k / 2]); };
+    $u = array_values(array_filter($res, fn($v, $i) => !empty($used[$i]), ARRAY_FILTER_USE_BOTH));
+    $m0 = $u ? $med($u) : $med($res);
+    $sig = 1.4826 * $med(array_map(fn($v) => abs($v - $m0), $u ?: $res));
+    $lab = ava_cal_band_label($band);
+    $col = 'var(' . ava_filter_var($band) . ', var(--ava-cal-sky))';
+    $o = ["<svg class=\"ava-chart ava-cal-z ava-cal-stars\" viewBox=\"0 0 $W $H\" role=\"img\" aria-label=\"Gaia minus AVA for the test-field stars in $lab: median "
+        . sprintf('%+.1f', $m0) . ' mmag, scatter ' . sprintf('%.0f', $sig) . " mmag per star\" xmlns=\"http://www.w3.org/2000/svg\">"];
+    $o[] = '<g class="grid">';
+    foreach ([-50, -25, 0, 25, 50] as $v) {
+        $o[] = "<line x1=\"$ml\" x2=\"" . ($ml + $pw) . '" y1="' . ava_cal_n($Y($v)) . '" y2="' . ava_cal_n($Y($v)) . '"/>';
+    }
+    $o[] = '</g><g class="tick">';
+    foreach ([-50, -25, 0, 25, 50] as $v) {
+        $o[] = '<text x="' . ($ml - 6) . '" y="' . ava_cal_n($Y($v) + 4) . '" text-anchor="end">' . ($v > 0 ? '+' : ($v < 0 ? '−' : '')) . abs($v) . '</text>';
+    }
+    for ($m = ceil($x0); $m <= $x1 + 1e-9; $m += 1) {
+        $o[] = '<text x="' . ava_cal_n($X($m)) . '" y="' . ($mt + $ph + 16) . '" text-anchor="middle">' . (int) $m . '</text>';
+    }
+    $o[] = '</g>';
+    $o[] = '<line class="zero" x1="' . $ml . '" x2="' . ($ml + $pw) . '" y1="' . ava_cal_n($Y(0)) . '" y2="' . ava_cal_n($Y(0)) . '"/>';
+    foreach ($mag as $i => $m) {
+        $cls = empty($used[$i]) ? 'pt off' : 'pt';
+        $o[] = '<circle class="' . $cls . '" style="--c:' . $col . '" cx="' . ava_cal_n($X((float) $m)) . '" cy="' . ava_cal_n($Y($res[$i])) . '" r="2.6"/>';
+    }
+    // median per 1-mag bin (≥ 4 used stars)
+    $pts = [];
+    for ($b = floor($x0); $b < $x1; $b += 1) {
+        $v = [];
+        foreach ($mag as $i => $m) {
+            if (!empty($used[$i]) && $m >= $b && $m < $b + 1) { $v[] = $res[$i]; }
+        }
+        if (count($v) >= 4) {
+            $pts[] = ava_cal_n($X($b + 0.5)) . ',' . ava_cal_n($Y($med($v)));
+        }
+    }
+    if (count($pts) >= 2) {
+        $o[] = '<polyline class="curve" style="--c:var(--ava-strong)" points="' . implode(' ', $pts) . '"/>';
+    }
+    foreach ($pts as $p) {
+        [$cx, $cy] = explode(',', $p);
+        $o[] = '<circle class="here" style="--c:var(--ava-strong)" cx="' . $cx . '" cy="' . $cy . '" r="3.5"/>';
+    }
+    $o[] = '<text class="title" x="' . $ml . '" y="15">' . h($lab) . '<tspan class="sub" dx="8">median '
+        . sprintf('%+.1f', $m0) . ' · σ ' . sprintf('%.0f', $sig) . ' mmag · ' . count($u) . ' stars</tspan></text>';
+    $o[] = '<text class="axis-label small" x="' . ($ml + $pw / 2) . '" y="' . ($H - 3) . '" text-anchor="middle">Gaia GSPC magnitude</text>';
+    $o[] = '</svg>';
+    return implode('', $o);
+}

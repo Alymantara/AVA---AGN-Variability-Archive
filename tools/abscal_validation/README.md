@@ -21,7 +21,7 @@ orders spliced at `spectroscopy.products.prepspec.red_min_wavelength`), continuu
 The general star-based check remains `tools/check_absolute_calibration.py` (`docs/figures/abscal/`).
 Report PDF (docs/reports/report_abscal.pdf, the repository convention for report PDFs): `pandoc report_abscal.md -o ../report_abscal.pdf --pdf-engine=xelatex` with an fvextra header, run in docs/reports/abscal.
 
-Website (web/calibration.php): `python tools/abscal_validation/export_web.py --sed <work> --ext <work>/ext` writes
+Website (web/calibration.php): `python tools/abscal_validation/export_web.py --sed <work> --ext <work>/ext --trends <work>/trends` (per-star residuals from `abscal_trends.py`) writes
 `web.calibration_src` (data/products/calibration/calibration.json); the -w publish step copies it to
 `<web.data_dir>/calibration/calibration.json`.
 

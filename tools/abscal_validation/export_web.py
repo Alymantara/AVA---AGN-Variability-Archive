@@ -5,11 +5,13 @@ Reads the outputs of agn_sed_corrections.py (and optionally abscal_ps1_apass.py)
 file to ``web.calibration_src`` (default data/products/calibration/calibration.json); ``tools/publish_web.py``
 (pipeline -w) copies it to ``<web.data_dir>/calibration/calibration.json``.
 
-    PYSYN_CDBS=... python tools/abscal_validation/export_web.py --sed <work> [--ext <work>/ext] [--out FILE]
+    PYSYN_CDBS=... python tools/abscal_validation/export_web.py --sed <work> [--ext <work>/ext]
+        [--trends <work>/trends] [--out FILE]
 
 Contents: per-target, per-band corrections (true − AVA in the reference system, line part, line fractions,
 flux factors, natural-system shift), thinned median spectra with continuum, LCO and reference passbands, a
-redshift scan of each spectrum, and the star-based accuracy (when --ext is given).
+redshift scan of each spectrum, the star-based accuracy (when --ext is given) and the per-star residuals of
+the test field (when --trends is given).
 """
 from __future__ import annotations
 
@@ -44,12 +46,33 @@ def thin_curve(wt, frac=0.01, n=160):
     return [[round(float(a), 1), round(float(b), 4)] for a, b in zip(g, tt)]
 
 
+TREND_BANDS = [("up", "u"), ("B", "B"), ("gp", "g"), ("V", "V"), ("rp", "r"), ("ip", "i"), ("zs", "z")]
+
+
+def star_residuals(trends: Path, target: str) -> dict:
+    """Per comparison star: Gaia GSPC magnitude and GSPC − AVA (abscal_trends.py trends_star_means.csv), by band."""
+    s = pd.read_csv(trends / "trends_star_means.csv")
+    ref = pd.read_csv(cfg.phot_dir(target) / "reference_stars.csv")
+    out = {"target": target}
+    for f, b in TREND_BANDS:
+        q = s[s["filter"] == f].merge(ref[["star_id", f"lco_{b}"]], on="star_id", how="inner")
+        q = q[np.isfinite(q[f"lco_{b}"]) & np.isfinite(q["res"])].sort_values(f"lco_{b}")
+        if len(q):
+            out[b] = dict(mag=[round(float(v), 3) for v in q[f"lco_{b}"]],
+                          res=[round(float(v), 4) for v in q["res"]],
+                          used=[bool(v) for v in q["used"]])
+    return out
+
+
 @click.command()
 @click.option("--sed", type=click.Path(file_okay=False, path_type=Path), required=True)
 @click.option("--ext", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--trends", type=click.Path(file_okay=False, path_type=Path), default=None,
+              help="abscal_trends.py output: per-star residuals for the stars chart")
+@click.option("--trends-target", default="Mrk_817", show_default=True)
 @click.option("--out", type=click.Path(dir_okay=False, path_type=Path), default=None)
 @click.option("--bin", "binw", default=8.0, show_default=True, help="spectrum bin width (Å)")
-def main(sed, ext, out, binw):
+def main(sed, ext, trends, trends_target, out, binw):
     web = cfg._raw.get("web", {}) or {}
     out = out or cfg._resolve(web.get("calibration_src") or "data/products/calibration/calibration.json")
     summ = pd.read_csv(sed / "sed_corr_summary.csv")
@@ -125,6 +148,7 @@ def main(sed, ext, out, binw):
     doc = dict(generated_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                bands=MAIN, all_bands=S.BANDS, targets=targets, spectra=spectra, passbands=passbands,
                redshift_scan=dict(z=[float(z) for z in zs], curves=zscan), stars=stars,
+               star_residuals=star_residuals(trends, trends_target) if trends is not None else None,
                transform={b: dict(a=r3(trn.loc[b, "a"]), C=r3(trn.loc[b, "C"]), C_emp=r3(trn.loc[b, "C_emp"]))
                           for b in S.BANDS},
                notes=dict(spectra="FLOYDS 6\" slit, fringe-corrected per-order fluxes (EXTRACTED), blue below "
