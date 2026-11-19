@@ -87,7 +87,7 @@ line in `future_improvements.md`.
 
 ## 3d. Production operations: to do first (user, 19 Nov)
 
-- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: the weekly backup. Fresh-install round, 19 Nov: overrides config + make_config, Prefect env, dry cleanup, UTC.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
+- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` committed (0337d2d, 3e6e2fb, b19df08), `--check` / `--run-now` (48be80c). Open: the weekly backup. Fresh-install round, 19 Nov: overrides config + make_config, Prefect env, dry cleanup, UTC.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
   for the Prefect flow, `scripts/cleanup.py --live`, `scripts/lco_usage.py --live-snapshot`), but the crontab is
   only written out in `deployment_guide.md` §7, with `/opt/ava` example paths. To do:
   - a `deploy/` folder with `crontab.example` and systemd units for the Prefect server and worker;
@@ -128,7 +128,7 @@ line in `future_improvements.md`.
 - [x] **C01** (decided 19 Nov: the full production list; `schedule_cron` 02:00 UTC): `nightly_steps` has no `pytics`, so the scheduled run never updates the ensemble light curves.
   Intended? `config/ava_config.yaml:578`.
 - [ ] **C02**: `merge` (`-m`/`-s`) raises `NotImplementedError`. Remove the flags or port the step?
-- [ ] **C03**: AVA ignores `LCODB_CONFIG` (`ava/config.py:248`). Matters on the host if only that variable is set.
+- [x] **C03** (fixed 19 Nov, 6baad1e/48be80c: `lcodb_config_path` honours `LCODB_CONFIG`, then `data/config/`, then the template): AVA ignored `LCODB_CONFIG` (`ava/config.py:248`).
 - [ ] **C04**: cleanup can delete a standard that an unreduced night elsewhere still needs (`archive/cleanup.py:291`).
   Fix together with B03.
 - [ ] **C05**: signed S3 URLs (valid 48 h) appear in download error logs.
