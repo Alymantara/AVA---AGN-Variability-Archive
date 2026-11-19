@@ -125,6 +125,11 @@ ava_page_start('data', 'Photometric calibration',
           <li>No trend with magnitude (1–6 mmag per mag), airmass (≤ 5 mmag), seeing (≤ 2 mmag per arcsec),
             season (1–3 mmag) or camera (1–3 mmag; <em>z</em> 7).</li>
           <li>The fit settings (sigma clip, error floor, star variability cut) move the zero point by ≤ 5 mmag.</li>
+          <li>Each merged light curve states its band's zero-point uncertainty in the column <code>zp_err_mag</code>
+            (typically 1–10 mmag). It is shared by every epoch of the band, so it is <em>not</em> part of the per-epoch
+            errors: it does not affect lags or variability, only absolute fluxes. Since 19 November 2026 the zero point
+            uses every star in the frames, not only the ensemble's comparison stars, which fixes fields where the
+            brightest stars are too bright for Gaia's SDSS/PS1 photometry and the shallow <em>Y</em> band.</li>
           <li><em>B</em> and <em>V</em> agree with GSPC by construction, but no independent catalogue on the Landolt
             system is good enough to check them below ≈ 20–25 mmag. APASS DR9 is off by 0.03–0.17 mag in this field.</li>
         </ul>

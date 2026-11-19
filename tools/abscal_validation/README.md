@@ -24,3 +24,9 @@ Report PDF (docs/reports/report_abscal.pdf, the repository convention for report
 Website (web/calibration.php): `python tools/abscal_validation/export_web.py --sed <work> --ext <work>/ext` writes
 `web.calibration_src` (data/products/calibration/calibration.json); the -w publish step copies it to
 `<web.data_dir>/calibration/calibration.json`.
+
+Absolute ZP anchors per field (19 Nov 2026; every field under photometry_root, read-only):
+
+    python tools/abscal_validation/field_inventory.py <work>/inventory.csv      # frames, anchors, ZP fit per band
+    python tools/abscal_validation/anchor_stars.py <work>/a.csv fairall_9:Y ... # current vs all-star anchor variants
+    python tools/abscal_validation/anchor_sweep.py <work>/sweep.csv             # current (A) vs all-star (D), all bands

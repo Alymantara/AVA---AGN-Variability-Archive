@@ -132,6 +132,37 @@ Newest decisions first within each section.
     passbands, per-target corrections and the redshift scan, from `calibration.json` (`export_web.py` →
     `web.calibration_src` → `-w`). Its status box says the natural-system switch is *under review*; update it with
     the decision.
+  - **Anchors in all 38 test fields (19 Nov 2026; `tools/abscal_validation/{field_inventory,anchor_stars,anchor_sweep}.py`).**
+    - **GSPC validity sets a bright limit:** SDSS u g r i z and PS1 y anchors exist only for G ≳ 14.2 (u 14.5); JKC B V
+      reach G ≈ 10.8. The colour term needs g−i, so every anchor must be fainter than G ≈ 14.2. Not hard-coded in
+      AVA, and absent from the old pipeline, which gave every APASS star model magnitudes in all bands.
+    - **Failures it causes:** the ZP only uses PyTICS comparison stars (the brightest `star_lim` = 100) with raw scatter
+      `rms_star` < 0.05. In Y only bright stars are that quiet. So Fairall 9 and NGC 4151 have 2 anchors and
+      **ZP = NaN (no calibrated Y light curve)**; Mrk 509 has 3. In a dense field (MCG 08-11-011, 2247 quality stars)
+      the 100 comparison stars are all brighter than G 14.3: 0–1 anchors, **no absolute ZP in any band**.
+    - **Bug:** the merged CSV still exports those Y rows with empty flux/mag (Fairall 9: 1414 rows, NGC 4151: 1011).
+    - **Tested fix (offline):** anchors from *all* stars in the frames, put on the ensemble scale with the stored
+      DMAGT/DMAGS/CK. Keep stars detected in ≥ 90 % of epochs with per-epoch scatter ≤ 0.2 mag, and judge
+      variability by the scatter *in excess of* stars of the same brightness. On the 192 field-bands that work now
+      it agrees with the current ZP (median 0, MAD 2–5 mmag; u −7 ± 11). It gives Y 23–53 anchors (Fairall 9 ±7 mmag,
+      Mrk 509 ±4, NGC 4151 9 anchors ±18) and MCG 95–805 anchors per band. In a few fields it finds fewer stars than
+      now (NGC 4395, NGC 5548 u), so take the union with the comparison stars.
+    - **Implemented (user OK, 19 Nov 2026):** `ensemble.anchor_stars` + `absolute_zp(stars=...)`, config
+      `ensemble.absolute_all_stars` (default true), `absolute_min_coverage` 0.9, `absolute_max_scatter` 0.2,
+      `absolute_trend_degree` 2. The typical scatter is a clipped quadratic in log(scatter) vs magnitude; a running
+      median was biased low at the faint end. Checked offline on every stored solution (no products rewritten):
+      192 working field-bands move by +1.1 mmag median (MAD 1.5, max 12.5). MCG 08-11-011 gets a ZP in all 7 bands
+      (95–805 anchors). Y: Fairall 9 36 anchors (±8 mmag), NGC 4151 21 (±8), Mrk 509 53 (±4, −18 mmag vs 3 stars),
+      Mrk 817 44 (+30 ± 15; only 10 Y frames). Bands without a ZP are already dropped from the merged CSV and plots
+      (qc-bugs B02/B12). **To do on turgon:** `--pytics-full` once for all targets.
+    - **Still open:** u bands with 7–9 anchors (Mrk 1044, Mrk 590, NGC 4151) are a catalogue problem (QC-0003),
+      not a star-selection one. PS1 DR2 y for 12.5 < G < 14.2 (dec > −30°) could add bright Y anchors.
+  - **Merged light-curve products (user, 19 Nov 2026).** The zero-point error was never in the per-epoch errors
+    (right for lags and F_var) but was missing from the shareable CSV. The merged CSV now has a `#` header, keeps
+    only the total per-epoch errors and adds `zp_err_mag`. The random (epoch-to-epoch) errors and the other QC
+    terms moved to `<target>_LCO_merged_lightcurve_qc.csv` (every epoch, not published). Readers use
+    `comment="#"`. Website Data and calibration pages updated. The photometry manual (LaTeX, user's) still
+    describes the old columns.
 
 ## Reference catalogue
 

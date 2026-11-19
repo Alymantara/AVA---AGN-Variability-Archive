@@ -140,7 +140,13 @@ def g_band(phot_dir: Path, target: str, mjd_range=None) -> pd.DataFrame:
     f = Path(phot_dir) / f"{target}_LCO_merged_lightcurve.csv"
     if not f.exists():
         return pd.DataFrame()
-    p = pd.read_csv(f)
+    p = pd.read_csv(f, comment="#")
+    qc = f.with_name(f.stem + "_qc" + f.suffix)
+    if "flux_err_random_mJy" not in p and qc.is_file():
+        # weights from the epoch-to-epoch error, kept in the QC file since Nov 2026 (the CSV has total errors)
+        p = p.merge(pd.read_csv(qc, comment="#", usecols=["frame", "flux_err_random_mJy"]), on="frame", how="left")
+    if "flux_err_random_mJy" not in p:
+        p["flux_err_random_mJy"] = p["flux_err_mJy"]
     p = p[p["filter"] == "g"]
     if mjd_range is not None:
         p = p[p.MJD.between(*mjd_range)]

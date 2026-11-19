@@ -99,7 +99,12 @@ def update_from_merged(db: Path, phot_dir, error: str = "total", min_epochs: int
         csv = Path(phot_dir(t)) / f"{t}_LCO_merged_lightcurve.csv"
         if not csv.is_file():
             continue
-        bv = band_variability(pd.read_csv(csv), error=error, min_epochs=min_epochs)
+        lc = pd.read_csv(csv, comment="#")
+        qc = csv.with_name(csv.stem + "_qc" + csv.suffix)
+        if error == "random" and "flux_err_random_mJy" not in lc and qc.is_file():
+            # the shareable CSV keeps only total errors (Nov 2026); the random part is in the QC file
+            lc = lc.merge(pd.read_csv(qc, comment="#", usecols=["frame", "flux_err_random_mJy"]), on="frame", how="left")
+        bv = band_variability(lc, error=error, min_epochs=min_epochs)
         if bv.empty:
             continue
         out[t] = (dict(zip(bv["filter"], bv["fvar"])) if dry_run

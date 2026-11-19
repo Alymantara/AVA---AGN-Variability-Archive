@@ -1,5 +1,8 @@
 """Offline tests for ava.photometry.ensemble (PyTICS port) and intercal on synthetic data."""
 
+import sqlite3
+from contextlib import closing
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -367,3 +370,104 @@ def test_rerun_without_new_frames_keeps_colour_check(tmp_path):
         assert meta2[f]["colour_check"] == meta1[f]["colour_check"]
         assert meta2[f]["colour_terms"] == meta1[f]["colour_terms"]
         assert meta2[f]["zp"] == meta1[f]["zp"]
+
+
+# ---- absolute ZP from all stars in the frames (ensemble.anchor_stars, 19 Nov 2026) ----------------
+
+def _ref_for(d, stars, zp=23.9, C=0.04, c0=0.8, seed=5):
+    """Reference catalogue in the GSPC layout for ``stars`` (true mean + ZP + colour term); others unlisted."""
+    rng = np.random.default_rng(seed)
+    m_true = d[~d.is_agn].groupby("star_id")["mag_inst"].median()     # ~ m_true + mean offsets (a constant)
+    rows = []
+    for s in stars:
+        c = rng.uniform(0.3, 1.6)
+        g = m_true[s] + zp + C * (c - c0)
+        rows.append(dict(star_id=s, quality_ok=True, is_agn=False, lco_g=g, lco_g_err=0.01, lco_i=g - c))
+    return pd.DataFrame(rows)
+
+
+def test_anchor_stars_rescue_zp_when_comparison_stars_have_no_reference():
+    """Dense-field / Y case: the comparison stars (brightest star_lim) have no GSPC magnitudes, fainter
+    stars do. Comparison stars alone give no ZP; all-star anchors give the same ZP as a full catalogue."""
+    d, _ = synthetic(n_stars=40, n_epochs=90)
+    sol = E.fit(d, agn_id=-1, star_lim=12)
+    comp = set(sol.stars.star_id)
+    faint = [s for s in sorted(d.star_id.unique()) if s >= 0 and s not in comp]
+    ref_all = _ref_for(d, [s for s in d.star_id.unique() if s >= 0])
+    ref_faint = ref_all[ref_all.star_id.isin(faint)]
+    colours = (ref_all.lco_g - ref_all.lco_i).set_axis(ref_all.star_id)
+
+    assert not np.isfinite(E.absolute_zp(sol, ref_faint)["zp"])            # the old failure
+    control = E.absolute_zp(sol, ref_all, stars=E.anchor_stars(sol, d, colours=colours))
+    z = E.absolute_zp(sol, ref_faint, stars=E.anchor_stars(sol, d, colours=colours))
+    assert z["n"] >= 20 and set(z["stars"].loc[z["stars"].used, "source"]) == {"extra"}
+    assert abs(z["zp"] - control["zp"]) < 0.003 and abs(z["C"] - 0.04) < 0.01
+
+
+def test_anchor_stars_noise_is_not_variability_and_partial_stars_dropped():
+    d, _ = synthetic(n_stars=40, n_epochs=120)
+    rng = np.random.default_rng(9)
+    ids = sorted(s for s in d.star_id.unique() if s >= 0)
+    var, partial = ids[25], ids[30]
+    mmed = d[~d.is_agn].groupby("star_id")["mag_inst"].median()
+    for s_ in ids:                                   # Y-like: noise rising smoothly to 0.15 mag at the faint end
+        k = d.star_id == s_
+        sig = 0.15 * np.exp(1.2 * (mmed[s_] - mmed.max()))
+        d.loc[k, "mag_inst"] += rng.normal(0, sig, k.sum())
+        d.loc[k, "magerr"] = np.hypot(d.loc[k, "magerr"], sig)
+    noisy = [s_ for s_ in ids[20:] if s_ not in (var, partial)]
+    kv = d.star_id == var
+    d.loc[kv, "mag_inst"] += 0.15 * np.sin(d.loc[kv, "MJD"] / 3.0)  # a real variable at ordinary noise
+    d = d[~((d.star_id == partial) & (d.frame.str[-5:].astype(int) % 2 == 0))]   # detected in half the frames
+    sol = E.fit(d, agn_id=-1, star_lim=15)
+    a = E.anchor_stars(sol, d).set_index("star_id")
+    assert partial not in a.index                                    # coverage cut
+    assert a.loc[noisy, "rms_raw"].max() > 0.12 and (a.loc[noisy, "rms_star"] < 0.05).all()
+    assert a.loc[var, "rms_star"] > 0.05                             # still rejected by absolute_max_rms_star
+    assert set(a.loc[a.index.isin(sol.stars.star_id), "source"]) == {"comparison"}
+
+
+def test_merged_csv_header_columns_and_qc_file(tmp_path):
+    """Shareable CSV: # header, total errors + zp_err_mag only; QC file: every epoch with the QC terms."""
+    from ava.config import cfg
+    from ava.pipeline.tasks import ensemble as _  # noqa: F401
+    import copy
+    import sys
+    T = sys.modules["ava.pipeline.tasks.ensemble"]
+
+    db = _target_folder(tmp_path, cams=("fa05", "fa16"))
+    E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="auto", log=lambda *a: None)
+    lc = T.intercal_lightcurve(tmp_path, copy.copy(cfg.ensemble))
+    lc["zp_err"] = 0.004                                  # as a run with an absolute ZP leaves it
+    lc.loc[lc.index[:5], "good"] = False
+    csv = tmp_path / "T_LCO_merged_lightcurve.csv"
+    out = T.export_merged_csv(lc, csv, "T", qc_path=T.qc_path_for(csv))
+
+    lines = csv.read_text().splitlines()
+    head = [ln for ln in lines if ln.startswith("#")]
+    assert head and lines[: len(head)] == head and any("zp_err_mag" in ln for ln in head)
+    m = pd.read_csv(csv, comment="#")
+    assert list(m.columns) == T.MERGED_COLUMNS and len(m) == int(lc.good.sum())
+    assert (m["zp_err_mag"] == 0.004).all() and "flux_err_random_mJy" not in m
+    assert {"flux_err_random_mJy", "mag_AB_err_random"} <= set(out.columns)          # kept for F_var
+
+    qc = pd.read_csv(T.qc_path_for(csv), comment="#")
+    assert list(qc.columns) == T.QC_COLUMNS and len(qc) == len(lc) and (~qc["good"]).sum() == 5
+    assert np.allclose(qc.loc[qc.good, "flux_mJy"].sort_values().to_numpy(), m["flux_mJy"].sort_values().to_numpy())
+
+
+def test_fvar_random_reads_the_qc_file(tmp_path):
+    from ava.photometry import variability as PV
+
+    t = np.arange(100.0)
+    flux = 10 * (1 + 0.1 * np.sin(t / 10) * np.sqrt(2))
+    m = pd.DataFrame({"target": "T", "MJD": 60000 + t, "filter": "g", "flux_mJy": flux, "flux_err_mJy": 0.5,
+                      "frame": [f"f{i}" for i in range(100)]})
+    csv = tmp_path / "T_LCO_merged_lightcurve.csv"
+    csv.write_text("# header\n" + m.to_csv(index=False))
+    m.assign(flux_err_random_mJy=0.05)[["frame", "flux_err_random_mJy"]].to_csv(
+        tmp_path / "T_LCO_merged_lightcurve_qc.csv", index=False)
+    with closing(sqlite3.connect(tmp_path / "ava.db")) as c:
+        c.execute("CREATE TABLE agn (data_id TEXT)"); c.execute("INSERT INTO agn VALUES ('T')"); c.commit()
+    out = PV.update_from_merged(tmp_path / "ava.db", lambda t_: tmp_path, error="random", dry_run=True)
+    assert out["T"]["g"] == pytest.approx(0.1, abs=0.01)

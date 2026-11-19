@@ -238,7 +238,7 @@ def analyse(phot: Path, qc_db: Path, X: pd.DataFrame, meta: dict):
     prod = sorted(phot.glob("*_LCO_merged_lightcurve.csv"))
     mjy = np.nan
     if prod:
-        p = pd.read_csv(prod[0], usecols=["flux_mJy", "mag_AB"])
+        p = pd.read_csv(prod[0], usecols=["flux_mJy", "mag_AB"], comment="#")
         mjy = float(np.median(p["flux_mJy"] / (3631e3 * 10 ** (-0.4 * p["mag_AB"]))))
     return (pd.DataFrame(rows), pd.concat(stars, ignore_index=True), pd.DataFrame(cams),
             pd.concat(fzp, ignore_index=True), mus, mjy)

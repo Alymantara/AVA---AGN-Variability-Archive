@@ -502,6 +502,14 @@ ensemble:
   absolute_clip: 3.0      # sigma clip of the star-by-star ZP fit (x robust scatter)
   absolute_floor: 0.01    # mag added in quadrature to each star; also the minimum clip scatter
   absolute_max_rms_star: 0.05   # mag; stars more variable than this are not used for the ZP
+  # Anchors from every star in the frames, not only the comparison stars (ensemble.anchor_stars, 19 Nov 2026).
+  # GSPC SDSS/PS1 anchors exist only for G >~ 14.2 and the comparison stars are the brightest star_lim: dense
+  # fields had no anchor and Y 2-3 (Fairall 9, NGC 4151: no Y ZP). With true, absolute_max_rms_star applies to
+  # the scatter in excess of stars of the same brightness (noise is not variability).
+  absolute_all_stars: true
+  absolute_min_coverage: 0.9    # extra stars: detected in >= this fraction of the best-covered star's epochs
+  absolute_max_scatter: 0.2     # mag; extra stars: robust per-epoch scatter at most this
+  absolute_trend_degree: 2      # polynomial in magnitude for the typical log(scatter) of non-variable stars
   # --- flux-flux intercalibration of the AGN (ava.photometry.intercal) -------------
   # additive host-light offset of cameras whose aperture (arcsec) differs from Sinistro 10.5" (MuSCAT 8.9")
   # Sinistro under both names (fl = 2014 - Sep 2018), so the early seasons have a reference too (18 Nov 2026).
@@ -517,7 +525,8 @@ ensemble:
   intercal_per_season: false
   intercal_season_gap_days: 60.0     # a gap longer than this starts a new season
   # --- shareable product ---------------------------------------------------------
-  export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv: mJy and AB mag
+  export_csv: true        # <phot>/<target>_LCO_merged_lightcurve.csv: mJy and AB mag, total errors, zp_err_mag, # header
+  export_qc_csv: true     # <phot>/<target>_LCO_merged_lightcurve_qc.csv: every epoch + QC columns (random errors, rms_t, ...)
   # Per-band fractional variability of the merged light curve (ava.photometry.variability)
   # → AVA DB table photometry_variability + legacy agn.frac_<band>.
   fvar_error: "total"     # errors in the excess variance: "total" (conservative) | "random"

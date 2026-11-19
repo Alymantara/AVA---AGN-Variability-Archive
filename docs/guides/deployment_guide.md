@@ -371,6 +371,21 @@ letters as `scripts/run_pipeline.py`):
 | spectroscopy products | `-P` | Hβ / [O III] fits, line light curves, mean/RMS spectra, variability in `ava.db` |
 | publish | `-w` | derived properties, observing flag, website data copy, public data releases |
 
+PyTICS absolute zero point (`-t`): anchored to Gaia GSPC stars, which exist only for G of about 14.2 and fainter in u g r i z y.
+Since 19 Nov 2026 the fit uses every star in the frames, not only the comparison stars
+(`ensemble.absolute_all_stars`, `absolute_min_coverage`, `absolute_max_scatter`, `absolute_trend_degree`).
+Without it, dense fields and Y had no usable anchors. After upgrading, run a full PyTICS refit
+(`--pytics-full`) once, so every target's zero point is recomputed.
+
+PyTICS products per target (`-t`; `ensemble.export_csv`, `ensemble.export_qc_csv`):
+- `<target>_LCO_merged_lightcurve.csv`: the **shareable** light curve, published as a download. It has a `#`
+  header describing every column; read it with `comment="#"`. Columns: target, MJD, filter, telescope, camera,
+  flux_mJy, flux_err_mJy, mag_AB, mag_AB_err (total per-epoch errors), zp_err_mag (the band's zero-point
+  uncertainty, a systematic common to all epochs and not added to the per-epoch errors), frame.
+- `<target>_LCO_merged_lightcurve_qc.csv`: **not published**. Every epoch, good or not, with the QC terms:
+  random (epoch-to-epoch) errors, rms_t, rms_sc, n_stars, ensemble offsets, intercal a/b, airmass and seeing.
+  F_var with `ensemble.fvar_error: random` and the spectroscopy g-band comparison read the random errors from here.
+
 Production `nightly_steps` (to set): `download_data, extract, calibrate_data, pytics, plot,
 spec_download_data, spec_reduce_data, spec_products_data, publish`. Download and processing can be split
 into two deployments (02:00 and 03:00) if preferred; the single flow already runs them in order.

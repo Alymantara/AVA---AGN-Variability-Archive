@@ -644,7 +644,8 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
                min_epochs: int = 10, absolute: bool = True, colour_term: bool = True,
                scope_colour_terms="auto", colour_check_min_gain: float = 0.05, ref_cameras=("fa",),
                intercal_max_gap: float = 3.0, auto_refit: bool = True, update_kw: dict | None = None,
-               apply_kw: dict | None = None, zp_kw: dict | None = None, log=print, **fit_kw) -> dict:
+               apply_kw: dict | None = None, zp_kw: dict | None = None, anchor_kw: dict | None = None,
+               log=print, **fit_kw) -> dict:
     """Calibrate ``data_id`` per filter and write ``agn_lightcurve_pytics.parquet``.
 
     mode: ``full`` refits everything; ``update`` adds new frames to the stored
@@ -659,6 +660,8 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     ``absolute``: tie the star means to ``reference_stars.csv``
     (:func:`agn_zero_points`, colour term at the AGN colour); updates reuse the
     stored zero point (star means do not change in an update).
+    ``anchor_kw``: when given (``ensemble.absolute_all_stars``), the absolute ZP uses every star in the
+    frames (:func:`anchor_stars` with these settings), not only the comparison stars.
     ``fit_kw`` go to :func:`fit`, ``update_kw`` to :func:`update`, ``apply_kw`` to :func:`apply`.
     """
     phot_dir = Path(phot_dir)
@@ -701,9 +704,18 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     refitted = [f for f in sols if report[f]["mode"] in ("full", "update->full")]
     agn = {f: data[f][data[f]["is_agn"]] for f in sols}
 
+    all_colours = (ref["lco_g"] - ref["lco_i"]).set_axis(ref["star_id"]).dropna() if ref is not None else None
+
+    def anchors(sol, f):
+        """Star means for the absolute ZP of ``sol`` (None: the comparison stars)."""
+        if anchor_kw is None:
+            return None
+        return anchor_stars(sol, data[f], colours=all_colours, **anchor_kw)
+
     def zero_points():
         rel = {f: apply(s, agn[f], **apply_kw)["mag"].to_numpy() for f, s in sols.items()}
-        return agn_zero_points(sols, ref, rel, colour_term=colour_term, zp_kw=zp_kw)
+        stars = {f: anchors(s, f) for f, s in sols.items()} if anchor_kw is not None else None
+        return agn_zero_points(sols, ref, rel, colour_term=colour_term, zp_kw=zp_kw, stars=stars)
 
     # ---- 2. per-scope colour terms: decide per filter from the data ------------------------
     if auto_ck and refitted and ref is not None and star_colours is not None:
@@ -712,7 +724,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
         for f in refitted:
             t0 = time.time()
             s1 = fit(data[f], agn_id=sols[f].meta["agn_id"], log=None, colours=star_colours, **fit_kw)
-            z1 = absolute_zp(s1, ref, colour_term=colour_term, **(zp_kw or {}))
+            z1 = absolute_zp(s1, ref, colour_term=colour_term, stars=anchors(s1, f), **(zp_kw or {}))
             zp1 = z1["zp"] + z1["C"] * (c_agn - z1["c0"])
             s1.meta["agn_colour"] = c_agn
             lc0 = apply(sols[f], agn[f], zps[f][0], **apply_kw)
@@ -786,8 +798,95 @@ def write_zp_summary(phot_dir: Path, sols: dict) -> dict:
     return out
 
 
+def anchor_stars(sol: Solution, d: pd.DataFrame, *, colours: pd.Series | None = None, min_coverage: float = 0.9,
+                 max_scatter: float = 0.2, trend_degree: int = 2, bad_flags: int = BAD_FLAGS) -> pd.DataFrame:
+    """Star means for the absolute ZP from every star in the frames, not only the comparison stars.
+
+    GSPC anchors exist only for G ≳ 14.2 (its SDSS / PS1 validity range), while the comparison stars are the
+    brightest ``star_lim``: in dense fields they are all brighter, and in Y only bright stars pass a raw-scatter
+    cut, so the ZP had 0-3 anchors (19 Nov 2026; tools/abscal_validation/anchor_sweep.py).  Here each star is put
+    on the ensemble scale with the solved offsets, exactly as :func:`apply` treats the AGN:
+
+        m = mag_inst - DMAGT(frame) - DMAGS(scope) [- CK(scope) (c - c0)]
+
+    on the solution's epochs (``bad_flags`` measurements dropped); the star mean is the median.
+
+    * comparison stars keep PyTICS's own ``m_star`` / ``m_star_err``;
+    * other stars must be detected in ≥ ``min_coverage`` of the epochs of the best-covered star (faint stars
+      seen only in good frames are biased bright) and scatter ≤ ``max_scatter`` mag (robust, per epoch);
+      their means are shifted by the median (ours − PyTICS) of the well-covered comparison stars (gauge);
+    * ``rms_star`` (used by :func:`absolute_zp` to reject variables) becomes the scatter in excess of the
+      typical scatter of stars of the same brightness: a polynomial (``trend_degree``) in m_star fitted to
+      log(scatter), iteratively clipped at +3 MAD so variables do not pull it (a running median was biased low
+      at the faint end, where the window only sees brighter stars).  Photometric noise is not variability.
+      ``rms_raw`` keeps the robust per-epoch scatter.
+
+    Returns star_id, m_star, m_star_err, rms_star, rms_raw, rms_trend, n, source ("comparison" | "extra").
+    """
+    cols = ["star_id", "m_star", "m_star_err", "rms_star", "rms_raw", "rms_trend", "n", "source"]
+    ep = sol.epochs.set_index("frame")
+    sc = sol.scopes.set_index("scope")
+    m = d[~d["is_agn"].astype(bool) & d["frame"].astype(str).isin(ep.index)]
+    if bad_flags and "sex_flags" in m:
+        m = m[(m["sex_flags"].fillna(0).astype(int) & bad_flags) == 0]
+    if m.empty:
+        return pd.DataFrame(columns=cols)
+    fr = m["frame"].astype(str)
+    mc = (m["mag_inst"].to_numpy(float) - fr.map(ep["DMAGT"]).to_numpy(float)
+          - m["scope"].map(sc["DMAGS"]).to_numpy(float))
+    if sol.meta.get("colour_terms") and "CK" in sc:
+        ck = m["scope"].map(sc["CK"]).fillna(0.0).to_numpy(float)
+        c = (m["star_id"].map(colours) if colours is not None else pd.Series(np.nan, index=m.index)).to_numpy(float)
+        # a star without g-i cannot take the per-scope term (NaN: dropped) unless that scope has none
+        mc = mc - np.where(ck == 0, 0.0, ck * (c - float(sol.meta.get("c0", 0.0))))
+    t = pd.DataFrame({"star_id": m["star_id"].to_numpy(), "mc": mc})
+    t = t[np.isfinite(t["mc"])]
+    g = t.groupby("star_id")["mc"]
+    med = g.median()
+    s = pd.DataFrame({"m_star": med, "n": g.size()})
+    s["rms_raw"] = 1.4826 * (t["mc"] - t["star_id"].map(med)).abs().groupby(t["star_id"]).median()
+    s["m_star_err"] = 1.2533 * s["rms_raw"] / np.sqrt(s["n"])          # error of a median
+    n_full = min_coverage * s["n"].max()
+    comp = sol.stars.set_index("star_id")
+    both = s.index.intersection(comp.index)
+    well = both[(s.loc[both, "n"] >= n_full).to_numpy()]
+    gauge = float(np.median(s.loc[well, "m_star"] - comp.loc[well, "m_star"])) if len(well) else 0.0
+    s["m_star"] -= gauge
+    s.loc[both, "m_star"] = comp.loc[both, "m_star"]
+    s.loc[both, "m_star_err"] = comp.loc[both, "m_star_err"]
+    s["source"] = "extra"
+    s.loc[both, "source"] = "comparison"
+    s = s[(s["source"] == "comparison") | ((s["n"] >= n_full) & (s["rms_raw"] <= max_scatter))]
+    s = s.sort_values("m_star")
+    s["rms_trend"] = _scatter_trend(s["m_star"].to_numpy(float), s["rms_raw"].to_numpy(float), trend_degree)
+    s["rms_star"] = np.sqrt(np.clip(s["rms_raw"] ** 2 - s["rms_trend"] ** 2, 0, None))
+    return s.reset_index()[cols]
+
+
+def _scatter_trend(m: np.ndarray, rms: np.ndarray, degree: int = 2, n_iter: int = 5) -> np.ndarray:
+    """Typical per-epoch scatter at each magnitude: poly(degree) in m fitted to log(rms), clipping stars
+    more than 3 MAD above it (variables); falls back to the median for fewer than 3 (degree + 1) stars."""
+    ok = np.isfinite(m) & np.isfinite(rms) & (rms > 0)
+    if ok.sum() < 3 * (degree + 1):
+        return np.full(len(m), float(np.median(rms[ok])) if ok.any() else np.nan)
+    y = np.log(np.clip(rms, 1e-4, None))
+    use = ok.copy()
+    for _ in range(n_iter):
+        p = np.polyfit(m[use], y[use], degree)
+        r = y - np.polyval(p, m)
+        mad = 1.4826 * np.median(np.abs(r[use] - np.median(r[use])))
+        new = ok & (r < 3 * max(mad, 0.05))
+        if (new == use).all() or new.sum() < 3 * (degree + 1):
+            break
+        use = new
+    # beyond the fitted range keep the end values (no extrapolation of the polynomial)
+    mm = np.clip(m, m[use].min(), m[use].max())
+    return np.exp(np.polyval(p, mm))
+
+
 def absolute_zp(sol: Solution, ref: pd.DataFrame, *, colour=("lco_g", "lco_i"), colour_term: bool = True,
-                clip: float = 3.0, floor: float = 0.01, max_rms_star: float = 0.05) -> dict:
+                clip: float = 3.0, floor: float = 0.01, max_rms_star: float = 0.05,
+                stars: pd.DataFrame | None = None) -> dict:
     """ZP (+ colour term) mapping the ensemble's star means onto the reference system:
 
         m_ref - m*_s = ZP + C (c_s - c0),   c = colour[0] - colour[1],  c0 = median star colour
@@ -795,13 +894,15 @@ def absolute_zp(sol: Solution, ref: pd.DataFrame, *, colour=("lco_g", "lco_i"), 
     weighted by 1 / (σ_m*² + σ_ref² + rms*² + floor²), iteratively ``clip``-σ clipped.
     One fit per filter over ~100 stars x all epochs — far better determined than a
     per-frame ZP.  Returns ZP, C, c0, errors, n, scatter and the per-star table.
+    ``stars``: the star means to use (:func:`anchor_stars`); default the comparison stars (``sol.stars``).
     """
     from ava.photometry.calibration import FILTER_TO_BAND
 
     band = FILTER_TO_BAND[sol.filter]
     col_b = f"lco_{band}"
     r = ref[(ref["quality_ok"].astype(bool)) & ~ref["is_agn"].astype(bool)]
-    t = sol.stars.merge(r[list(dict.fromkeys(["star_id", col_b, col_b + "_err", *colour]))], on="star_id")
+    base = sol.stars if stars is None else stars
+    t = base.merge(r[list(dict.fromkeys(["star_id", col_b, col_b + "_err", *colour]))], on="star_id")
     t = t[np.isfinite(t[col_b]) & np.isfinite(t[colour[0]]) & np.isfinite(t[colour[1]])
           & (t["rms_star"] < max_rms_star)].copy()
     t["dm"] = t[col_b] - t["m_star"]
@@ -837,10 +938,14 @@ def absolute_zp(sol: Solution, ref: pd.DataFrame, *, colour=("lco_g", "lco_i"), 
 
 
 def agn_zero_points(sols: dict, ref: pd.DataFrame, agn_lc: dict | None = None, colour_term: bool = True,
-                    n_iter: int = 3, colour=("gp", "ip"), zp_kw: dict | None = None) -> dict:
+                    n_iter: int = 3, colour=("gp", "ip"), zp_kw: dict | None = None,
+                    stars: dict | None = None) -> dict:
     """{filter: (zp_at_AGN_colour, err)} with the AGN colour from its own calibrated
-    mean magnitudes (iterated; the colour term is then evaluated at the AGN's colour)."""
-    fits = {f: absolute_zp(s, ref, colour_term=colour_term, **(zp_kw or {})) for f, s in sols.items()}
+    mean magnitudes (iterated; the colour term is then evaluated at the AGN's colour).
+    ``stars``: {filter: star means} (:func:`anchor_stars`); missing filters use the comparison stars."""
+    stars = stars or {}
+    fits = {f: absolute_zp(s, ref, colour_term=colour_term, stars=stars.get(f), **(zp_kw or {}))
+            for f, s in sols.items()}
     # start from the median star colour of the fits that worked (a failed fit has no stars and c0 = 0)
     usable = [z["c0"] for z in fits.values() if z["n"] > 0 and np.isfinite(z["zp"])]
     c_agn = float(np.median(usable)) if usable else float("nan")
