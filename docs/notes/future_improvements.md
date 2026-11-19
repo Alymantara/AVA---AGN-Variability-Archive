@@ -947,3 +947,29 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   extracted whole sites first, not the recent frames.
 - **Fix.** `newest_first_key` sorts by observing date and frame number from the LCO name, then by name.
 - Test: `tests/test_sextract_order.py`.
+
+## pandas 3: read-only arrays from copy-on-write (production VM, 19 Nov 2026)
+
+- **Bug (VM, fresh install at `16467af`, `check_install --tests`: 1 failed, 218 passed).**
+  `catalogs.measurements` did `m &= ...` on `matched["star_id"].notna().to_numpy()`. In pandas 3 copy-on-write is
+  always on, so `to_numpy()` / `.values` can return a read-only view and the in-place update raised "output array
+  is read-only". This would have crashed photometry extraction (`-e`) on the VM. `environment.yml` is not pinned:
+  the VM got pandas 3.1.1, numpy 2.5.5, astropy 8.0.3, scipy 1.18.1, pyarrow 26.0.1; the Mac and turgon have
+  pandas 2.x.
+- **Fix.** `catalogs.py:237` uses `to_numpy(copy=True)`.
+- **Sweep.** A syntax-tree scan of `ava/`, `tools/` and `scripts/` looked for any name bound to `.to_numpy()`,
+  `.values`, `np.asarray` or `np.asanyarray` (tuple assignments included) and later updated in place (augmented
+  assignment, subscript assignment, `out=`, `.sort()`, `.fill()`, `.put()`). It found only this site.
+- **Guard.** `tests/conftest.py` switches copy-on-write on under pandas 2, which reproduces the read-only views (the
+  old code fails the same test there). pandas-2 machines now catch this class of bug too.
+- **Checked.** 219 passed under pandas 2.3.3 with copy-on-write, and 219 passed under pandas 3.1.1 + astropy 8.0.3
+  + scipy 1.18.1 + pyarrow 26.0.1 with numpy 2.3.5. The Mac's x86_64 Python has no numba build for numpy 2.5.
+  Under numpy 2.5.5 itself, 193 pass and the only failures are numba refusing to load ("Numba needs NumPy 2.3 or
+  less"); the VM, with its own numba, passes them.
+- **Not changed (pandas-4 / Python deprecations, for later):**
+  - `pd.Timestamp.utcnow()` in `ava/lcodb/query.py:533,587` and `tools/ava_crossmatch.py:240` → `Timestamp.now('UTC')`;
+  - `pd.read_csv(..., float_precision='round_trip')` in `ava/lcodb/ava.py:99` (deprecated in pandas 3; the default
+    now round-trips);
+  - `datetime.utcnow()` in `ava/lcodb/db.py:49` → `datetime.now(timezone.utc)`.
+- **Pins.** Turgon (backfill) and the VM (production) must run the same versions. `environment.yml` is to be pinned
+  to the VM's set once agreed (not changed yet). Pin numba as well, to the VM's version: numba refuses a newer numpy than it was built for (the Mac's 0.62.1 stops at numpy 2.3).

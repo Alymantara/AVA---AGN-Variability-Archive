@@ -234,7 +234,7 @@ def measurements(cat: Catalog, matched: pd.DataFrame, aperture_index: int) -> pd
     Columns: star_id, is_agn, mag, magerr (science aperture), sep_arcsec,
     x, y, fwhm_px, flags, ... ; plus the frame basename.
     """
-    m = matched["star_id"].notna().to_numpy()
+    m = matched["star_id"].notna().to_numpy(copy=True)   # writable: pandas 3 (copy-on-write) gives a read-only view
     mag, err = cat.mag_aper[:, aperture_index], cat.magerr_aper[:, aperture_index]
     # SExtractor writes 99 for the magnitude and its error when the aperture flux is <= 0: no measurement (B11)
     m &= np.isfinite(mag) & np.isfinite(err) & (mag < SEX_NO_MAG) & (err < SEX_NO_MAG)
