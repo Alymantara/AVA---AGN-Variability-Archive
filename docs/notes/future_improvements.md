@@ -449,7 +449,39 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - Other hits were only engineering and EPO frames (`LCOEngineering`, `LCOEPO2014B-006`, `ENG2014A-003` FLOYDS
   calibrations): not useful.
 - Filter rule (user, 18 Nov): only u B V g r i z Y imaging (`up B V gp rp ip zs Y`) goes into the photometry database. Other filters may be listed by the crawl but are dropped in post-processing.
-- Still to search: the other 12 IBRM priority targets, then the obscure targets.
+- **All-target sweep, done (18 Nov 2026):** cone search of every AVA target, 2010 → 2020-07, levels 90/91,
+  about 330 requests in total. After July 2020 everything is Sinistro and coverage is dense: not searched (user decision).
+  - Report (private artifact): https://claude.ai/artifact/8rKKfr2fLY5t8E6QeAgvbw
+  - Data: `missing_summary_pre2020-07.csv` / `missing_frames_pre2020-07.csv` in the side-session notes.
+- **Ingested offline (user OK, 18 Nov 2026):** `tools/ingest_archive_sweep.py` fed the sweep's frame records
+  through `ingest.Router` (cbe50d5 rules: SBIG 1 m only, u B V g r i z Y). Result: **11,996 new photometry frames**
+  (6,728 KEY2014A-002 SBIG, 183 + 75 LCO2014A-001, the rest from about 55 other programmes), 0 spectra.
+  - Left out: focus, engineering, calibration, pointing and EPO proposals.
+  - Afterwards: `mark_best`, `lcodb airmass`, `link` and `stats` were run.
+  - Backups: `data/lcodb/backups/*_20261118T102433Z_before_archive_sweep.sqlite`.
+  - Linking: 11,141 frames link to AVA targets. The unlinked 855 are pointings at other objects with the AGN in the
+    field (`TIC 121338379` near NGC 2617, `2016itd`, `161018`) plus `PG1302-102_ury` (18 frames). The last one
+    probably wants a row in `ava_link_overrides.csv`.
+  - Biggest additions: NGC 1566 (2,280; ASASSN-14ha 2014 and the 2018 outburst), PG 1302-102 (837),
+    NGC 5548 2014 (803), Mrk 1048, NGC 4593 2016 (683), NGC 3783 (404; NOAO 2017 + 2020 V band).
+- **Not searched: 19 northern targets.** Cone queries return HTTP 500, between RA 8h and 16h: NGC 4151, Mrk 110,
+  Mrk 1220, Mrk 142, Mrk 876, Mrk 817, Mrk 279, PG 0844+349, PG 0923+201, PG 0804+761, NGC 4395, Arp 151,
+  NGC 3227, NGC 4051, Mrk 704, MCG+04-22-042, SBS 1518+593, NGC 3516, NGC 5273.
+  - Their KEY2014A-002 SBIG frames come in with a re-crawl, e.g.
+    `lcodb sync --proposal KEY2014A-002 --since 2014-01-01 --until 2017-01-01`.
+  - Other programmes for them would need name searches.
+- **KEY2014A-002 re-crawl, done (user OK, 18 Nov 2026):**
+  `lcodb sync --proposal KEY2014A-002 --since 2014-01-01 --until 2017-01-01 --no-standards`, 157 requests.
+  Backup first: `data/lcodb/backups/*_20261118T112515Z_before_key2014_recrawl.sqlite`. Then airmass, link and stats.
+  - Added 13,414 SBIG 1 m photometry frames and 9 spectra.
+  - Linked: 2,559. The northern targets got NGC 3227 (881 frames, 81 nights, 2014-06 → 2016-02, V g r i),
+    Arp 151 (758, 2014-11 → 2015-07), Mrk 1220 (719, 2015-04 → 06), NGC 4051 (100, 2014-05),
+    NGC 4151 (36, 2016-01) and MCG+04-22-042 (9).
+  - The other 13 northern targets have no SBIG frames in KEY2014A-002; their 2014–16 KEY data was Sinistro and
+    is already in the mirror. Their non-KEY programmes are still unsearched.
+  - 10,855 frames (61 LCO names) belong to KEY2014A-002 targets that are not in AVA: K2 fields, `1435+02`,
+    `Q1133+0039`, `HS0817+1315`, `J08265+1310`, … They are candidates for the "obscure targets" review.
+- Archive requests on 18 Nov 2026 for this work: about 490, of the 5000/day limit.
 
 ### SBIG 1 m frames: pipeline support (18 Nov 2026; code done, backfill not run)
 
