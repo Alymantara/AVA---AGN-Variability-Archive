@@ -61,7 +61,7 @@
 \lstdefinestyle{shell}{backgroundcolor=\color{avaCodeBG},basicstyle=\ttfamily\small,
   breaklines=true,frame=single,rulecolor=\color{avaInkBlue!25},framesep=4pt}
 
-\graphicspath{{figures/pytics/}}
+\graphicspath{{figures/pytics/}{../../figures/pytics_errors/}}
 
 \begin{document}
 
@@ -414,9 +414,13 @@ photometric error by $k$ and the epoch scatter by $\beta$ and adds a floor $s_0$
 and camera family. They are fitted to pairs of AGN epochs less than 1\,h apart on the same camera, which
 should differ only by noise. A camera term $s_\mathrm{cam}$, added in quadrature for comparisons between
 different cameras ($\sigma_\mathrm{tot}^2=\sigma_\mathrm{rand}^2+s_\mathrm{cam}^2$), is fitted to pairs
-from different cameras. The model is fitted on every run but used for the products only when
-\texttt{error\_model: fitted}; it is off by default while under verification
-(Appendix~\ref{app:figs}).
+from different cameras. Since 19 November 2026 the model is used for the products by default
+(\texttt{error\_model: fitted}) and always contains the floor: groups that cannot be fitted (too few pairs,
+a filter or camera family without pairs) and the one-factor fit used when the quoted errors span too narrow a
+range (MuSCAT3) take a default model with $k=1.07$, $\beta=0.11$, $s_0=1.1$\,mmag
+(\texttt{error\_model\_default}) instead of the PyTICS form, which has no floor, and $s_0$ is never below
+1\,mmag (\texttt{error\_model\_min\_floor}). The evidence is the pair test of every AGN in
+Sect.~\ref{sec:pairs-all}.
 
 \section{Summary of the flow}
 
@@ -774,6 +778,24 @@ are conservative. With 57--63 stars, $ZP$ is determined to 2\,mmag in B, g, V, r
 (g) to $+21$\,mmag (z); this is the reason for fitting $C$ at all. Y has 10 frames and 68\,mmag scatter
 and should be treated as unreliable.
 
+\paragraph{Anchors from every star (19 November 2026).} GSPC gives validated SDSS $u\,g\,r\,i\,z$ and PS1 $y$
+only for stars fainter than $G\approx14.2$ (u: 14.5; Johnson B and V reach $G\approx10.8$), and the colour
+term needs $g-i$, so every anchor is fainter than $G\approx14.2$. The fit above used only the comparison
+stars, the brightest \texttt{star\_lim} (100) of the field, and rejected stars with a per-epoch scatter
+above 50\,mmag. In the 38 fields of the test archive this left Y with 2--3 anchors (Fairall\,9 and
+NGC\,4151 had no Y zero point at all; only bright stars are quiet in Y) and the dense field of
+MCG\,08-11-011 without any zero point (its 100 comparison stars are all brighter than $G=14.3$). The fit
+now uses every star in the frames (\texttt{ensemble.anchor\_stars}): each star is put on the ensemble scale
+with the solved offsets, $m=m_\mathrm{inst}-\Delta T_t-\Delta S_k-CK_k(c-c_0)$, exactly as the AGN; stars
+outside the comparison set must be detected in at least 90\,\% of the epochs and scatter at most 0.2\,mag;
+and variability is judged by the scatter in excess of stars of the same brightness, not by the raw scatter,
+since photometric noise is not variability. On the 192 field--band pairs that worked before, the zero point
+moves by $+1.1$\,mmag (median; MAD 1.5\,mmag); Y gains 21--53 anchors ($\pm4$--8\,mmag) and MCG\,08-11-011
+95--805 per band. Settings: \texttt{ensemble.absolute\_all\_stars}, \texttt{absolute\_min\_coverage},
+\texttt{absolute\_max\_scatter}, \texttt{absolute\_trend\_degree}. The uncertainty of the zero point is a
+systematic common to all epochs of a band; it is not in the per-epoch errors and is given separately in the
+merged light curve (\texttt{zp\_err\_mag}).
+
 \section{MuSCAT3 intercalibration}
 
 PyTICS makes the comparison stars agree between cameras, but the AGN sits in a host galaxy and MuSCAT3's
@@ -868,6 +890,15 @@ varies by a factor of about two in u (5--11\,mJy) and by less towards the red (z
 host contributes more of the aperture flux. The same data, in the web-plot format, are in
 Appendix~\ref{app:figs}.
 
+Since 19 November 2026 the file starts with a commented header (lines beginning with \texttt{\#}: target,
+pipeline version, citation, how the scale is set, and every column) and holds only what a user needs:
+\texttt{target, MJD, filter, telescope, camera, flux\_mJy, flux\_err\_mJy, mag\_AB, mag\_AB\_err,
+zp\_err\_mag, frame}. The errors are the total per-epoch errors (the fitted model, Sect.~\ref{sec:agnlc});
+\texttt{zp\_err\_mag} is the band's zero-point uncertainty, the same for every epoch, to be added only to
+absolute fluxes. Everything else (random errors, $\mathrm{rms}_t$, $\mathrm{rms}_\mathrm{sc}$, the ensemble
+terms, intercalibration $a$ and $b$, airmass, seeing) goes to \texttt{<target>\_LCO\_merged\_lightcurve\_qc.csv},
+which holds every epoch, good or not, and is not published.
+
 %%============================================================
 \chapter{Error model and quality}
 \label{ch:errors}
@@ -910,6 +941,148 @@ $\mathrm{rms}_\mathrm{sc}$, which is the same for both epochs of a pair. With \t
 absolute fluxes, and \texttt{mag\_err\_rand} for epoch-to-epoch variability within a camera. The pair test
 in Appendix~\ref{app:figs} shows that even \texttt{mag\_err\_rand} has the wrong shape (too small for
 the best epochs, too large for the worst), which is what the opt-in error model addresses.
+
+\section{Pair test of every AGN}
+\label{sec:pairs-all}
+
+The test of Fig.~\ref{fig:errors} was repeated on every AGN with a PyTICS light curve: 36 targets, 89\,168
+pairs of good epochs less than 1\,h apart on the same telescope and camera (75\,\% less than 2\,min apart),
+and, as a control, 8.1 million such pairs of comparison stars on the ensemble scale. For each pair
+$z=\Delta m/\sqrt{\sigma_1^2+\sigma_2^2}$ should follow $N(0,1)$. The width is measured robustly,
+$\sigma_\mathrm{rob}=1.4826\times\mathrm{median}|z-\mathrm{median}\,z|$, which equals the standard deviation
+for a Gaussian but ignores outliers; the tails are counted separately (fraction with $|z|>3$; Gaussian
+0.27\,\%). Four errors were tested: photometric only, PyTICS random, PyTICS total and the fitted model
+(scripts \texttt{tools/pytics\_validation/pair\_scatter\_*.py}).
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_01_distributions}
+  \caption{Normalised differences of back-to-back pairs, AGN (left) and comparison stars (right), log scale,
+    against $N(0,1)$. The robust width and the fraction beyond $3\sigma$ are in the legends.}
+  \label{fig:pairs-dist}
+\end{figure}
+
+\paragraph{The core is Gaussian; the PyTICS error has the wrong shape.} Over all AGN pairs the robust width
+is 1.21 with the photometric error, 0.95 with the PyTICS random error, 0.60 with the total error (its camera
+term cancels within one camera) and 1.01 with the model (Fig.~\ref{fig:pairs-dist}). The PyTICS average is
+right only by compensation (Fig.~\ref{fig:pairs-shape}): epochs with quoted errors below 4\,mmag scatter
+12--30\,\% more than quoted, and epochs with a large $\mathrm{rms}_t$ up to 7 times less. Only about 11\,\%
+of $\mathrm{rms}_t$ applies to the AGN or to the stars themselves.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_03_shape}
+  \caption{Robust width of $z$ against the quoted per-epoch error (left) and against $\mathrm{rms}_t$
+    (right), for the AGN and the comparison stars.}
+  \label{fig:pairs-shape}
+\end{figure}
+
+\paragraph{The model and its floor.} Pooled over all Sinistro AGN pairs, the model
+$\sigma^2=(k\sigma_\mathrm{phot})^2+(\beta\,\mathrm{rms}_t)^2+s_0^2$ gives $k=1.07$, $\beta=0.11$ and
+$s_0=1.1$\,mmag (Fig.~\ref{fig:pairs-model}): SExtractor's error is 7\,\% too small, $\mathrm{rms}_t$ is
+largely irrelevant, and there is a floor. Figure~\ref{fig:pairs-floor} shows the floor directly: in quiet
+epochs ($\mathrm{rms}_t<1.5$\,mmag) the observed scatter of stars and AGN follows $k\sigma_\mathrm{phot}$
+down to about 3\,mmag and then flattens at 1.3--2\,mmag, which needs $s_0=1.0$--1.2\,mmag. With the model,
+Sinistro pairs fainter than instrumental magnitude $-11$ have width 1.00 (AGN) and 0.98 (stars) and a
+Gaussian core. Fitted on even nights and tested on odd nights (and back), over 162 band--camera groups of
+13 AGN, the model gives width 1.00 (5--95\,\%: 0.82--1.20) against 0.95 (0.79--1.27) for PyTICS, and halves
+the tails.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_07_error_model}
+  \caption{The error model, fitted to all Sinistro back-to-back AGN pairs. Left: observed per-epoch scatter
+    against the photometric error in quiet epochs; the model flattens at the floor $s_0$ (dotted). Right: at
+    fixed $\sigma_\mathrm{phot}\approx5$\,mmag the scatter hardly grows with $\mathrm{rms}_t$; PyTICS adds
+    all of it, the model 11\,\%.}
+  \label{fig:pairs-model}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_09_sinistro_floor}
+  \caption{Sinistro. Left: observed scatter against the photometric error for stars and AGN in quiet epochs,
+    with the photometric error alone (dashed) and the model with $k=1.07$ and $s_0=1.1$\,mmag. Right: $z$ with
+    the model errors for Sinistro pairs fainter than instrumental magnitude $-11$, against $N(0,1)$.}
+  \label{fig:pairs-floor}
+\end{figure}
+
+\paragraph{The floor depends on the conditions.} From 823\,543 bright Sinistro star pairs in quiet frames
+the overall floor is 1.09\,mmag, but it rises from 0.95 to 1.5\,mmag as the exposure falls from $\geq60$ to
+$\leq30$\,s, from 1.1 to 1.7\,mmag between airmass 1.2 and 1.7, and from 1.0 to 1.7\,mmag between 1.5 and
+3.5$''$ seeing; it is 0.6--0.9\,mmag in z, u and Y and 1.2--1.3\,mmag in B, V and g, 0.8\,mmag in 2019--20
+and 1.2--1.3\,mmag in 2023--25, and varies by 0.4\,mmag from night to night beyond sampling noise
+(Fig.~\ref{fig:pairs-cond}). This is the signature of scintillation (Young's formula gives about 0.6\,mmag
+for a 1-m telescope at 30\,s and airmass 1.2) plus a seeing-dependent term. The constant 1.1\,mmag is right
+on average; a floor computed per epoch is the next step.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_10_floor_conditions}
+  \caption{The floor $s_0$ of bright Sinistro stars in quiet frames against exposure time, airmass, seeing
+    and year. Dotted: the constant $s_0$ of the model.}
+  \label{fig:pairs-cond}
+\end{figure}
+
+\paragraph{Where the tails come from.} 1.7\,\% of the AGN pairs lie beyond $3\sigma$ with the PyTICS random
+error (1\,524 pairs, where a Gaussian gives 241). Bright epochs (instrumental magnitude $<-11$; 4.7\,\% of
+the pairs) hold 28\,\% of them; on Sinistro this is the floor that PyTICS lacks plus non-Gaussian outliers,
+not non-linearity: binned by peak counts (2.2 million Mrk\,817 star measurements, Fig.~\ref{fig:pairs-peak}),
+the excess is flat from 5\,\% of saturation up to saturation. MuSCAT3, SBIG and Spectral frames hold another
+12\,\% (widths 1.19--1.34). The remaining 58\,\% are isolated single-frame events (889 tail pairs on 880
+different nights; cosmic rays, satellites) at 1.1\,\% of the pairs, which a robust lag analysis absorbs.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_04_brightness}
+  \caption{Robust width (left) and tail fraction (right) against the instrumental magnitude, AGN and
+    comparison stars.}
+  \label{fig:pairs-bright}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_08_peak}
+  \caption{Comparison-star pairs of Mrk\,817 against peak counts as a fraction of saturation, with the PyTICS
+    random error and the model. Sinistro (solid) shows a flat excess, MuSCAT3 (dotted) none. Dashed: the
+    AGN cut at 0.8.}
+  \label{fig:pairs-peak}
+\end{figure}
+
+\paragraph{MuSCAT3 saturation on NGC\,4151.} The MuSCAT3 pairs of NGC\,4151 have widths 2.6--4.2 and
+35--61\,\% beyond $3\sigma$ in every quarter from 2024Q4 to 2025Q3, at instrumental magnitude about $-13$,
+after the realuminisation of the 2-m mirror; Sinistro gives 0.7--1.6 on the same AGN. Saturation had been
+checked only for the zero-point standards, and MuSCAT3 had no saturation level for frames without their
+image. Calibration now stores the AGN peak (\texttt{frame\_qc.agn\_peak}) and QC flags
+\texttt{agn\_saturated} above 0.8 of the saturation level; the MuSCAT3 level is 118\,000\,ADU, the lowest
+pile-up of its four cameras (119--134\,k).
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_05_per_agn}
+  \caption{Robust width per AGN (29 with at least 100 pairs), PyTICS random error and model. The five AGN
+    where the two coincide have too few pairs for their own fit and use the default model.}
+  \label{fig:pairs-agn}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pair_06_cameras}
+  \caption{Left: back-to-back width and tail fraction per camera. Right: width of same-night pairs of
+    different cameras (total error) against their separation; same-camera pairs for comparison.}
+  \label{fig:pairs-cam}
+\end{figure}
+
+\paragraph{Per AGN, per camera, between cameras.} The model brings 22 of the 29 AGN with at least 100 pairs to
+$1.00\pm0.03$ (Fig.~\ref{fig:pairs-agn}); five of the others have too few pairs for their own fit and now get
+the default model with its floor. Sinistro is at 0.92--1.02, SBIG 1.19, Spectral 1.26 and MuSCAT3 1.34
+(Fig.~\ref{fig:pairs-cam}). Pairs of different cameras less than 30\,min apart have width 1.09 with the total
+error, rising to 1.5 over 5\,h as the AGN varies; within 1\,h B and z reach 1.43--1.45, so the camera term
+is too small there.
+
+\paragraph{Consequences.} For lags and variability: use the model errors (now the default), exclude saturated
+epochs (now flagged), and treat the remaining $\sim$1\,\% of outliers robustly. The zero-point uncertainty
+plays no part.
 
 \section{Residual systematics}
 
@@ -955,7 +1128,13 @@ of 4--7\,mmag.
   \item \textbf{MuSCAT re-extraction.} After re-extracting MuSCAT3 with an aperture matching Sinistro
         (10.5$''$), the intercalibration offset $b$ and the season step (Appendix~\ref{app:figs}) should
         shrink.
-  \item \textbf{Y band} has 10 frames and 68\,mmag ZP scatter; treat as unreliable.
+  \item \textbf{Y band} has 10 frames and 68\,mmag ZP scatter for Mrk\,817; other fields now have 21--53 Y
+        anchors (Sect.~\ref{sec:pairs-all} and the absolute zero point).
+  \item \textbf{Per-epoch floor.} The floor follows exposure time, airmass and seeing
+        (Fig.~\ref{fig:pairs-cond}); model it per epoch (scintillation plus a seeing term).
+  \item \textbf{Camera term in B and z} is too small (pairs of different cameras within 1\,h: width 1.45).
+  \item \textbf{Peak cut for the comparison stars}, as for the AGN; \texttt{measurements.parquet} needs the peak.
+  \item \textbf{On turgon:} recalibrate (\texttt{-c}) for \texttt{agn\_peak}, then \texttt{--pytics-full}.
   \item \textbf{Colour-term universality.} Currently measured from one field; running on two or three
         more will show whether $C$ is universal per filter and camera family.
   \item \textbf{Colour-check record (resolved 18 Nov 2026).} The Mrk\,817 solutions used for the

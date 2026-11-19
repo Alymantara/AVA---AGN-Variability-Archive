@@ -6,4 +6,8 @@ incremental updates take 16--36\,ms per filter.  The model is extended with a SE
 stationary stopping rule, per-camera colour terms (switched on automatically in u, B, g, V), which reduce
 camera-to-camera AGN offsets by 30--45\,\% in B, g and V, and an absolute zero point with a colour term
 evaluated at the AGN colour.  MuSCAT3 aperture offsets are corrected by flux-flux intercalibration, giving
-continuous merged light curves from 2020 to 2026.
+continuous merged light curves from 2020 to 2026.  A pair test of every AGN (89\,168 back-to-back pairs, 36 AGN) shows that
+the error distribution is Gaussian in its core but that the PyTICS error lacks a floor of about 1\,mmag that
+follows exposure, airmass and seeing, and over-counts the comparison-star scatter; the fitted error model,
+with the floor, is now the default.  The absolute zero point uses every star in the frames, which gives
+anchors to dense fields and to Y.

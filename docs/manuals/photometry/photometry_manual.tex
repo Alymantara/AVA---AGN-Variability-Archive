@@ -598,7 +598,11 @@ Key & Default & Meaning \\
         the \texttt{APERDIAM} header.
   \item Match detections to \path{reference_stars.csv} (\texttt{match\_\hspace{0pt}to\_\hspace{0pt}reference});
         attempt WCS repair from star patterns if fewer than 10 reference stars match.
-  \item Compute the zero point and AGN magnitude via \path{calibrate_frame}.
+  \item Compute the zero point and AGN magnitude via \path{calibrate_frame}, and the AGN's peak counts
+        (\texttt{FLUX\_MAX + BACKGROUND}, stored as \texttt{frame\_qc.agn\_peak}).
+        Frames without their image (legacy catalogues) take \texttt{SATURATE} and the image size from
+        \path{photometry.calibration.camera_defaults} (Sinistro 128\,000, SBIG 64\,000, Spectral 500\,000 and,
+        since 19 November 2026, MuSCAT3 118\,000\,ADU, the lowest saturation pile-up of its four cameras).
   \item Compute frame QC numbers: WCS offset, FWHM, background, ellipticity, ZP scatter.
   \item Return one \texttt{frame\_qc} dict and one \texttt{measurements} table.
 \end{enumerate}
@@ -855,9 +859,33 @@ After the full fit, \texttt{absolute\_zp} maps the ensemble star means onto
 \begin{equation}
   m_\mathrm{ref} - m^*_s = \mathrm{ZP} + C\,(c_s - c_0), \qquad c = g - i
 \end{equation}
-weighted, iteratively $3\sigma$-clipped over $\sim 100$ stars.  The AGN
+weighted, iteratively $3\sigma$-clipped.  The AGN
 colour $c_\mathrm{AGN}$ is determined from its own calibrated magnitudes
 (iterated), so the zero point is evaluated at the AGN colour.
+
+\paragraph{Anchors from every star (19 November 2026).}  Gaia GSPC validates SDSS $u\,g\,r\,i\,z$ and
+PS1 $y$ only for stars fainter than $G\approx14.2$ (B and V reach $G\approx10.8$), and the colour term
+needs $g-i$, so every anchor is fainter than $G\approx14.2$.  The PyTICS comparison stars are the
+brightest 100 of the field: in dense fields they are all brighter (MCG\,08-11-011 had no zero point), and
+in Y only bright stars pass a raw-scatter cut (Fairall\,9 and NGC\,4151 had no Y zero point).
+\texttt{ensemble.anchor\_stars} therefore puts \emph{every} star in the frames on the ensemble scale with
+the solved offsets, $m = m_\mathrm{inst} - \Delta T_t - \Delta S_k - CK_k(c - c_0)$, exactly as the AGN.
+Comparison stars keep their PyTICS means; other stars must be detected in $\geq 90\,\%$ of the epochs
+(\path{absolute_min_coverage}) and scatter $\leq 0.2$\,mag (\path{absolute_max_scatter}).  Variability is
+judged by the scatter in excess of stars of the same brightness (a quadratic in magnitude of
+log scatter, \path{absolute_trend_degree}), so photometric noise is not mistaken for variability.  Where
+the zero point worked before it moves by about 1\,mmag; Y and dense fields gain tens to hundreds of
+anchors.  Switch: \path{absolute_all_stars} (default true).
+
+\paragraph{Zero-point uncertainty.}  The zero-point error (1--10\,mmag) is common to every epoch of a band.
+It is not added to the per-epoch errors (it does not affect lags or variability) and is given in the merged
+light curve as \texttt{zp\_err\_mag}.
+
+\paragraph{The AGN is not a star.}  The colour term converts LCO magnitudes into the SDSS/Johnson systems
+for stellar spectra.  Emission lines at the edges of the filters (H$\alpha$ in $r$ at $z\approx0.03$--0.05,
+[O\,\textsc{iii}] in $V$ at low $z$) make the AGN's true SDSS/Johnson magnitude differ from AVA's by up to
+0.18\,mag in $r$ and 0.08\,mag in $V$.  The light curves are exact in the LCO passbands; see
+\path{docs/reports/abscal/report_abscal.md} and the website's Photometric calibration page.
 
 \subsection{Flux-flux intercalibration}
 
@@ -882,6 +910,58 @@ at 10.5\,arcsec).  The stars fixed $a \approx 1$ already; $a = 1$ is enforced
 by the additive-only mode.  The corrected flux is $F' = F - b$.
 Configured cameras for correction: \texttt{intercal\_\hspace{0pt}correct\_\hspace{0pt}cameras: [ep]}
 (MuSCAT3 only).
+
+\subsection{Error bars and the error model}
+\label{sec:error-model}
+
+PyTICS quotes for each AGN epoch a random error $\sqrt{\sigma_\mathrm{phot}^2 + \mathrm{rms}_t^2}$ and a
+total error that adds the per-camera systematic $\mathrm{rms}_\mathrm{sc}$.  A test on every AGN (89\,168
+pairs of epochs less than 1\,h apart on the same camera, 36 AGN, and 8.1 million comparison-star pairs;
+\path{docs/reports/pytics_update/pair_test_all_agn.md}) shows that the distribution of the normalised
+differences is Gaussian in its core, but that this error has the wrong shape: it has no floor, so bright
+epochs scatter more than quoted, and it adds all of $\mathrm{rms}_t$, of which only about 11\,\% applies.
+\texttt{ava.photometry.errors} replaces it with
+\begin{equation}
+  \sigma_\mathrm{rand}^2 = (k\,\sigma_\mathrm{phot})^2 + (\beta\,\mathrm{rms}_t)^2 + s_0^2, \qquad
+  \sigma_\mathrm{tot}^2 = \sigma_\mathrm{rand}^2 + s_\mathrm{cam}^2 ,
+\end{equation}
+fitted per target, band and camera family to that target's back-to-back pairs (Student-$t$ likelihood,
+then rescaled to unit robust width); $s_\mathrm{cam}$ comes from same-night pairs of different cameras.
+Pooled over Sinistro: $k = 1.07$, $\beta = 0.11$ and a \textbf{floor} $s_0 = 1.1$\,mmag
+(Fig.~\ref{fig:err-floor}).  Held out across nights the model gives unit width (5--95\,\%: 0.82--1.20).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pytics_errors/pair_09_sinistro_floor}
+  \caption{Sinistro.  Left: observed per-epoch scatter against the photometric error for stars and AGN in
+    quiet epochs; it flattens at the floor $s_0 \approx 1.1$\,mmag.  Right: normalised differences with the
+    model errors, against a unit Gaussian.}
+  \label{fig:err-floor}
+\end{figure}
+
+\textbf{The floor is always part of the model} (since 19 November 2026).  Groups that cannot be fitted and
+the one-factor fit used when the errors span too narrow a range (MuSCAT3) take
+\path{ensemble.error_model_default} ($k$ 1.07, $\beta$ 0.11, $s_0$ 1.1\,mmag) instead of the PyTICS form,
+and $s_0 \geq$ \path{error_model_min_floor} (1\,mmag).  The products use the model by default
+(\path{ensemble.error_model: fitted}).
+
+\textbf{The floor follows the conditions} (Fig.~\ref{fig:err-cond}): from bright Sinistro stars it is
+1.5\,mmag for exposures $\leq 30$\,s and 0.95 for $\geq 60$\,s, 1.1 at airmass 1.2 and 1.7 at 1.7,
+1.0 at 1.5$''$ seeing and 1.7 at 3.5$''$, and varies by 0.4\,mmag from night to night: scintillation plus
+a seeing term.  The constant is right on average; a per-epoch floor is a planned improvement.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/pytics_errors/pair_10_floor_conditions}
+  \caption{The floor $s_0$ of bright Sinistro stars against exposure time, airmass, seeing and year;
+    dotted: the constant of the model.}
+  \label{fig:err-cond}
+\end{figure}
+
+\textbf{Tails.}  1.7\,\% of the AGN pairs lie beyond $3\sigma$ with the PyTICS error (Gaussian 0.27\,\%):
+28\,\% of them from bright epochs (floor plus outliers), 12\,\% from MuSCAT3, SBIG and Spectral frames
+(with saturated MuSCAT3 frames of NGC\,4151 in 2024--25, now flagged \texttt{agn\_saturated}), and the rest
+from isolated single-frame events at about 1\,\%.
 
 \subsection{Data products}
 
@@ -911,8 +991,16 @@ Configured cameras for correction: \texttt{intercal\_\hspace{0pt}correct\_\hspac
     \texttt{F\_ic} (mJy), \texttt{DMAGT}, \texttt{DMAGS}, \texttt{CKterm},
     \texttt{rms\_t}, \texttt{rms\_sc}, \texttt{n\_stars}, \texttt{good}.
   \item[\texttt{<target>\_\hspace{0pt}LCO\_\hspace{0pt}merged\_\hspace{0pt}lightcurve.csv}]
-    The \textbf{shareable science product}: \texttt{good} epochs only, in mJy
-    and AB mag with separate total and epoch-to-epoch (random) errors.
+    The \textbf{shareable science product}: \texttt{good} epochs with an absolute zero point, in mJy and
+    AB mag.  A commented header (\texttt{\#} lines; read with \texttt{pandas.read\_csv(f, comment="\#")})
+    gives the target, pipeline version, citation, calibration and every column.  Columns:
+    \texttt{target, MJD, filter, telescope, camera, flux\_mJy, flux\_err\_mJy, mag\_AB, mag\_AB\_err,
+    zp\_err\_mag, frame}: total per-epoch errors (the error model, Sect.~\ref{sec:error-model}) and the
+    band's zero-point uncertainty (a systematic common to all epochs).
+  \item[\texttt{<target>\_\hspace{0pt}LCO\_\hspace{0pt}merged\_\hspace{0pt}lightcurve\_\hspace{0pt}qc.csv}]
+    Quality control, not published (\path{ensemble.export_qc_csv}): every epoch, good or not, with the
+    random errors, $\mathrm{rms}_t$, $\mathrm{rms}_\mathrm{sc}$, \texttt{n\_stars}, the ensemble terms,
+    the intercalibration $a$ and $b$, airmass and seeing.
 \end{description}
 
 \begin{notebox}
@@ -1040,6 +1128,7 @@ Flag & Condition \\
 \texttt{few\_matched} & fewer than \texttt{min\_matched} (30) reference stars matched \\
 \texttt{agn\_missing} & AGN not detected in this frame \\
 \texttt{agn\_flagged} & AGN detected with non-zero SExtractor FLAGS \\
+\texttt{agn\_saturated} & AGN peak $\geq$ \path{max_agn_peak_frac} (0.8) $\times$ \texttt{SATURATE} (19 Nov 2026) \\
 \texttt{zp\_scatter}  & star-to-star ZP scatter $>$ \path{max_zp_scatter} (0.05\,mag) \\
 \texttt{seeing}       & median FWHM $>$ \path{max_fwhm_arcsec} (4.5\,arcsec) \\
 \texttt{zp\_offset}   & $|\mathrm{ZP} - \mathrm{med}(\mathrm{ZP}_\mathrm{camera/filter})|$ $>$ 0.5\,mag (clouds) \\
