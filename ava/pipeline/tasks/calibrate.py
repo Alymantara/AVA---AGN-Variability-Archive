@@ -98,5 +98,5 @@ def calibrate(target: str, force: bool = False, max_frames: int | None = None) -
         target, catdir=cfg.sextractor_dir(target), phot_dir=cfg.phot_dir(target),
         ref=pd.read_csv(ref_path), frame_db=frame_db_path(), meta_provider=raw_meta_provider(target),
         settings=settings, q=dict(vars(cfg.photometry.qc)), force=force, max_frames=max_frames,
-        n_workers=int(cc.n_workers), log=logger.info)
+        n_workers=int(cc.n_workers), log=logger.info, filters=list(cfg.photometry.filters))
     return {"target": target, **out}

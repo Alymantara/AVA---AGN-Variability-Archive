@@ -249,7 +249,7 @@ def _work(args):
 def calibrate_target(data_id: str, *, catdir: Path, phot_dir: Path, ref: pd.DataFrame, frame_db: Path,
                      meta_provider, settings: ZPSettings, q: dict, force: bool = False,
                      max_frames: int | None = None, frames: list[str] | None = None,
-                     n_workers: int = 1, chunk_size: int = 2000, log=print) -> dict:
+                     n_workers: int = 1, chunk_size: int = 2000, log=print, filters=None) -> dict:
     """Calibrate every (new) catalogue of a target; update frame_qc, measurements, AGN light curve.
 
     ``meta_provider(frame) -> dict | None`` gives frame metadata (normally
@@ -267,15 +267,20 @@ def calibrate_target(data_id: str, *, catdir: Path, phot_dir: Path, ref: pd.Data
         keep = set(frames)
         cats = [p for p in cats if p.name[: -len("_cat.fits")] in keep]
     todo = [p for p in cats if p.name[: -len("_cat.fits")] not in done][: max_frames]
-    jobs, skipped = [], 0
+    jobs, skipped, other = [], 0, {}
+    allowed = set(filters) if filters else None
     for p in todo:
         meta = meta_provider(p.name[: -len("_cat.fits")])
         if meta is None:
             skipped += 1
             continue
+        if allowed is not None and meta.get("filter") not in allowed:   # R, I, U, w, ...: not used (18 Nov 2026)
+            other[meta.get("filter")] = other.get(meta.get("filter"), 0) + 1
+            continue
         jobs.append((p, ref, meta, data_id, settings, q))
     log(f"{data_id}: {len(cats)} catalogues, {len(done)} already calibrated, {len(jobs)} to do"
-        + (f", {skipped} without metadata" if skipped else ""))
+        + (f", {skipped} without metadata" if skipped else "")
+        + (f", not calibrated (filter not in photometry.filters): {other}" if other else ""))
     if not jobs:
         return dict(catalogues=len(cats), processed=0)
     # Process in chunks; each chunk is written (frame_qc + measurements) as soon as it is done,

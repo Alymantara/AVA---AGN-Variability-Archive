@@ -908,3 +908,18 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   they succeed. The log says how many.
 - The Mac test archive has no error frames, so nothing is redone there.
 - Test: `tests/test_retry_errors.py`.
+
+## B15: R / I frames with the APASS fallback catalogue (19 Nov 2026)
+
+- **Bug.** `FILTER_TO_BAND` maps R → `R` and I → `I`, but a reference catalogue from the APASS model fallback has
+  only u B g V r i z Y (`LCO_BANDS`). `calibrate_frame` then raised `KeyError 'lco_R'`, the frame was stored as
+  `error:KeyError`, and its measurements were lost.
+- R and I frames are not used since 18 Nov (`photometry.filters`), but the per-frame calibration still sees the
+  legacy catalogues in those filters.
+- **Decision (user, 19 Nov 2026): R and I are not used at all and are not part of the database.**
+  - `calibrate_target` (with `filters=photometry.filters`) now skips every catalogue whose filter is not in the
+    list (R, I, Johnson U, ...), with a log line. These frames get no `frame_qc` row and no measurements.
+  - As a backstop, a filter whose reference column is missing gets no zero point instead of a `KeyError`.
+- Rows from before this change are still there: in the Mac test archive, 62 R, 60 I and 407 U frames in
+  `frame_qc`, plus their measurements. They are not used by PyTICS, which reads only `ensemble.filters`.
+- Test: `tests/test_no_ref_band.py` (`KeyError` on the previous commit).

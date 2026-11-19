@@ -132,8 +132,8 @@ def calibrate_frame(meas: pd.DataFrame, ref: pd.DataFrame, *, filt: str, exptime
     m = m.merge(ref[[c for c in dict.fromkeys(cols) if c in ref]], on="star_id", how="left")
     m["is_standard"] = False
     m["used_in_zp"] = False
-    if band is None:
-        return m, ZPResult(), {}
+    if band is None or f"lco_{band}" not in m:   # no reference magnitudes in this band (R / I with the APASS
+        return m, ZPResult(), {}                   # fallback catalogue): no zero point, not a KeyError (B15)
     ref_mag = m[f"lco_{band}"].to_numpy(float)
     cand = standard_mask(m, ref_mag, saturate=saturate, naxis1=naxis1, naxis2=naxis2, s=s)
     m.loc[cand, "is_standard"] = True
