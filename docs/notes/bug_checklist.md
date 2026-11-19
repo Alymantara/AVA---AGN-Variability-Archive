@@ -83,7 +83,7 @@ line in `future_improvements.md`.
 - [ ] **B5ₚ**: `ensemble.absolute_zp` needed finite GSPC g and i for every star, even with the colour term off. In
   dense fields the 100 brightest PyTICS stars are brighter than GSPC's g/i limit (G ≲ 13), so the ZP is NaN in
   every filter (MCG+08-11-011). Recheck MCG+08-11-011 after `5f45417` ("absolute ZP from all stars").
-- [ ] **B22**: `ava/plots/webplots.py:41` SyntaxWarning, invalid escape `'\ '` in a docstring.
+- [x] **B22** (fixed 19 Nov, B22 commit; no other file has a SyntaxWarning): `ava/plots/webplots.py:41` SyntaxWarning, invalid escape `'\ '` in a docstring.
 
 ## 4. QC items already opened by the QC session
 

@@ -38,7 +38,7 @@ def serialized(fn):
     """Draw one figure at a time, with its style changes kept local to it.
 
     Matplotlib is not thread-safe (pyplot state, ``rcParams``, the mathtext parser) and the pipeline runs targets
-    in a thread pool (``pipeline.n_cores``): concurrent figures fail with random mathtext ``ParseException``\ s, and
+    in a thread pool (``pipeline.n_cores``): concurrent figures fail with random mathtext ``ParseException`` errors, and
     one module's ``rcParams`` (the bigger spectroscopy fonts) would leak into another's figure.  Every website plot
     function holds ``PLOT_LOCK`` for the whole figure inside ``plt.rc_context()``, on the Agg backend (the macOS GUI
     backend refuses to create figures off the main thread).
