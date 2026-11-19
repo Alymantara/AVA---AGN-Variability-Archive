@@ -898,3 +898,13 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
 - The Mac test archive's `frame_qc` predates the saturate / naxis columns, so the number of affected frames is not
   known. It is a guard against a silent failure rather than a fix for many frames.
 - Tests: `tests/test_missing_header_meta.py`.
+
+## B17: frames that raised an error were never retried (19 Nov 2026)
+
+- **Bug.** An exception in `process_catalog` (e.g. a transient read error, or B15) was stored as
+  `qc_flags = error:<Type>` with the current pipeline version. The next run counted the frame as done, so it was
+  never calibrated again without `force`, and it had no measurements.
+- **Fix.** `process.done_frames` leaves `error:` frames out of the done set, so they are retried on every run until
+  they succeed. The log says how many.
+- The Mac test archive has no error frames, so nothing is redone there.
+- Test: `tests/test_retry_errors.py`.

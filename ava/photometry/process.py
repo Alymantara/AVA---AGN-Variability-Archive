@@ -222,6 +222,17 @@ def match_settings() -> dict:
 MATCH_KW = match_settings()
 
 
+def done_frames(fq: pd.DataFrame, force: bool = False) -> dict:
+    """Frames already calibrated with this pipeline version, which a run skips. A frame stored with an
+    ``error:...`` flag (an exception in ``process_catalog``) is NOT done: it is retried on the next run, so a
+    transient read error does not drop it for good (B17). Returns {"frames": set, "_retry": n retried}."""
+    if force or fq is None or fq.empty:
+        return {"frames": set(), "_retry": 0}
+    cur = fq[fq["pipeline_version"] == PIPELINE_VERSION]
+    err = cur["qc_flags"].fillna("").astype(str).str.startswith("error:")
+    return {"frames": set(cur.loc[~err, "frame"]), "_retry": int(err.sum())}
+
+
 def _work(args):
     cat_path, ref, meta, data_id, settings, q = args
     try:
@@ -246,8 +257,11 @@ def calibrate_target(data_id: str, *, catdir: Path, phot_dir: Path, ref: pd.Data
     """
     from ava.photometry import store
 
-    done = store.read_frame_qc(frame_db, data_id)
-    done = set(done.loc[done["pipeline_version"] == PIPELINE_VERSION, "frame"]) if not force else set()
+    done = done_frames(store.read_frame_qc(frame_db, data_id), force)
+    retry = done.pop("_retry", 0)
+    if retry:
+        log(f"{data_id}: {retry} frame(s) that raised an error last time are retried")
+    done = done["frames"]
     cats = sorted(p for p in Path(catdir).glob("*_cat.fits") if imaging_frame_ok(p.name))
     if frames is not None:
         keep = set(frames)
