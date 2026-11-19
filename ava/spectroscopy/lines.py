@@ -67,8 +67,29 @@ def settings_from_config(section: dict | None) -> FitSettings:
     return FitSettings(**kw)
 
 
+#: EXTRACTED order of each FLOYDS arm
+ARM_ORDER = {"blue": 2, "red": 1}
+
+
+def hbeta_arm(z: float, arm: str = "auto", red_above_z: float = 0.09) -> str:
+    """The arm the Hβ region and the 5100 Å continuum are measured in, ONE per target (the arms can differ by
+    ~0.1 mag, so a target never mixes them). ``auto``: blue below ``red_above_z``; above it the blue arm (to 5608 Å
+    observed at OGG, 5765 Å at COJ) no longer reaches 5100 Å rest, while the red arm (from 4893 / 4524 Å) covers the
+    whole fit window (B08)."""
+    if arm in ARM_ORDER:
+        return arm
+    if arm != "auto":
+        raise ValueError(f"hbeta arm must be 'auto', 'blue' or 'red', not {arm!r}")
+    return "red" if float(z) >= float(red_above_z) else "blue"
+
+
+def arm_spectrum(path, z: float, arm: str = "blue") -> pd.DataFrame:
+    """Rest-frame spectrum of one arm from a -1d file (EXTRACTED, fringe-corrected per order)."""
+    return blue_arm(path, z, order=ARM_ORDER[arm])
+
+
 def blue_arm(path, z: float, order: int = 2) -> pd.DataFrame:
-    """Rest-frame blue-arm spectrum from a -1d file (EXTRACTED, fringe-corrected per order)."""
+    """Rest-frame spectrum of one order (default 2 = blue arm) from a -1d file (EXTRACTED, fringe-corrected)."""
     from astropy.io import fits
 
     d = fits.getdata(path, "EXTRACTED")
@@ -218,7 +239,7 @@ def nightly(t: pd.DataFrame, col: str, err: str) -> pd.DataFrame:
         if len(h) > 1:
             e = max(e, float(np.std(h[col], ddof=1) / np.sqrt(len(h))))
         rows.append({"night": n, "MJD": float(h["MJD"].mean()), col: m, err: e, "n_exp": len(h)})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["night", "MJD", col, err, "n_exp"])   # columns also when empty (B06)
 
 
 def variability(f, e) -> dict:

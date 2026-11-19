@@ -768,3 +768,56 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **Fix.** "Refitted" now means fully fitted in this run (`report[f]["mode"]` is `full` or `update->full`).
 - Test: `test_rerun_without_new_frames_keeps_colour_check`. The synthetic cameras get colour slopes (±0.06 mag per
   mag), so the first run turns the terms on (gain +93 %). Before the fix, the rerun rewrote this to −4 %, `use=False`.
+
+## B06 / B07: spectroscopy products crashed at higher redshift (19 Nov 2026)
+
+- **B06.** At z ≈ 0.095–0.114 (e.g. PG 0804+761, z = 0.102), the Hβ fit window is covered but 5100 Å is not, so
+  `cont5100` is NaN in every spectrum. `lines.nightly` then returned a table with no columns, and
+  `hbeta_series` crashed on `cont.columns[2]` (`IndexError`) before any product was written.
+  - Fix: `nightly` always returns its columns, and the merge uses the column names. The nightly Hβ light curve is
+    kept, with `cont5100` NaN.
+- **B07.** For z > ~0.19, FLOYDS' blue arm (to ~5606 Å observed) does not reach 4720 Å rest. `latest_hbeta_fit`
+  then took `nanmax` of an empty selection (`ValueError`), and `spec_products` aborted for PG 0923+201, PKS 2004,
+  PG 1302-102, RX J1438, J0132-0027 and SMSS J1144-43.
+  - Fix: the plot is skipped (`[]`) when the blue arm has no data in the window, and the other products are made.
+  - The Hβ fit itself is not done for these targets either (B08: the line is in the red arm). That is still open.
+- Tests: `tests/test_spec_products_redshift.py` (all three fail on the previous commit).
+
+## B19 / B20 / B21 / B08: FLOYDS standards, repeat reductions, sky flats, red arm (19 Nov 2026)
+
+Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0.193) in the Mac test archive
+(31 archive requests for the frames, 6 for the headers that gave the standard positions).
+
+- **B19, flux standards.**
+  - banzai-floyds knew 7 standards, but `spectrum_standards` chose from about 40. About half of the AGN spectra
+    were paired with a star banzai treats as a science target, and in a fresh calibration DB such a night gave no
+    spectra.
+  - Fix, in two parts:
+    1. Five reference spectra added to the fork (`banzai_floyds/data/standards/`): GD 71 (X-shooter), HZ 44 and
+       G191-B2B (HST), Feige 66 (Oke, extended to 11000 Å like Feige 67), CD-32 9927 (CTIO). The positions are the
+       LCO catalogue positions (CAT-RA/DEC of a FLOYDS frame).
+    2. lcodb matches only standards within `standards.usable_radius_arcsec` (300″) of a reference file's RA/DEC
+       (`standards.reference_dir`). A FLOYDS footprint centre is about 165″ from the target, so the radius is wide;
+       no two standards are that close.
+  - Result in the spectra DB: 8959 of 9160 AGN spectra (98 %) get a usable standard, against about 46 % before.
+    The median |Δt| goes from 0.21 to 0.29 d. L745-46A and EG 21 are not added (no good fluxed spectrum).
+- **B20, repeat reductions.** `chain` rebuilt the residual templates from every standard in the calibration DB and
+  raised on standards from earlier runs, which had been reduced with a template. So every second reduction in a
+  work folder failed.
+  - Fix, in the fork (`fringe_masters.keep_template_free`): after pass 1 the template-free -1d/-2d of each standard
+    is kept as `*-notpl`, and the templates are built from those. Older standards without a copy are skipped with
+    a message.
+  - Checked: two targets reduced one after the other in the shared test-archive folder.
+- **B21, sky flats.** COJ nights before Dec 2025 had no sky flat ("Master SKYFLAT does not exist").
+  - Cause: on the Mac, `spectroscopy.reduction.skyflats_dir` pointed at a private folder with 8 of the 31 sky
+    flats. The fork ships all 31 in `banzai_floyds/data/orders/skyflats/`, as the deployment guide (§4.3) says.
+  - The 23 missing raw COJ sky flats were fetched into that folder (`fetch-skyflats`, 46 public requests). On a
+    host, follow the guide.
+- **B08+, red arm.** `spectroscopy.products.hbeta_arm: auto` measures Hβ and 5100 Å in the red arm above
+  `hbeta_red_arm_above_z` (0.09), one arm per target.
+  - Results: PG 0923+201 gets Hβ (red arm, 2 of 2 spectra; 0 of 2 in the blue). For PG 0804+761 the red-arm Hβ is
+    6–13 % above the blue-arm value, the blue/red offset the calibration study also saw.
+  - The blue arm keeps its fit-cache key.
+- **B23, new.** The COJ arcs of April 2021 are marked bad without a message, even in a fresh DB, so those nights
+  still give no spectra. This is in the fork's wavelength step.
+- The Hβ-fit plot's residual axis is now labelled χ.

@@ -112,8 +112,13 @@ def cmd_match(cfg, a):
     s, c = cfg['standards'], cfg['calibs']
     nf = standards.flag_by_position(cons['spectra'], s.get('position_radius_arcsec', 120.0))
     log.info('standards: %d more frames flagged by position', nf)
-    nsci, nrow = standards.rebuild(cons['spectra'], s['n_nearest'], s['max_dt_days'])
-    log.info('standards: %d science spectra, %d matches', nsci, nrow)
+    usable = standards.reference_positions(cfg.resolve(s['reference_dir']) if s.get('reference_dir') else None)
+    if s.get('reference_dir') and usable is None:
+        log.warning('standards.reference_dir %s not found: every flagged standard can be matched', s['reference_dir'])
+    nsci, nrow = standards.rebuild(cons['spectra'], s['n_nearest'], s['max_dt_days'], usable,
+                                   float(s.get('usable_radius_arcsec', 300.0)))
+    log.info('standards: %d science spectra, %d matches%s', nsci, nrow,
+             '' if usable is None else f' (only the {len(usable)} standards with reference spectra)')
     nspec, ncal = calibs.rebuild(cons['spectra'], c['n_nearest'], c['max_dt_days'])
     log.info('arcs/flats: %d spectra, %d matches', nspec, ncal)
     return nrow + ncal, 0

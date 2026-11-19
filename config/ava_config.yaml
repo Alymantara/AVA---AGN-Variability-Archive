@@ -425,6 +425,11 @@ spectroscopy:
       min_good_fraction: 0.8     # validation: each order needs this fraction of good bins
   # ---- website products (ava.pipeline.tasks.spec_products) ----
   products:
+    # Arm for Hβ and the 5100 Å continuum, one per target (B08, 19 Nov 2026): auto = blue below
+    # hbeta_red_arm_above_z, red above (the blue arm ends at 5608 Å observed at OGG, 5765 Å at COJ; the red arm starts
+    # at 4893 / 4524 Å). Or "blue" / "red". The arms can differ by ~0.1 mag, so a target never mixes them.
+    hbeta_arm: auto
+    hbeta_red_arm_above_z: 0.09
     latest_spectrum:
       red_range: [5300.0, 9050.0]   # observed A shown for the red arm (the order end beyond is noisy)
     hbeta:

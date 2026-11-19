@@ -24,9 +24,9 @@ line in `future_improvements.md`.
   173 fa08 B frames. Needs a decision on fa08. `photometry/process.py:141`.
 - [x] **B05** (main, ensemble; fixed 19 Nov, see the B05 commit): a run with no new frames re-runs the colour check against itself and writes a stale
   record. `photometry/ensemble.py:472`, `:699`.
-- [ ] **B06** (main, spectroscopy): `spec_products` crashes when 5100 Å is not covered (z ≈ 0.095–0.114).
+- [x] **B06** (main, spectroscopy; fixed 19 Nov, B06/B07 commit): `spec_products` crashes when 5100 Å is not covered (z ≈ 0.095–0.114).
   `spectroscopy/products.py:126`.
-- [ ] **B07** (main, spectroscopy): the latest-Hβ web plot crashes for z > 0.19 (6 targets). `spectroscopy/webplots.py:157`.
+- [x] **B07** (main, spectroscopy; fixed 19 Nov, B06/B07 commit; Hβ itself is B08+): the latest-Hβ web plot crashes for z > 0.19 (6 targets). `spectroscopy/webplots.py:157`.
 - [ ] **B08** (main, spectroscopy): Hβ is always fitted in the blue arm, so there is no Hβ for Mrk 876, 3C 273 or
   PDS 456 (z ≳ 0.11). `spectroscopy/lines.py:79`, `products.py:84`.
 - [x] **B09** (main, lcodb; fixed in `797debc` with B01): a run of short 429s makes `Client.get` return `None`. `lcodb/api.py:85`.
@@ -47,6 +47,43 @@ line in `future_improvements.md`.
   `photometry/calibration.py:76`.
 - [ ] **B17** (QC): frames that raised an exception are never retried. `photometry/process.py:227`.
 - [ ] **B18** (main, photometry): "newest first" in SExtractor sorts by site, not by date. `pipeline/tasks/sextract.py:56`.
+
+## 3b. Found on 19 Nov (high-z spectra download and reduction test)
+
+- [x] **B19** (fixed 19 Nov, fork `9e34c07` + AVA: 5 reference spectra added to the fork, and lcodb matches only standards with one; 98 % of AGN spectra get a usable standard) (spectroscopy + banzai-floyds data): banzai-floyds knows only 7 flux standards (Feige 110, Feige 34,
+  GD 153, GD 108, EG 274, Feige 67, BD+28 4211), but `spectrum_standards` picks from about 40. About half of the
+  9160 AGN spectra are paired with a standard banzai cannot use (GD 71, HZ 44, Feige 66, L745-46A, CD-32 9927,
+  G191-B2B, ...). banzai classifies it as science; in a fresh calibration DB the night gives no spectra
+  ("Master STANDARD does not exist"). Decision: add reference spectra to banzai, or restrict the choice to the 7.
+- [x] **B20** (fixed 19 Nov in the fork, `9e34c07`: template-free copies of standards kept; older ones skipped) (banzai-floyds fork): `chain` rebuilds the residual templates from every standard in the calibration
+  DB, and raises on standards from earlier runs (`fringe_masters.py:157`, "processed with a residual template").
+  A second reduction run in the same work folder fails, which breaks incremental reduction.
+- [x] **B21** (fixed 19 Nov: the 23 missing COJ sky flats fetched, 46 public requests) (banzai-floyds data): COJ sky flats only from 2025-12-08 (OGG from 2019-03-29). COJ nights before
+  then get "Master SKYFLAT does not exist" and no spectra. Fetch older COJ sky flats.
+- [x] **B08+** (fixed 19 Nov: `products.hbeta_arm: auto`, red above z = 0.09) (main, spectroscopy): use the red arm for Hβ and 5100 Å per target when the blue arm does not reach
+  them (z ≳ 0.09). The red arm starts at 4524 Å (COJ) / 4893 Å (OGG). One arm per target, because of the blue/red
+  offset found by the calibration study. Measured today: the PG 0804+761 (z = 0.102) OGG blue arm ends at 5090 Å
+  rest, so 5100 Å comes from about 10 Å at the window edge.
+
+- [ ] **B23** (banzai-floyds fork): the COJ arcs of April 2021 (PG 0923+201) are marked bad without any log message,
+  also in a fresh calibration DB, so those nights give no spectra ("Master ARC does not exist"). Probably the wavelength
+  priors / LSF history tuned on recent data. Found 19 Nov while testing B21.
+
+## 3c. From the PyTICS test-archive run (QC test session, 19 Nov)
+
+- [x] **B1ₚ** (`93ce9f5`): `tasks/calibrate.frame_db_path` resolved a relative `photometry.calibration.frame_db` from
+  `ava_root` instead of `archive_root`. A missing frame-QC DB then read as "0 frames" in every filter; the ensemble
+  task now warns and skips.
+- [x] **B2ₚ** (`93ce9f5`): with no filter reaching `min_epochs`, the ensemble task raised `FileNotFoundError` on
+  `agn_lightcurve_pytics.parquet` (NGC 3783, NGC 7469, PG 2304+043). It now skips.
+- [x] **B3ₚ** = B02 (`8ded558`).
+- [x] **B4ₚ** library side = B12 (`8ded558`). Task side (`93ce9f5`): NaN `mag_ic` from a filter without an absolute
+  ZP crashed the merged plots and reached the merged CSV (Fairall 9, NGC 4151). Those epochs are dropped with a
+  warning.
+- [ ] **B5ₚ**: `ensemble.absolute_zp` needed finite GSPC g and i for every star, even with the colour term off. In
+  dense fields the 100 brightest PyTICS stars are brighter than GSPC's g/i limit (G ≲ 13), so the ZP is NaN in
+  every filter (MCG+08-11-011). Recheck MCG+08-11-011 after `5f45417` ("absolute ZP from all stars").
+- [ ] **B22**: `ava/plots/webplots.py:41` SyntaxWarning, invalid escape `'\ '` in a docstring.
 
 ## 4. QC items already opened by the QC session
 

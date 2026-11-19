@@ -96,6 +96,11 @@ standards:
   n_nearest: 5                # standards kept per science frame AND per slit width
   max_dt_days: 60             # search limit; picks beyond preferred_dt_days are labelled wide_window
   preferred_dt_days: 30       # standards within this always win (fixed at 30 d in the spectrum_standards view)
+  # Only standards the reduction has a reference spectrum for are matched (B19, 19 Nov 2026): the RA/DEC of the
+  # banzai-floyds reference files, within usable_radius_arcsec of the frame footprint centre. Per host; null or a
+  # missing folder = no restriction (with a warning).
+  reference_dir: ~/astro/floyds/banzai-floyds/banzai_floyds/data/standards
+  usable_radius_arcsec: 300   # the footprint centre of a FLOYDS frame is ~165" from the target (113–209" typical)
   window_days: 365            # time windows for the by-name search
   # Flux standards. Frames with these target names are flagged is_standard in any proposal,
   # and are searched for across ALL proposals on the spectrographs (spaces/case ignored).

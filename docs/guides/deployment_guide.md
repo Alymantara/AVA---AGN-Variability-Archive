@@ -128,7 +128,7 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
 
 - Fork: `https://github.com/Alymantara/banzai-floyds` (based on LCO's banzai-floyds; depends on
   `lco-banzai` 1.36.2 from GitHub, `torch`, `astroscrappy`, `scikit-image`, `scikit-learn`, `alembic`, …).
-  Deploy a **fixed commit** (currently `3e8e796` on `rm-improvements`, 17 Nov 2026; was `8897b99`); the version is
+  Deploy a **fixed commit** (currently `9e34c07` on `rm-improvements`, 19 Nov 2026; was `3e8e796`); the version is
   recorded in every product. Install notes: the fork's `docs/INSTALL_RM.md`.
 - Python 3.12, own environment (e.g. `/opt/ava/env-banzai`). The fork has a `Dockerfile` that can be
   used instead.
@@ -138,6 +138,14 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
   registered by `setup-db`); point `spectroscopy.reduction.skyflats_dir` at that folder.
 - AVA calls it as an external process; configure `spectroscopy.reduction.python`, `.package`,
   `.skyflats_dir` and `paths.floyds_pipeline` (currently `/Users/juan/...` paths — **must change**).
+- **Flux standards (19 Nov 2026).** The fork has reference spectra for 12 standards
+  (`banzai_floyds/data/standards/`). Set lcodb `standards.reference_dir` to that folder on each host. lcodb then
+  matches science spectra only to those standards, within `standards.usable_radius_arcsec` (300″). A missing
+  folder lifts the restriction, with a warning.
+- **Arm for Hβ / 5100 Å.** `spectroscopy.products.hbeta_arm` (`auto`, `blue` or `red`). `auto` uses the red arm
+  above `hbeta_red_arm_above_z` (0.09), one arm per target.
+- **Repeat reductions** in the same work folder need the fork with `keep_template_free` (19 Nov 2026). It keeps
+  `*-notpl` copies of the standards in the processed tree; do not delete them.
 
 # 5. Configuration, secrets and network
 

@@ -371,3 +371,29 @@ def test_daily_crawls_only_active_matching_proposals(cfg):
     # without the portal listing the ids keep the old behaviour (active)
     props = ingest.discover_proposals(PortalClient(portal, fail=True), cfg)
     assert {p[0]: p[2] for p in props}['LCO2014A-001'] == 1
+
+
+def test_std_match_only_standards_with_reference_spectra(cfg, cons, tmp_path):
+    """B19: banzai-floyds treats a standard it has no reference spectrum for as a science target, so the night
+    gets no flux calibration; only standards near a reference position are matched."""
+    from astropy.io import fits
+    from astropy.table import Table
+    con = cons[0]['spectra']
+    names = {'EG21', 'GD71'}
+    rows = [frame(1, 'coj2m002-en12-20261010-0006-e00', block=10),
+            frame(2, 'coj2m002-en12-20261010-0007-e00', obj='EG21', block=10, ra=50.0),          # nearest, unusable
+            frame(3, 'coj2m002-en12-20261011-0008-e00', obj='GD71', block=11, ra=88.115,
+                  date='2026-10-11T12:00:00Z')]
+    db.upsert_frames(con, [db.frame_row(f, names, set()) for f in rows])
+    ref = tmp_path / 'standards'
+    ref.mkdir()
+    hdr = fits.Header({'RA': 88.115588, 'DEC': -58.795, 'OBSTYPE': 'fluxstandard'})       # GD71 at the test footprint
+    fits.HDUList([fits.PrimaryHDU(header=hdr), fits.BinTableHDU(Table({'wavelength': [3000.0], 'flux': [1.0]}))]
+                 ).writeto(ref / 'gd71.fits')
+    use = standards.reference_positions(ref)
+    assert [u[0] for u in use] == ['gd71']
+    standards.rebuild(con, n_nearest=5, max_dt_days=30)
+    assert [r[0] for r in con.execute('SELECT std_id FROM std_match ORDER BY rank')] == [2, 3]
+    standards.rebuild(con, n_nearest=5, max_dt_days=30, usable=use, usable_radius_arcsec=300)
+    assert [r[0] for r in con.execute('SELECT std_id FROM std_match ORDER BY rank')] == [3]
+    assert standards.reference_positions(tmp_path / 'missing') is None

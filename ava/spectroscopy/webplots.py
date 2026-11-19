@@ -121,12 +121,16 @@ def latest_spectrum(arms: dict, hdr: dict, target_name: str, z: float, out_base:
 
 @serialized
 def latest_hbeta_fit(sp: pd.DataFrame, fit: dict, settings: L.FitSettings, hdr: dict, target_name: str, z: float,
-                     out_base: Path, formats=("png",), window=(4720.0, 5130.0), unit=1e-15) -> list[str]:
-    """The Hβ-region fit of the latest spectrum (blue arm, rest frame): data, model components, residuals."""
+                     out_base: Path, formats=("png",), window=(4720.0, 5130.0), unit=1e-15,
+                     arm: str = "blue") -> list[str]:
+    """The Hβ-region fit of the latest spectrum (``arm``, rest frame): data, model components, residuals.
+    No plot (``[]``) when the arm has no data in ``window`` (blue arm for z > ~0.19, B07)."""
+    x = sp[(sp.w > window[0]) & (sp.w < window[1])]
+    if not np.isfinite(np.asarray(x.f, float)).any():
+        return []
     plt = _setup()
     fig, (a, r) = plt.subplots(2, 1, figsize=(WIDTH, 7.0), sharex=True, gridspec_kw=dict(height_ratios=[3.2, 1]))
-    x = sp[(sp.w > window[0]) & (sp.w < window[1])]
-    a.plot(x.w, x.f / unit, color=INK, lw=1.4, drawstyle="steps-mid", label="data (blue arm)", zorder=3)
+    a.plot(x.w, x.f / unit, color=INK, lw=1.4, drawstyle="steps-mid", label=f"data ({arm} arm)", zorder=3)
     a.fill_between(x.w, (x.f - x.e) / unit, (x.f + x.e) / unit, color="0.8", lw=0, step="mid", zorder=2)
     for w0, w1 in settings.continuum_windows:
         a.axvspan(w0, w1, color="0.94", zorder=0, lw=0)
@@ -160,7 +164,7 @@ def latest_hbeta_fit(sp: pd.DataFrame, fit: dict, settings: L.FitSettings, hdr: 
     a.legend(loc="upper left", ncol=1, fontsize=11)
     r.axhline(0, color=GREY, lw=1.2)
     r.set_ylim(-6, 6)
-    r.set_ylabel("residual / σ")
+    r.set_ylabel(r"$\chi$")
     r.set_xlabel("rest wavelength (Å)")
     r.set_xlim(*window)
     top = a.secondary_xaxis("top", functions=(lambda w: w * (1 + z), lambda w: w / (1 + z)))

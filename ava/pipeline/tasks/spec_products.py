@@ -48,12 +48,13 @@ def spec_products(target: str) -> dict:
     out = {"target": target, "spectra": len(files), "plots": []}
 
     s = L.settings_from_config(hb)              # every FitSettings field can be set in spectroscopy.products.hbeta
+    arm = L.hbeta_arm(z, str(pc.get("hbeta_arm", "auto")), float(pc.get("hbeta_red_arm_above_z", 0.09)))
     lp = pc.get("latest_spectrum", {}) or {}
     red_range = tuple(lp.get("red_range", (5300.0, 9050.0)))
     t, night, meta = P.hbeta_series(files, z, s, qc_good=tuple(hb.get("oiii_reference_qc", ["OK"])),
                                     min_series=int(hb.get("min_series", 3)),
                                     scale_limits=tuple(hb.get("scale_limits", (0.2, 5.0))),
-                                    cache=cfg.spec_dir(target) / "hbeta_fits.parquet")
+                                    cache=cfg.spec_dir(target) / "hbeta_fits.parquet", arm=arm)
     logger.info("%s: Hβ fits: %d new, %d from the cache (%s)", target, meta.get("n_fitted", 0),
                 meta.get("n_cached", 0), cfg.spec_dir(target) / "hbeta_fits.parquet")
     method = f"gauss{s.broad_components}b+oiii{'w' if s.oiii_wing else ''}"
@@ -63,10 +64,10 @@ def spec_products(target: str) -> dict:
     out["latest"] = str(latest)
     out["plots"] += W.latest_spectrum(P.arms(latest), hdr, entry["name"], z, plot_dir / f"lco_latest_{target}_spec",
                                       formats, red_range=red_range)
-    sp = L.blue_arm(latest, z)
+    sp = L.arm_spectrum(latest, z, arm)
     fit = L.fit_hbeta(sp, s)
     out["plots"] += W.latest_hbeta_fit(sp, fit, s, hdr, entry["name"], z, plot_dir / f"lco_latest_{target}_hbeta_fit",
-                                       formats)
+                                       formats, arm=arm)
     # mean and RMS spectrum ([O III]-calibrated when there is a series; one spectrum is fine too)
     if len(t):
         mp = pc.get("mean_rms", {}) or {}

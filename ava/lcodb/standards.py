@@ -41,10 +41,48 @@ def flag_by_position(con, radius_arcsec=60.0):
     return len(hits)
 
 
-def rebuild(con, n_nearest=5, max_dt_days=30):
+def reference_positions(folder):
+    """(name, ra, dec) of the flux standards the reduction can use: the RA/DEC header of every reference spectrum
+    in ``folder`` (banzai-floyds ``banzai_floyds/data/standards/*.fits``). None when the folder is not set or
+    missing (no restriction)."""
+    import glob
+    import os
+
+    if not folder or not os.path.isdir(os.path.expanduser(str(folder))):
+        return None
+    from astropy.io import fits
+
+    out = []
+    for f in sorted(glob.glob(os.path.join(os.path.expanduser(str(folder)), '*.fits'))):
+        h = fits.getheader(f, 0)
+        if 'RA' in h and 'DEC' in h:
+            out.append((os.path.basename(f).split('.')[0], float(h['RA']), float(h['DEC'])))
+    return out
+
+
+def _near(ra, dec, positions, radius_arcsec):
+    if ra is None or dec is None:
+        return False
+    for _, sra, sdec in positions:
+        if abs(dec - sdec) * 3600 > radius_arcsec:
+            continue
+        r1, d1, r2, d2 = map(math.radians, (ra, dec, sra, sdec))
+        c = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(r1 - r2)
+        if math.degrees(math.acos(min(1.0, max(-1.0, c)))) * 3600 <= radius_arcsec:
+            return True
+    return False
+
+
+def rebuild(con, n_nearest=5, max_dt_days=30, usable=None, usable_radius_arcsec=300.0):
+    """``usable``: (name, ra, dec) of the standards the reduction has reference spectra for
+    (:func:`reference_positions`); other standards are never matched (B19: banzai-floyds treats a star it does not
+    know as a science target and the night gets no flux calibration). None = every flagged standard."""
     cols = 'id, instrument_id, mjd_obs, block_id, aperwid, object, proposal_id, COALESCE(airmass, airmass_calc)'
-    stds = con.execute(f"""SELECT {cols} FROM frames WHERE rlevel=0 AND is_standard=1
+    stds = con.execute(f"""SELECT {cols}, ra, dec FROM frames WHERE rlevel=0 AND is_standard=1
         AND obstype IN ('SPECTRUM','STANDARD') AND mjd_obs IS NOT NULL""").fetchall()
+    if usable is not None:
+        stds = [s for s in stds if _near(s[8], s[9], usable, usable_radius_arcsec)]
+    stds = [tuple(s)[:8] for s in stds]
     sci = con.execute(f"""SELECT {cols} FROM frames WHERE rlevel=0 AND is_standard=0
         AND obstype='SPECTRUM' AND mjd_obs IS NOT NULL""").fetchall()
     by_inst = defaultdict(list)

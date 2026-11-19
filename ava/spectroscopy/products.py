@@ -53,11 +53,13 @@ def _header(path) -> dict:
     return {k: h.get(k) for k in keys}
 
 
-def fit_key(s: L.FitSettings, z: float) -> str:
-    """Identifies the fit settings (and redshift) a cached fit was made with."""
+def fit_key(s: L.FitSettings, z: float, arm: str = "blue") -> str:
+    """Identifies the fit settings (redshift, arm) a cached fit was made with; the blue arm keeps the key it had
+    before the arm became a setting, so existing caches stay valid."""
     from dataclasses import asdict
 
-    return json.dumps({**asdict(s), "z": round(float(z), 7), "measures": 4}, sort_keys=True, default=list)   # 4: + the [O III] lines
+    extra = {} if arm == "blue" else {"arm": arm}
+    return json.dumps({**asdict(s), "z": round(float(z), 7), "measures": 4, **extra}, sort_keys=True, default=list)   # 4: + the [O III] lines
 
 
 def _file_stamp(f) -> tuple[int, int]:
@@ -67,7 +69,7 @@ def _file_stamp(f) -> tuple[int, int]:
 
 def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good=("OK",),
                  min_series: int = 3, scale_limits=(0.2, 5.0),
-                 cache: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+                 cache: Path | None = None, arm: str = "blue") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """Per-exposure fits (+ [O III] calibration) and the nightly light curve.
 
     ``cache``: a per-target table (parquet) of the per-spectrum fits (fluxes, [O III] flux and wavelength
@@ -75,7 +77,7 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
     only new or changed spectra are fitted, so a daily update costs one fit per new spectrum.  The [O III]
     reference, scale factors and nightly light curve are always recomputed from the whole series."""
     s = settings or L.FitSettings()
-    key = fit_key(s, z)
+    key = fit_key(s, z, arm)
     cached = {}
     if cache is not None and Path(cache).exists():
         try:
@@ -92,7 +94,7 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
             continue
         n_fit += 1
         h = _header(f)
-        sp = L.blue_arm(f, z)
+        sp = L.arm_spectrum(f, z, arm)
         r = L.fit_hbeta(sp, s)
         row = {"basename": Path(f).name.split("-e91")[0] + "-e00", "path": str(f), "MJD": h["MJD-OBS"],
                "night": Path(f).name.split("-")[2],          # LCO DAY-OBS (site-aware observing night)
@@ -121,16 +123,17 @@ def hbeta_series(files, z: float, settings: L.FitSettings | None = None, qc_good
     cal = bool(t["oiii_calibrated"].any())
     col = "hb_broad_cal" if cal else "hb_broad"
     night = L.nightly(t, col, f"{col}_err").rename(columns={col: "hb", f"{col}_err": "hb_err"})
-    cont = L.nightly(t, "cont5100_cal" if cal else "cont5100", ("cont5100_cal" if cal else "cont5100") + "_err")
+    ccol = "cont5100_cal" if cal else "cont5100"
+    cont = L.nightly(t, ccol, f"{ccol}_err")    # empty when 5100 Å is never covered (z ≈ 0.095–0.114, B06)
     if len(night):
-        night = night.merge(cont.rename(columns={cont.columns[2]: "cont5100", cont.columns[3]: "cont5100_err"})
+        night = night.merge(cont.rename(columns={ccol: "cont5100", f"{ccol}_err": "cont5100_err"})
                             [["night", "cont5100", "cont5100_err"]], on="night", how="left")
     for key in ("oiii5007_int", "oiii4959_int"):       # [O III] lines as measured (not calibrated: they set it)
         if key in t and len(night):
             o = L.nightly(t.assign(**{f"{key}_err": t[f"{key}_err"].where(t[f"{key}_err"] > 0)}), key, f"{key}_err")
             if len(o):
                 night = night.merge(o[["night", key, f"{key}_err"]], on="night", how="left")
-    meta = {**ref, "oiii_calibrated": cal, "n_spectra": len(t), "n_good": int(t["good"].sum()),
+    meta = {**ref, "arm": arm, "oiii_calibrated": cal, "n_spectra": len(t), "n_good": int(t["good"].sum()),
             "n_nights": len(night), "n_fitted": n_fit, "n_cached": len(t) - n_fit}
     return t, night, meta
 
