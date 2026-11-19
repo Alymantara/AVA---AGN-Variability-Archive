@@ -87,7 +87,7 @@ line in `future_improvements.md`.
 
 ## 3d. Production operations: to do first (user, 19 Nov)
 
-- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: C01 `nightly_steps`, and the weekly backup.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
+- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: the weekly backup.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
   for the Prefect flow, `scripts/cleanup.py --live`, `scripts/lco_usage.py --live-snapshot`), but the crontab is
   only written out in `deployment_guide.md` §7, with `/opt/ava` example paths. To do:
   - a `deploy/` folder with `crontab.example` and systemd units for the Prefect server and worker;
@@ -121,7 +121,7 @@ line in `future_improvements.md`.
 
 ## 5. To confirm (decision or unverified; tick when decided)
 
-- [ ] **C01**: `nightly_steps` has no `pytics`, so the scheduled run never updates the ensemble light curves.
+- [x] **C01** (decided 19 Nov: the full production list; `schedule_cron` 02:00 UTC): `nightly_steps` has no `pytics`, so the scheduled run never updates the ensemble light curves.
   Intended? `config/ava_config.yaml:578`.
 - [ ] **C02**: `merge` (`-m`/`-s`) raises `NotImplementedError`. Remove the flags or port the step?
 - [ ] **C03**: AVA ignores `LCODB_CONFIG` (`ava/config.py:248`). Matters on the host if only that variable is set.

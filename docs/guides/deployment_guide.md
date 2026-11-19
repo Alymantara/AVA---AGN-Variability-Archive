@@ -452,8 +452,10 @@ PyTICS products per target (`-t`; `ensemble.export_csv`, `ensemble.export_qc_csv
   random (epoch-to-epoch) errors, rms_t, rms_sc, n_stars, ensemble offsets, intercal a/b, airmass and seeing.
   F_var with `ensemble.fvar_error: random` and the spectroscopy g-band comparison read the random errors from here.
 
-Production `nightly_steps` (to set): `download_data, extract, calibrate_data, pytics, plot,
-spec_download_data, spec_reduce_data, spec_products_data, publish`. Download and processing can be split
+Production `nightly_steps` (set 19 Nov 2026): `download_data, extract, calibrate_data, pytics, plot,
+spec_download_data, spec_reduce_data, spec_products_data, publish`, at 02:00 UTC (`schedule_cron`, and the
+`pipeline` line of `scripts/make_crontab.py --production`). The spectra reduction (`-R`) needs the banzai-floyds
+environment (`spectroscopy.reduction.python`, section 4.3) on the machine, or the run fails. Download and processing can be split
 into two deployments (02:00 and 03:00) if preferred; the single flow already runs them in order.
 
 ```

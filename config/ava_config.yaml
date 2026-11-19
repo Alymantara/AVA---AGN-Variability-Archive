@@ -598,12 +598,15 @@ pipeline:
   prefect:
     deployment_name: "ava-daily"
     work_pool: "ava-process"
-    schedule_cron: "30 10 * * *"  # daily 10:30 UTC, after `lcodb daily` (09:30)
+    schedule_cron: "0 2 * * *"    # daily 02:00 UTC, after `lcodb daily` (01:00); same as scripts/make_crontab.py --production
     schedule_timezone: "UTC"
     # Steps of the scheduled run (scripts/deploy.py; flags override). Known: init, download_data, extract,
     # calibrate_data, pytics, plot, merge_data, save, spec_init, spec_download_data, spec_reduce_data,
     # spec_products_data, publish.
-    nightly_steps: ["download_data", "extract", "calibrate_data", "plot", "publish"]
+    # Production list (user, 19 Nov 2026): PyTICS refreshes the merged light curves and photometric F_var, the
+    # spectroscopy steps the Hbeta products and line_variability; publish copies everything to the website.
+    nightly_steps: ["download_data", "extract", "calibrate_data", "pytics", "plot",
+                    "spec_download_data", "spec_reduce_data", "spec_products_data", "publish"]
 
 
 # ============================================================
