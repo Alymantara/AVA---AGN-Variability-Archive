@@ -27,8 +27,13 @@
 .ava-cal-grid .ava-figcap { margin: .2rem .25rem 0; font-size: .78rem; }
 
 /* passband panels */
-.ava-cal-pb .fill { fill: var(--c); fill-opacity: .14; stroke: none; }
-.ava-cal-pb .lco { fill: none; stroke: var(--c); stroke-width: 2.2; stroke-linejoin: round; }
+/* Band colours are the site's filter colours; on the dark theme they are lifted toward white so the darker ones
+   (g, B, z) stay visible. */
+.ava-cal-pb { --cc: var(--c); }
+[data-bs-theme="dark"] .ava-cal-pb { --cc: color-mix(in srgb, var(--c) 65%, white); }
+.ava-cal-pb .fill { fill: var(--cc); fill-opacity: .32; stroke: none; }
+.ava-cal-pb .lco { fill: none; stroke: var(--cc); stroke-width: 2.4; stroke-linejoin: round; }
+[data-bs-theme="light"] .ava-cal-pb .lco { stroke: color-mix(in srgb, var(--c) 78%, black); }   /* pale Y on white */
 .ava-cal-pb .ref { fill: none; stroke: var(--ava-strong); stroke-width: 1.6; stroke-dasharray: 6 4; opacity: .85; }
 .ava-cal-pb .base { stroke: var(--ava-muted); stroke-width: 1; }
 .ava-chart .title { fill: var(--ava-strong); font-size: 15px; font-weight: 700; }

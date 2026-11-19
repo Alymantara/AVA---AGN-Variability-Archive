@@ -19,8 +19,10 @@ CDBS = Path(os.environ.get("PYSYN_CDBS", ""))
 C_LIGHT = 2.99792458e18
 BANDS = ["u", "B", "g", "V", "r", "i", "z"]
 FILTER_OF = dict(u="up", B="B", g="gp", V="V", r="rp", i="ip", z="zs")
-REF_NAME = dict(u="sdss_u", B="landolt_B", g="sdss_g", V="landolt_V", r="sdss_r", i="sdss_i", z="sdss_z")
-REF_LABEL = dict(u="SDSS u", B="Landolt B", g="SDSS g", V="Landolt V", r="SDSS r", i="SDSS i", z="SDSS z")
+REF_NAME = dict(u="sdss_u", B="landolt_B", g="sdss_g", V="landolt_V", r="sdss_r", i="sdss_i", z="sdss_z",
+                Y="ps1_y")   # Y: passband plots only (FLOYDS does not reach it)
+REF_LABEL = dict(u="SDSS u", B="Landolt B", g="SDSS g", V="Landolt V", r="SDSS r", i="SDSS i", z="SDSS z",
+                 Y="PS1 y")
 # rest-frame windows free of strong AGN lines (continuum spline)
 LINE_FREE_REST = [(3600, 3640), (3790, 3820), (4020, 4060), (4180, 4230), (4440, 4460), (4530, 4560),
                   (5080, 5130), (5420, 5470), (5600, 5650), (6050, 6200), (6850, 6880), (7000, 7050),

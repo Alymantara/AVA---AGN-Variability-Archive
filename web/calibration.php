@@ -101,7 +101,8 @@ ava_page_start('data', 'Photometric calibration',
     <p class="text-secondary mb-4" style="max-width:80ch">LCO filters (solid; filter × Sinistro CCD × atmosphere at
       airmass 1) against the passbands that define the Gaia anchors' magnitudes (dashed), each normalised to its peak.
       Shaded: where the LCO filter transmits. An emission line on the edge where only one of them transmits changes the
-      AGN's magnitude in one system and not the other.</p>
+      AGN's magnitude in one system and not the other. <em>Y</em> is anchored to Pan-STARRS <em>y</em>, which is
+      ≈ 300 Å bluer than LCO <em>Y</em>: there the colour term carries more of the conversion, even for stars.</p>
     <div class="ava-cal-grid">
       <?php foreach ($cal['passbands'] as $b => $pb): ?>
         <figure class="ava-chart-wrap m-0"><?= ava_cal_passband_svg((string) $b, $pb) ?>

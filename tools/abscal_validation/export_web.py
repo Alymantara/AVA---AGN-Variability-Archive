@@ -46,6 +46,11 @@ def thin_curve(wt, frac=0.01, n=160):
     return [[round(float(a), 1), round(float(b), 4)] for a, b in zip(g, tt)]
 
 
+def passband_entry(lco, ref, b):
+    return dict(lco=thin_curve(lco), ref=thin_curve(ref), ref_name=S.REF_LABEL[b],
+                lco_half=[round(float(x)) for x in S.span(lco, 0.5)], ref_half=[round(float(x)) for x in S.span(ref, 0.5)])
+
+
 TREND_BANDS = [("up", "u"), ("B", "B"), ("gp", "g"), ("V", "V"), ("rp", "r"), ("ip", "i"), ("zs", "z")]
 
 
@@ -125,9 +130,8 @@ def main(sed, ext, trends, trends_target, out, binw):
                 res[b].append(r3((m[f"ref_{b}"] - m[f"lco_{b}"] - trn.loc[b, "a"] - trn.loc[b, "C"] * m["gi"]), 4))
         zscan[t] = res
 
-    passbands = {b: dict(lco=thin_curve(F.lco[b]), ref=thin_curve(F.ref[b]), ref_name=S.REF_LABEL[b],
-                         lco_half=[round(float(x)) for x in S.span(F.lco[b], 0.5)],
-                         ref_half=[round(float(x)) for x in S.span(F.ref[b], 0.5)]) for b in S.BANDS}
+    passbands = {b: passband_entry(F.lco[b], F.ref[b], b) for b in S.BANDS}
+    passbands["Y"] = passband_entry(S.load_curve("lco", "Y"), S.load_curve("ref", "Y"), "Y")   # plots only
 
     stars = None
     if ext is not None and (ext / "ps1_apass_offsets.csv").exists():
