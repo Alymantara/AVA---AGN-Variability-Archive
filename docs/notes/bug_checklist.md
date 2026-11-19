@@ -43,7 +43,7 @@ line in `future_improvements.md`.
   (`assign_star_ids`).
 - [ ] **B15** (main, photometry): R/I frames with an APASS-fallback catalogue raise `KeyError 'lco_R'`.
   `photometry/calibration.py:41`.
-- [ ] **B16** (QC): a NaN `saturate`/`naxis` rejects every standard, so the frame silently gets `no_zp`.
+- [x] **B16** (QC; fixed 19 Nov, B16 commit): a NaN `saturate`/`naxis` rejects every standard, so the frame silently gets `no_zp`.
   `photometry/calibration.py:76`.
 - [ ] **B17** (QC): frames that raised an exception are never retried. `photometry/process.py:227`.
 - [ ] **B18** (main, photometry): "newest first" in SExtractor sorts by site, not by date. `pipeline/tasks/sextract.py:56`.

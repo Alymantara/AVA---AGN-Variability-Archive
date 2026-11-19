@@ -59,22 +59,22 @@ def raw_meta_provider(target: str):
     None if no source has the frame."""
     from ava.lcodb.config import load_config
     from ava.photometry.process import header_meta
-    from ava.photometry.store import frame_meta, listing_meta, meta_complete
+    from ava.photometry.store import fill_camera_defaults, frame_meta, listing_meta, meta_complete
 
     raw, stored, listed = cfg.phot_raw(target), None, None
+    defaults = dict(cfg._raw.get("photometry", {}).get("calibration", {}).get("camera_defaults") or {})
 
     def meta(frame: str):
         nonlocal stored, listed
         p = raw / frame.split("-")[2] / f"{frame}.fits.fz"
-        if p.exists() and p.stat().st_size > 0:
-            return header_meta(p)
+        if p.exists() and p.stat().st_size > 0:   # a header without SATURATE / NAXIS takes the camera default
+            return fill_camera_defaults(header_meta(p), frame, defaults)
         if stored is None:
             stored = frame_meta(frame_db_path(), target)
         m = stored.get(frame)
         if meta_complete(m):
             return m
         if listed is None:
-            defaults = dict(cfg._raw.get("photometry", {}).get("calibration", {}).get("camera_defaults") or {})
             listed = listing_meta(load_config(cfg.lcodb_config_path).db_path("photometry"), target, defaults)
         return listed.get(frame)
     return meta

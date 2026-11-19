@@ -885,3 +885,16 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   0.000 mmag difference in every filter; with 99 mag errors the rows had no weight. They are still not
   measurements, though: they counted towards star selection and could reach an unweighted step.
 - Tests: `tests/test_sentinel_mags.py` (both fail on the previous commit).
+
+## B16: a header without SATURATE / NAXIS rejected every standard (19 Nov 2026)
+
+- **Bug.** `header_meta` returns NaN for a missing SATURATE / NAXIS keyword. `standard_mask` tested
+  `if saturate:` and `if naxis1 and naxis2:`, which are true for NaN, and then every comparison with NaN failed. So
+  all standards were rejected and the frame got `no_zp` with no message.
+- **Fix.**
+  - `standard_mask` skips a cut whose value is missing (None, NaN or ≤ 0), as it did for None.
+  - `raw_meta_provider` fills a missing saturation level or image size from `photometry.calibration.camera_defaults`
+    (`store.fill_camera_defaults`), which is what already happens for frames calibrated without their image.
+- The Mac test archive's `frame_qc` predates the saturate / naxis columns, so the number of affected frames is not
+  known. It is a guard against a silent failure rather than a fix for many frames.
+- Tests: `tests/test_missing_header_meta.py`.

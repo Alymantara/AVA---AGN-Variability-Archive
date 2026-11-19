@@ -71,9 +71,13 @@ def standard_mask(meas: pd.DataFrame, ref_mag: np.ndarray, *, saturate: float | 
          & (meas["sex_flags"].to_numpy() == 0)
          & np.isfinite(ref_mag) & np.isfinite(meas["mag_inst"].to_numpy())
          & (meas["magerr"].to_numpy() > 0) & (meas["magerr"].to_numpy() < 1.0857 / s.min_snr))
-    if saturate:
+    # a missing value (None / NaN / <= 0: header keyword absent) skips that cut; NaN used to fail every
+    # comparison and so rejected every standard (B16)
+    def _given(v):
+        return v is not None and np.isfinite(float(v)) and float(v) > 0
+    if _given(saturate):
         m &= (meas["flux_max"].to_numpy() + meas["background"].to_numpy()) < s.max_peak_frac * saturate
-    if naxis1 and naxis2:
+    if _given(naxis1) and _given(naxis2):
         x, y = meas["x"].to_numpy(), meas["y"].to_numpy()
         m &= (x > s.edge_px) & (x < naxis1 - s.edge_px) & (y > s.edge_px) & (y < naxis2 - s.edge_px)
     return m

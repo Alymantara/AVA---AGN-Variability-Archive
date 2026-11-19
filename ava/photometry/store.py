@@ -121,6 +121,20 @@ def listing_meta(lcodb_db: Path, data_id: str, camera_defaults: dict | None = No
     return out
 
 
+def fill_camera_defaults(meta: dict | None, frame: str, camera_defaults: dict | None) -> dict | None:
+    """Saturation level and image size from ``camera_defaults`` (2-letter camera prefix of the frame name) where
+    ``meta`` (e.g. a raw header without SATURATE / NAXIS) has none; other values are kept (B16)."""
+    if not meta:
+        return meta
+    d = (camera_defaults or {}).get(str(frame).split("-")[1][:2].lower() if "-" in str(frame) else "") or {}
+    out = dict(meta)
+    for k in ("saturate", "naxis1", "naxis2"):
+        v = out.get(k)
+        if (v is None or (isinstance(v, float) and not np.isfinite(v))) and d.get(k) is not None:
+            out[k] = float(d[k])
+    return out
+
+
 def meta_complete(m: dict | None) -> bool:
     """Everything a recalibration needs from the image is stored (time, filter, saturation, image size)."""
     return bool(m) and all(m.get(c) is not None and not (isinstance(m.get(c), float) and not np.isfinite(m[c]))
