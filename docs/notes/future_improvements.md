@@ -614,3 +614,28 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
      frames, and it rewrites `frame_qc` and `measurements.parquet`. Then re-run PyTICS for those targets. Agree the
      scope with the user before starting. Targets with RA < 100° kept ≥ 4 decimals (≤ 0.36″) and can wait.
   3. **Afterwards**, re-check the `few_matched` and `agn_missing` rates per target.
+
+## B01/B09: archive requests on server errors; headers reduced to the slit width (19 Nov 2026)
+
+- **Bug (B01).** HTTP 500/502/503/504 were retried 7 times with backoff. The header step then marked the frame
+  failed and moved on, so a server-wide outage ran through the whole backlog: about 12,800 requests a day with 4
+  workers, over the 5000/day account limit.
+- **Bug (B09).** A run of short 429s made `Client.get` return `None`.
+- **Fix:**
+  - A 5xx is retried `server_error_retries` times (1).
+  - After `server_error_limit` (3) consecutive failed requests, the client refuses to send and raises
+    `ServerError`.
+  - `headers.fetch` stops on `ServerError` as on a long 429 and leaves the frames pending.
+  - The 429 path raises `Throttled` instead of falling through.
+- **Decision (user, 19 Nov 2026): headers only for the slit width.**
+  - One request per exposure: `pending` picks one frame per `exp_key`, and the twins inherit the value.
+  - Only `aperwid` is written (`headers.columns`), and full headers are no longer stored (`store_full: false`).
+  - `lcodb purge-headers [--live]` deletes the stored ones after a backup (Mac copy: 42,061 headers, 253 → 68 MB;
+    all 42,037 slit widths kept).
+  - Cost: about 8 header requests a day (4412 exposures since June 2025).
+- **Not done:** getting the slit width without any header request. It is in the observation portal's request
+  (`instrument_configs[].optical_elements.slit`), one request per observing request instead of per exposure. But
+  the portal only shows our own proposals, not the calibration programmes' standards, so headers are still
+  needed for those.
+- Tests: `tests/test_lcodb_requests.py`.
+

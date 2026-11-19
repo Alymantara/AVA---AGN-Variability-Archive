@@ -189,8 +189,8 @@ def test_header_cutoff(tmp_path):
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE frames (id INTEGER, md5 TEXT, header_status INTEGER, rlevel INTEGER, is_best INTEGER, "
-                "day_obs TEXT, date_obs TEXT)")
-    con.executemany("INSERT INTO frames VALUES (?,?,?,?,?,?,?)",
-                    [(1, "a", 0, 0, 1, "2018-01-01", "2018"), (2, "b", 0, 0, 1, "2026-11-01", "2026")])
+                "day_obs TEXT, date_obs TEXT, exp_key TEXT)")
+    con.executemany("INSERT INTO frames VALUES (?,?,?,?,?,?,?,?)",
+                    [(1, "a", 0, 0, 1, "2018-01-01", "2018", "e1"), (2, "b", 0, 0, 1, "2026-11-01", "2026", "e2")])
     assert [r["id"] for r in headers.pending(con, [0])] == [2, 1]
     assert [r["id"] for r in headers.pending(con, [0], since="2021-09-01")] == [2]

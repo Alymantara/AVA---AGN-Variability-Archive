@@ -4,22 +4,33 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from . import db
-from .api import Throttled
+from .api import ServerError, Throttled
 
 log = logging.getLogger(__name__)
 
 
 def pending(con, levels, limit=None, best_only=False, since=None):
-    """Frames still without a header; ``since`` (YYYY-MM-DD): only frames observed on or after that night."""
-    q = (f"SELECT id, md5 FROM frames WHERE header_status=0 AND rlevel IN ({','.join('?' * len(levels))}) "
-         + ("AND is_best=1 " if best_only else "") + ("AND day_obs >= ? " if since else "") + "ORDER BY date_obs DESC")
+    """Frames still without a header, ONE per exposure: the raw frame and its products share a header
+    (``propagate_headers`` copies it to the twins), so only the highest level of each ``exp_key`` is fetched,
+    and none when a twin already has a header. ``since`` (YYYY-MM-DD): only frames observed on or after then."""
+    lv = ','.join('?' * len(levels))
+    q = (f"SELECT id, md5 FROM frames f WHERE header_status=0 AND rlevel IN ({lv}) "
+         + ("AND is_best=1 " if best_only else "") + ("AND day_obs >= ? " if since else "")
+         + f"AND id = (SELECT t.id FROM frames t WHERE t.exp_key=f.exp_key AND t.header_status=0 AND t.rlevel IN ({lv}) "
+         + ("AND t.is_best=1 " if best_only else "") + "ORDER BY t.rlevel DESC, t.id LIMIT 1) "
+         "AND NOT EXISTS (SELECT 1 FROM frames t WHERE t.exp_key=f.exp_key AND t.header_status IN (1, 2)) "
+         "ORDER BY date_obs DESC")
     if limit:
         q += f' LIMIT {int(limit)}'
-    return con.execute(q, list(levels) + ([str(since)] if since else [])).fetchall()
+    return con.execute(q, list(levels) + ([str(since)] if since else []) + list(levels)).fetchall()
 
 
-def fetch(client, con, levels, workers=8, store_full=True, limit=None, commit_every=500, best_only=False,
-          batch=2000, since=None):
+def fetch(client, con, levels, workers=8, store_full=False, limit=None, commit_every=500, best_only=False,
+          batch=2000, since=None, columns=None):
+    """Fetch the headers of pending frames and keep only ``columns`` (``schema.HEADER_COLUMNS`` keys; None =
+    all). ``store_full`` also keeps the whole header in the ``headers`` table (off: only the slit width is used).
+    A 429 with a long Retry-After or repeated server errors (``ServerError``) stop the step and leave the
+    remaining frames pending; other failures mark the frame -1 (retried with ``--retry-failed``)."""
     todo = pending(con, levels, limit, best_only, since)
     log.info('headers to fetch: %d', len(todo))
     if not todo:
@@ -36,9 +47,9 @@ def fetch(client, con, levels, workers=8, store_full=True, limit=None, commit_ev
                 r = futs.pop(fut)
                 i += 1
                 try:
-                    db.store_header(con, r['id'], r['md5'], fut.result(), store_full)
+                    db.store_header(con, r['id'], r['md5'], fut.result(), store_full, columns)
                     ok += 1
-                except Throttled as e:  # leave it pending (status 0); stop the whole step cleanly
+                except (Throttled, ServerError) as e:  # leave it pending (status 0); stop the whole step cleanly
                     throttled = e
                 except Exception as e:  # keep going; failed ones are retried with --retry-failed
                     log.warning('header %s failed: %s', r['id'], e)
@@ -54,8 +65,9 @@ def fetch(client, con, levels, workers=8, store_full=True, limit=None, commit_ev
             if throttled:
                 for f in futs:
                     f.cancel()
-                log.warning('stopping headers: %s (UTC %s); %d left pending, rerun to resume',
-                            throttled, throttled.until.strftime('%Y-%m-%d %H:%M'), len(todo) - ok - bad)
+                until = getattr(throttled, 'until', None)
+                log.warning('stopping headers: %s%s; %d left pending, rerun to resume', throttled,
+                            f" (UTC {until.strftime('%Y-%m-%d %H:%M')})" if until else '', len(todo) - ok - bad)
                 break
     return ok, bad
 

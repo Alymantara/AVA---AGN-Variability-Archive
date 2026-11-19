@@ -48,7 +48,10 @@ def archive_client():
         token = cfg.lco_token
         if not token:
             raise RuntimeError("No LCO API token (lco.token_file / LCO_API_TOKEN)")
-        _CLIENT = Client(token=token, rate_per_s=float(cfg.download.rate_per_s))
+        dl = cfg.download
+        _CLIENT = Client(token=token, rate_per_s=float(dl.rate_per_s),
+                         server_error_retries=int(dl.get("server_error_retries", 1)),
+                         server_error_limit=int(dl.get("server_error_limit", 3)))
     return _CLIENT
 
 

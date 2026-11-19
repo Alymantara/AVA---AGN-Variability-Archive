@@ -194,6 +194,17 @@ volume): on a network-mounted home the ephemeral API server times out at start. 
 (`download.rate_per_s: 1`, lcodb `header_rate_per_s: 4`, `sync_rate_per_s`). Do not raise these, and do
 not run several archive jobs at the same time (the cron times in section 7 are spaced for that).
 
+**Server errors stop a job (19 Nov 2026).** An HTTP 5xx is not treated as transient: one request is retried at
+most `server_error_retries` times (default 1), and after `server_error_limit` consecutive failed requests
+(default 3) the client sends nothing more and the step stops. The frames it had not reached stay pending for the
+next run. The settings are in `lcodb_config.yaml` and in `download:` in `ava_config.yaml`.
+
+**Headers: slit width only (19 Nov 2026).** The header step fetches one header per new FLOYDS exposure (about 8 a
+day), keeps only `APERWID` (`headers.columns: [aperwid]`) and no longer stores full headers (`store_full: false`).
+To delete full headers stored earlier (103 MB on the Mac copy), run `lcodb purge-headers` (a dry run that prints
+the count), then `lcodb purge-headers --live`. That backs the database up to `<db_dir>/backups/` first, then
+deletes the headers and VACUUMs.
+
 # 6. Databases and data layout
 
 | Database | Default location | Written by | Contents |

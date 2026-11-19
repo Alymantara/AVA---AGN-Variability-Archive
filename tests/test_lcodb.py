@@ -81,7 +81,7 @@ def test_headers_store_and_propagate(cfg, cons):
     con = cons[0]['spectra']
     db.upsert_frames(con, [db.frame_row(frame(1, 'coj2m002-en12-20261010-0006-e00'), set(), set()),
                            db.frame_row(frame(2, 'coj2m002-en12-20261010-0006-e91-1d', rlevel=91), set(), set())])
-    db.store_header(con, 2, 'a', {'AIRMASS': '1.234', 'APERWID': 6.0, 'MOONDIST': 'N/A', 'GROUPID': 'F9 rm'})
+    db.store_header(con, 2, 'a', {'AIRMASS': '1.234', 'APERWID': 6.0, 'MOONDIST': 'N/A', 'GROUPID': 'F9 rm'}, store_full=True)
     assert db.propagate_headers(con) == 1
     r = con.execute('SELECT airmass, aperwid, moondist, groupid, header_status FROM frames WHERE id=1').fetchone()
     assert tuple(r) == (1.234, 6.0, None, 'F9 rm', 2)

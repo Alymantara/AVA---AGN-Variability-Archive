@@ -64,7 +64,9 @@ photometry_filters: [up, B, V, gp, rp, ip, zs, Y]
 page_size: 1000               # anonymous access is capped at 100; the token allows 1000
 window_days: 30               # proposals are crawled in time windows of this size
 overlap_days: 7               # daily sync re-reads the last N days (late frames / new reductions)
-max_retries: 6
+max_retries: 6               # timeouts / connection errors / short 429s
+server_error_retries: 1      # HTTP 5xx is NOT transient: retry one request at most this many times ...
+server_error_limit: 3        # ... and after this many consecutive failed requests stop the whole step
 request_timeout: 180
 header_workers: 4
 header_rate_per_s: 4        # sustained archive limit seen in Nov 2026; faster gets a multi-hour 429 block
@@ -84,7 +86,10 @@ headers:
   photometry: {levels: [90, 91], best_only: true, enabled: false}   # one header per exposure (the best level)
   # photometry headers are OFF (Nov 2026): ~5e5 headers vs the archive rate limit, and the quality numbers come from
   # our own reductions. Set enabled: true (or run `lcodb headers --db photometry`) to backfill later.
-  store_full: true            # keep the whole header (zlib JSON); lets you add columns later without re-downloading
+  # Only the slit width is kept (decided 19 Nov 2026): one header request per new exposure (raw + products share it),
+  # about 8 a day. The full headers are not stored; `lcodb purge-headers --live` deletes the ones stored before.
+  columns: [aperwid]
+  store_full: false
 
 # --- standard-star matching (spectra DB) ---------------------------------------
 standards:

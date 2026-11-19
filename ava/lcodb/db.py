@@ -165,12 +165,15 @@ def _coerce(value, typ):
     return None if s.upper() in ('', 'N/A', 'NA', 'UNKNOWN', 'NONE') else s
 
 
-def header_values(hdr):
-    return {col: _coerce(hdr.get(kw), typ) for col, (kw, typ) in schema.HEADER_COLUMNS.items()}
+def header_values(hdr, columns=None):
+    cols = schema.HEADER_COLUMNS if columns is None else {c: schema.HEADER_COLUMNS[c] for c in columns}
+    return {col: _coerce(hdr.get(kw), typ) for col, (kw, typ) in cols.items()}
 
 
-def store_header(con, frame_id, md5, hdr, store_full=True):
-    vals = header_values(hdr)
+def store_header(con, frame_id, md5, hdr, store_full=False, columns=None):
+    """Write the header keywords ``columns`` (None = all of ``schema.HEADER_COLUMNS``) into ``frames``;
+    ``store_full`` also keeps the whole header (zlib JSON) in ``headers``."""
+    vals = header_values(hdr, columns)
     sets = ','.join(f'{c}=?' for c in vals)
     con.execute(f'UPDATE frames SET {sets}, header_status=1 WHERE id=?', tuple(vals.values()) + (frame_id,))
     if store_full:
@@ -184,9 +187,9 @@ def load_header(con, frame_id):
     return json.loads(zlib.decompress(r[0])) if r else None
 
 
-def propagate_headers(con):
+def propagate_headers(con, columns=None):
     """Frames without their own header take the values of their raw/product twin (same exp_key)."""
-    cols = list(schema.HEADER_COLUMNS)
+    cols = list(schema.HEADER_COLUMNS) if columns is None else list(columns)
     sets = ','.join(f'{c}=(SELECT t.{c} FROM frames t WHERE t.exp_key=frames.exp_key '
                     f'AND t.header_status=1 ORDER BY t.rlevel DESC LIMIT 1)' for c in cols)
     cur = con.execute(f"""UPDATE frames SET {sets}, header_status=2

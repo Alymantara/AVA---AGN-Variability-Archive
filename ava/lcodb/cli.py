@@ -8,6 +8,7 @@
   lcodb link        LCO target names -> AVA ids (frames.ava_id, table target_link)
   lcodb stats       per-AGN LCO statistics in the AVA DB (agn_lco), via tools/ava_crossmatch.py
   lcodb reextract
+  lcodb purge-headers [--live]   delete the stored full headers (slit width stays in frames.aperwid)
   lcodb daily       = sync (active proposals matching daily.include_regex only) + standards harvest + headers
                       + airmass + matching + link + stats
   lcodb status
@@ -17,7 +18,7 @@ import logging
 import subprocess
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import airmass, ava, calibs, db, headers, ingest, standards
@@ -39,7 +40,9 @@ def _client(cfg, rate=None):
                     cfg.get('token_file'))
         cfg.raw['page_size'] = min(cfg['page_size'], 100)
     rate = rate if rate is not None else cfg.get('sync_rate_per_s')   # listing requests (sync, crawls)
-    return Client(cfg.token, cfg['request_timeout'], cfg['max_retries'], rate)
+    return Client(cfg.token, cfg['request_timeout'], cfg['max_retries'], rate,
+                  server_error_retries=int(cfg.get('server_error_retries', 1)),
+                  server_error_limit=int(cfg.get('server_error_limit', 3)))
 
 
 def _date(s):
@@ -86,10 +89,12 @@ def cmd_headers(cfg, a):
             con.commit()
         if k == 'photometry':
             db.mark_best(con)
+        cols = cfg['headers'].get('columns')
         ok, bad = headers.fetch(c, con, cfg['headers'][k]['levels'], cfg['header_workers'],
-                                cfg['headers']['store_full'], a.limit, best_only=cfg['headers'][k].get('best_only', False),
-                                since=cfg['headers'][k].get('since'))
-        inh = db.propagate_headers(con)
+                                cfg['headers'].get('store_full', False), a.limit,
+                                best_only=cfg['headers'][k].get('best_only', False),
+                                since=cfg['headers'][k].get('since'), columns=cols)
+        inh = db.propagate_headers(con, cols)
         log.info('%s: %d headers fetched, %d failed, %d frames inherited from their twin', k, ok, bad, inh)
         tot += ok
     return tot, 0
@@ -143,6 +148,29 @@ def cmd_reextract(cfg, a):
         con.commit()
         db.propagate_headers(con)
         log.info('%s: re-extracted %d headers', k, n)
+    return 0, 0
+
+
+def cmd_purge_headers(cfg, a):
+    """Delete the stored full headers (``headers`` table); the slit width stays in ``frames.aperwid``.
+    Dry run unless ``--live``; a live run backs the database up to <db_dir>/backups/ first and VACUUMs."""
+    import sqlite3
+    cons, _ = _open(cfg)
+    for k, con in cons.items():
+        n, mb = con.execute('SELECT COUNT(*), COALESCE(SUM(LENGTH(header)), 0) / 1e6 FROM headers').fetchone()
+        log.info('%s: %d stored headers (%.0f MB)%s', k, n, mb, '' if a.live else ' [dry run]')
+        if not a.live or not n:
+            continue
+        src = cfg.db_path(k)
+        out = src.parent / 'backups' / f'{src.stem}_{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}_before_purge_headers.sqlite'
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(out) as dst:
+            con.backup(dst)
+        log.info('%s: backup %s', k, out)
+        con.execute('DELETE FROM headers')
+        con.commit()
+        con.execute('VACUUM')
+        log.info('%s: %d headers deleted', k, n)
     return 0, 0
 
 
@@ -229,6 +257,8 @@ def main(argv=None):
     s.add_argument('--db', choices=['spectra', 'photometry', 'both'], default='both')
     s.add_argument('--limit', type=int)
     s.add_argument('--retry-failed', action='store_true')
+    s = sub.add_parser('purge-headers', help='delete the stored full headers (dry run unless --live)')
+    s.add_argument('--live', action='store_true')
     s = sub.add_parser('calib-sync', help='only the observatory calibration programmes (standards.calib_proposals)')
     s.add_argument('--full', action='store_true')
     for name in ('airmass', 'match', 'standards', 'link', 'stats', 'reextract', 'status'):

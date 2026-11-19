@@ -142,6 +142,8 @@ download:
                                 # each page's URLs are used before the next page is requested)
   page_size: 100                # frames per archive page (URLs are used before the next page)
   rate_per_s: 1.0               # archive requests per second (lcodb sees blocks above ~4/s)
+  server_error_retries: 1       # HTTP 5xx is not transient: retry one request at most this many times ...
+  server_error_limit: 3         # ... and stop the download after this many consecutive failed requests
   verify_existing: false        # md5-check files already on disk
   unlinked_radius_arcmin: 10    # report unlinked LCO OBJECT names this close to the AGN
   # Archive query parameter names (the API renamed the legacy OBJECT / PROPID / RLEVEL).

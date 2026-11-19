@@ -1,6 +1,12 @@
 """Thin clients for the LCO science archive and observation portal.
 
-Only this module talks HTTP. Retries with exponential backoff on 429/5xx/timeouts.
+Only this module talks HTTP. Retries with exponential backoff on 429 and timeouts.
+
+Server errors (HTTP 5xx) are NOT treated as transient: a request is retried at most
+``server_error_retries`` times (default 1), and after ``server_error_limit`` consecutive
+failed requests (default 3, any thread) the client refuses to send anything more and raises
+:class:`ServerError` at once, so a crawl or header step stops instead of hammering a broken
+archive (5000 requests/day per user).
 """
 import logging
 import threading
@@ -35,6 +41,10 @@ class Throttled(RuntimeError):
         self.until = datetime.now(timezone.utc) + timedelta(seconds=retry_after)
 
 
+class ServerError(RuntimeError):
+    """The archive keeps answering with HTTP 5xx: stop, do not retry in a loop."""
+
+
 class RateLimiter:
     def __init__(self, per_s):
         self.dt = 1.0 / per_s if per_s else 0.0
@@ -53,8 +63,12 @@ class RateLimiter:
 
 
 class Client:
-    def __init__(self, token=None, timeout=180, max_retries=6, rate_per_s=None, max_wait_s=900):
+    def __init__(self, token=None, timeout=180, max_retries=6, rate_per_s=None, max_wait_s=900,
+                 server_error_retries=1, server_error_limit=3):
         self.timeout = timeout
+        self.server_error_retries = server_error_retries   # retries of one request after a 5xx
+        self.server_error_limit = server_error_limit       # consecutive failed requests -> refuse all further ones
+        self._server_fails = 0
         self.max_wait_s = max_wait_s  # longer Retry-After -> raise Throttled instead of sleeping
         self._blocked_until = 0.0     # shared by all threads: once throttled, nobody sends until then
         self._block_lock = threading.Lock()
@@ -72,7 +86,18 @@ class Client:
             self._local.s = s
         return s
 
+    def _server_failed(self, url, status):
+        with self._block_lock:
+            self._server_fails += 1
+            n = self._server_fails
+        log.error('HTTP %s from %s (%d consecutive failed request(s))', status, url, n)
+        raise ServerError(f'{url}: HTTP {status} (repeated server error; not retrying)')
+
     def get(self, url, params=None):
+        if self.server_error_limit and self._server_fails >= self.server_error_limit:
+            raise ServerError(f'{self._server_fails} consecutive server errors; refusing further requests')
+        server_tries = 0
+        ra = 60.0
         for attempt in range(self.max_retries + 1):
             wait_block = self._blocked_until - time.monotonic()
             if wait_block > self.max_wait_s:
@@ -93,9 +118,17 @@ class Client:
                         raise Throttled(ra)
                     log.warning('429: pausing all requests for %.0f s', ra)
                     continue
-                if r.status_code in (500, 502, 503, 504):
-                    raise requests.HTTPError(f'{r.status_code}', response=r)
+                if r.status_code >= 500:
+                    server_tries += 1
+                    if server_tries > self.server_error_retries:
+                        self._server_failed(url, r.status_code)
+                    wait = min(300, 2 ** attempt * 3)
+                    log.warning('HTTP %s, retry after %ss: %s', r.status_code, wait, url)
+                    time.sleep(wait)
+                    continue
                 r.raise_for_status()
+                with self._block_lock:
+                    self._server_fails = 0
                 return r.json()
             except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as e:
                 status = getattr(getattr(e, 'response', None), 'status_code', None)
@@ -106,6 +139,8 @@ class Client:
                 wait = min(300, 2 ** attempt * 3)
                 log.warning('retry %d after %ss: %s %s', attempt + 1, wait, url, e)
                 time.sleep(wait)
+        # every attempt was a short 429: give up like a long one (never return None)
+        raise Throttled(ra)
 
     # ---------------- archive ----------------
     def frames(self, start, end, page_size=1000, related=True, **filters):
