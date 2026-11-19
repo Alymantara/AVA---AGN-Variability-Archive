@@ -201,6 +201,64 @@ def _servers(server) -> list[str]:
     return [server] if isinstance(server, str) else list(server)
 
 
+#: The ESA Gaia Archive (TAP), usable as a "server" in ``vizier_servers`` for the Gaia DR3 tables only: the
+#: query goes to ESA and the result gets the VizieR column names, so callers do not change.
+ESA_GAIA_HOST = "gea.esac.esa.int"
+
+# VizieR catalogue -> (ADQL template, {ESA column: VizieR column}).  Positions are Gaia DR3 (epoch 2016.0), as in
+# VizieR's RA_ICRS/DE_ICRS.  {cone} is the cone condition on gs.ra/gs.dec.
+_GSPC_ESA_BANDS = {"u": "u_sdss", "g": "g_sdss", "r": "r_sdss", "i": "i_sdss", "z": "z_sdss", "y": "y_ps1",
+                   "B": "b_jkc", "V": "v_jkc", "R": "r_jkc", "I": "i_jkc"}
+ESA_GAIA_TABLES = {
+    "I/355/gaiadr3": (
+        "SELECT gs.source_id, gs.ra, gs.dec, gs.phot_g_mean_mag, gs.bp_rp, gs.parallax, gs.parallax_error, gs.ruwe, "
+        "gs.has_xp_continuous FROM gaiadr3.gaia_source AS gs WHERE {cone}",
+        {"source_id": "Source", "ra": "RA_ICRS", "dec": "DE_ICRS", "phot_g_mean_mag": "Gmag", "bp_rp": "BP-RP",
+         "parallax": "Plx", "parallax_error": "e_Plx", "ruwe": "RUWE", "has_xp_continuous": "XPcont"}),
+    "I/355/paramp": (
+        "SELECT ap.source_id, ap.teff_gspphot, ap.logg_gspphot, ap.mh_gspphot, ap.distance_gspphot "
+        "FROM gaiadr3.astrophysical_parameters AS ap JOIN gaiadr3.gaia_source AS gs ON gs.source_id = ap.source_id WHERE {cone}",
+        {"source_id": "Source", "teff_gspphot": "Teff", "logg_gspphot": "logg", "mh_gspphot": "[Fe/H]",
+         "distance_gspphot": "Dist"}),
+    "I/360/syntphot": (
+        "SELECT sp.source_id, gs.ra, gs.dec, sp.c_star, "
+        + ", ".join(f"sp.{e}_mag, sp.{e}_flux, sp.{e}_flux_error, sp.{e}_flag" for e in _GSPC_ESA_BANDS.values())
+        + " FROM gaiadr3.synthetic_photometry_gspc AS sp JOIN gaiadr3.gaia_source AS gs ON gs.source_id = sp.source_id "
+          "WHERE {cone}",
+        {"source_id": "Source", "ra": "RA_ICRS", "dec": "DE_ICRS", "c_star": "E(BP/RP)corr",
+         **{f"{e}_{k}": v.format(b=b) for b, e in _GSPC_ESA_BANDS.items()
+            for k, v in (("mag", "{b}mag"), ("flux", "F{b}"), ("flux_error", "e_F{b}"), ("flag", "{b}Flag"))}}),
+}
+
+
+def _esa_job(adql: str):
+    """Run an ADQL query on the ESA Gaia Archive (asynchronous: no 2000-row cap); returns an astropy Table."""
+    from astroquery.gaia import Gaia
+
+    Gaia.ROW_LIMIT = -1
+    return Gaia.launch_job_async(adql, verbose=False).get_results()
+
+
+def esa_gaia_query(coord, radius, catalog: str):
+    """``catalog`` (a VizieR Gaia DR3 table) from the ESA Gaia Archive, with VizieR column names."""
+    import astropy.units as u
+
+    if catalog not in ESA_GAIA_TABLES:
+        raise KeyError(f"{catalog} is not a Gaia table on the ESA archive")
+    sql, names = ESA_GAIA_TABLES[catalog]
+    c = coord.icrs
+    cone = (f"1=CONTAINS(POINT('ICRS', gs.ra, gs.dec), CIRCLE('ICRS', {c.ra.deg:.8f}, {c.dec.deg:.8f}, "
+            f"{radius.to(u.deg).value:.8f}))")
+    t = _esa_job(sql.format(cone=cone))
+    lower = {n.lower(): n for n in t.colnames}           # the archive may return upper- or lower-case names
+    old = [lower[k] for k in names if k in lower]
+    if old:
+        t.rename_columns(old, [names[k] for k in names if k in lower])
+    for col in [n for n in ("XPcont",) + tuple(f"{b}Flag" for b in _GSPC_ESA_BANDS) if n in t.colnames]:
+        t[col] = t[col].astype(int)                      # booleans on ESA, 0/1 on VizieR
+    return t
+
+
 def vizier_query(servers, coord, radius, catalog: str, columns=("**",), accept=None):
     """Query ``catalog`` on each VizieR mirror in turn; return (table, server).
 
@@ -212,8 +270,14 @@ def vizier_query(servers, coord, radius, catalog: str, columns=("**",), accept=N
     errors = []
     for server in _servers(servers):
         try:
-            res = _vizier(server, columns).query_region(coord, radius=radius, catalog=[catalog])
-            table = res[0] if len(res) else []
+            if server == ESA_GAIA_HOST:
+                if catalog not in ESA_GAIA_TABLES:
+                    errors.append(f"{server}: not a Gaia table")
+                    continue
+                table = esa_gaia_query(coord, radius, catalog)
+            else:
+                res = _vizier(server, columns).query_region(coord, radius=radius, catalog=[catalog])
+                table = res[0] if len(res) else []
         except Exception as exc:  # noqa: BLE001 — try the next mirror
             errors.append(f"{server}: {type(exc).__name__}")
             continue
@@ -730,6 +794,8 @@ def build_gspc_catalog(
     table, server = vizier_query(vizier_server, c, r, "I/360/syntphot", accept=complete)
     sp = table.to_pandas()
     log(f"GSPC from {server}: {len(sp)} rows ({n_xp} Gaia sources with XP spectra)")
+    source = "ESA Gaia Archive gaiadr3.synthetic_photometry_gspc" if server == ESA_GAIA_HOST \
+        else "VizieR I/360/syntphot"
 
     cat = pd.DataFrame({"gaia_source_id": sp["Source"].astype("int64"),
                         "ra": sp["RA_ICRS"], "dec": sp["DE_ICRS"]})
@@ -773,7 +839,7 @@ def build_gspc_catalog(
 
     meta = {
         "method": "gspc",
-        "catalogue": "Gaia DR3 GSPC (VizieR I/360/syntphot)",
+        "catalogue": f"Gaia DR3 GSPC ({source})",
         "radius_arcmin": radius_arcmin,
         "n_stars": int(len(cat)),
         "n_quality_ok": int(cat["quality_ok"].sum()),

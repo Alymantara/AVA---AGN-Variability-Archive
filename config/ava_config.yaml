@@ -205,8 +205,13 @@ photometry:
     apass_url: "https://www.aavso.org/download-apass-data"
     # VizieR mirrors, tried in order (some mirrors hold incomplete copies:
     # vizier.cfa.harvard.edu lacks GSPC + APASS DR9 around NGC 5548).
+    # "gea.esac.esa.int" = the ESA Gaia Archive (TAP), for the Gaia DR3 tables only (gaia_source,
+    # astrophysical_parameters, synthetic_photometry_gspc); added 18 Nov 2026 when CDS VizieR was down.
+    # Order (18 Nov 2026): ESA before CfA. CfA's copies of I/355 and I/360 are incomplete in some fields, and the
+    # completeness check compares I/360 against the same mirror's I/355, so it cannot see it (NGC 7469: 34 stars).
     vizier_servers:
       - "vizier.cds.unistra.fr"
+      - "gea.esac.esa.int"
       - "vizier.cfa.harvard.edu"
     # Cone radius.  Must exceed the largest camera footprint: Sinistro is
     # 26.5' x 26.5', i.e. corners at 18.7' from the pointing centre.

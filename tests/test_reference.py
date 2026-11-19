@@ -116,3 +116,47 @@ def test_catalogue_csv_round_trip_keeps_positions(tmp_path):
     sep = SkyCoord(stars.ra.values * u.deg, stars.dec.values * u.deg).separation(
         SkyCoord(back.ra.values * u.deg, back.dec.values * u.deg)).arcsec
     assert sep.max() < 0.01
+
+
+def test_esa_gaia_fallback_gives_vizier_columns(monkeypatch):
+    """CDS down (18 Nov 2026): the ESA Gaia Archive serves the Gaia DR3 tables under the VizieR column names."""
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from astropy.table import Table
+
+    from ava.photometry import reference as R
+
+    def vizier_down(server, columns=("**",)):
+        class V:
+            def query_region(self, *a, **k):
+                raise ConnectionError("404")
+        return V()
+
+    seen = []
+
+    def fake_job(adql):
+        seen.append(adql)
+        if "synthetic_photometry_gspc" in adql:
+            cols = {"SOURCE_ID": [1, 2], "ra": [10.0, 10.01], "dec": [-5.0, -5.01], "c_star": [0.01, 0.02]}
+            for e in R._GSPC_ESA_BANDS.values():
+                cols.update({f"{e}_mag": [15.0, 16.0], f"{e}_flux": [2.0, 1.0], f"{e}_flux_error": [0.02, 0.02],
+                             f"{e}_flag": [True, False]})
+            return Table(cols)
+        return Table({"source_id": [1], "ra": [10.0], "dec": [-5.0], "phot_g_mean_mag": [15.1], "bp_rp": [0.8],
+                      "parallax": [1.0], "parallax_error": [0.1], "ruwe": [1.0], "has_xp_continuous": [True]})
+
+    monkeypatch.setattr(R, "_vizier", vizier_down)
+    monkeypatch.setattr(R, "_esa_job", fake_job)
+    servers = ["vizier.cds.unistra.fr", R.ESA_GAIA_HOST]
+    c, r = SkyCoord(10.0, -5.0, unit="deg"), 20 * u.arcmin
+    t, server = R.vizier_query(servers, c, r, "I/360/syntphot")
+    assert server == R.ESA_GAIA_HOST
+    for col in ("Source", "RA_ICRS", "DE_ICRS", "E(BP/RP)corr", "gmag", "Fg", "e_Fg", "gFlag", "Vmag", "FR", "ymag"):
+        assert col in t.colnames, col
+    assert list(t["gFlag"]) == [1, 0]
+    assert "CIRCLE('ICRS', 10.00000000, -5.00000000, 0.33333333)" in seen[-1]
+    t, _ = R.vizier_query(servers, c, r, "I/355/gaiadr3")
+    assert {"Source", "Gmag", "BP-RP", "Plx", "e_Plx", "RUWE", "XPcont"} <= set(t.colnames) and t["XPcont"][0] == 1
+    # APASS is not a Gaia table: ESA is skipped and the error names both servers
+    with pytest.raises(RuntimeError, match="gea.esac.esa.int: not a Gaia table"):
+        R.vizier_query(servers, c, r, "II/336/apass9")
