@@ -338,7 +338,7 @@ photometry:
     sigma_floor: 0.01      # mag, added in quadrature to each standard (stops the brightest dominating)
     clip_kappa: 3.0
     min_standards: 5
-    frame_db: null         # SQLite holding frame_qc; null = the lcodb photometry DB
+    frame_db: null         # SQLite holding frame_qc (absolute, or relative to archive_root); null = the lcodb photometry DB
     n_workers: 4
     # Frame metadata for catalogues WITHOUT their image (legacy catalogues ported from the old pipeline):
     # time, filter, exposure, night, site and airmass come from the LCO archive listing (lcodb photometry DB);

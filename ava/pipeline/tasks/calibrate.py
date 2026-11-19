@@ -37,9 +37,11 @@ from ava.config import cfg
 
 
 def frame_db_path() -> Path:
+    """SQLite holding ``frame_qc``: ``photometry.calibration.frame_db`` (absolute, or relative to
+    ``paths.archive_root`` like the other data paths), else the lcodb photometry DB."""
     cc = cfg.photometry.calibration
     if cc.get("frame_db"):
-        return cfg._resolve(cc.frame_db)
+        return cfg._resolve_archive(cc.frame_db)
     from ava.lcodb.config import load_config
 
     return load_config(cfg.lcodb_config_path).db_path("photometry")

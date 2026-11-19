@@ -96,7 +96,8 @@ def export_merged_csv(lc: pd.DataFrame, path: Path, target: str, error_model: st
     (total = random ⊕ camera term; ava.photometry.errors) instead of the PyTICS ones."""
     from ava.photometry import intercal as IC
 
-    g = lc[lc["good"]].copy()
+    # good epochs with a magnitude: a filter without an absolute ZP (e.g. Y with 2 reference stars) has NaN mag_ic
+    g = lc[lc["good"] & np.isfinite(lc["mag_ic"].to_numpy(float))].copy()
     if error_model == "fitted":
         e_tot, e_rand = g["mag_err_model"], g["mag_err_model_rand"]
         f_tot, f_rand = g["Ferr_model"], g["Ferr_model_rand"]
@@ -148,10 +149,16 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         # no calibrated photometry (no catalogues yet, or a spectroscopy-only target): skip, like webplot
         logger.info("%s: no measurements.parquet (nothing calibrated yet) — PyTICS skipped", target)
         return {"target": target, "skipped": "no photometry"}
+    db = frame_db_path()
+    if not db.exists():
+        # frame_qc decides which frames PyTICS sees; a wrong path would read as "0 frames" in every filter
+        logger.warning("%s: frame_qc database %s not found (photometry.calibration.frame_db) — PyTICS skipped",
+                       target, db)
+        return {"target": target, "skipped": f"no frame_qc database ({db})"}
     sct = ec.get("scope_colour_terms", "auto")
     sct = list(sct) if isinstance(sct, (list, tuple)) else (sct if sct == "auto" else bool(sct))
     report = E.run_target(
-        phot, frame_db_path(), target, list(ec.filters), mode=mode or ec.mode,
+        phot, db, target, list(ec.filters), mode=mode or ec.mode,
         min_epochs=int(ec.min_epochs), absolute=bool(ec.absolute), colour_term=bool(ec.colour_term),
         scope_colour_terms=sct, colour_check_min_gain=float(ec.get("colour_check_min_gain", 0.05)),
         ref_cameras=tuple(ec.intercal_reference_cameras), intercal_max_gap=float(ec.intercal_max_gap_days),
@@ -165,6 +172,10 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         max_loops=int(ec.max_loops), safe=float(ec.safe), frac=float(ec.frac), tiny=float(ec.get("tiny", 1e-4)),
         star_lim=int(ec.star_lim), bad_ids=tuple(ec.get("bad_ids", []) or []), bad_flags=int(ec.bad_flags),
         rms_err_floor=float(ec.get("rms_err_floor", 1e-3)), atol=float(ec.get("atol", 1e-5)))
+    if not report:
+        # every filter below min_epochs passing frames (no frame_qc rows yet, or none pass QC): no light curve
+        logger.info("%s: no filter with %d passing frames — PyTICS skipped", target, int(ec.min_epochs))
+        return {"target": target, "skipped": "no filter with enough passing frames"}
     lc = intercal_lightcurve(phot, ec)
     files = []
     error_model = str(ec.get("error_model", "pytics"))
@@ -174,7 +185,15 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         merged_csv = export_merged_csv(lc, csv, target, error_model=error_model)
         files.append(str(csv))
     fvar = _record_fvar(target, lc, merged_csv, error_model, ec, logger)
-    if plot:
+    no_zp = [f for f, r in report.items() if r.get("zp") is not None and not np.isfinite(r["zp"])]
+    if no_zp:
+        # too few reference stars with the band (and the g-i colour) among the PyTICS stars: no absolute
+        # magnitudes for these filters, so they are left out of the CSV and the plots
+        logger.warning("%s: no absolute zero point for %s — left out of the merged light curve",
+                       target, ", ".join(no_zp))
+    if plot and not np.isfinite(lc["mag_ic"].to_numpy(float)).any():
+        logger.warning("%s: no filter with absolute magnitudes — merged plots skipped", target)
+    elif plot:
         from ava.pipeline.tasks.webplot import spectroscopy_epochs
         from ava.plots import webplots as wp
 
@@ -182,6 +201,7 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         merged = pd.DataFrame({"mjd_mid": lc["MJD"], "filter": lc["Filter"], "mag": lc["mag_ic"],
                                "mag_err": lc["mag_err_model" if ec.get("error_model", "pytics") == "fitted" else "mag_ic_err"],
                                "qc_pass": lc["good"].astype(int)})
+        merged = merged[np.isfinite(merged["mag"].to_numpy(float))]     # no absolute ZP -> NaN mag: not plotted
         spec, last = spectroscopy_epochs(target)
         plot_dir = cfg.target_plots_dir(target)
         plot_dir.mkdir(parents=True, exist_ok=True)
