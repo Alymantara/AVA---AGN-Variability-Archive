@@ -27,10 +27,10 @@ line in `future_improvements.md`.
 - [x] **B06** (main, spectroscopy; fixed 19 Nov, B06/B07 commit): `spec_products` crashes when 5100 Å is not covered (z ≈ 0.095–0.114).
   `spectroscopy/products.py:126`.
 - [x] **B07** (main, spectroscopy; fixed 19 Nov, B06/B07 commit; Hβ itself is B08+): the latest-Hβ web plot crashes for z > 0.19 (6 targets). `spectroscopy/webplots.py:157`.
-- [ ] **B08** (main, spectroscopy): Hβ is always fitted in the blue arm, so there is no Hβ for Mrk 876, 3C 273 or
+- [x] **B08** (main, spectroscopy; fixed by B08+, `05fc389`): Hβ is always fitted in the blue arm, so there is no Hβ for Mrk 876, 3C 273 or
   PDS 456 (z ≳ 0.11). `spectroscopy/lines.py:79`, `products.py:84`.
 - [x] **B09** (main, lcodb; fixed in `797debc` with B01): a run of short 429s makes `Client.get` return `None`. `lcodb/api.py:85`.
-- [ ] **B10** (main, lcodb): `sync --proposal A B` silently drops B when discovery doesn't list it. `lcodb/ingest.py:196`.
+- [x] **B10** (main, lcodb; fixed 19 Nov, B10/B13 commit): `sync --proposal A B` silently drops B when discovery doesn't list it. `lcodb/ingest.py:196`.
 - [ ] **B11** (QC): `MAG_APER = 99` rows go into `measurements.parquet` and PyTICS. `photometry/catalogs.py:228`,
   `process.py:91`.
 
@@ -38,7 +38,7 @@ line in `future_improvements.md`.
 
 - [x] **B12** (main, ensemble; fixed 19 Nov with B4ₚ, same commit as B02): a failed g or i absolute ZP makes the ZP of every filter NaN.
   `photometry/ensemble.py:845`.
-- [ ] **B13** (main, lcodb): `sync --proposal ID` skips an inactive proposal that was already crawled. `lcodb/ingest.py:215`.
+- [x] **B13** (main, lcodb; fixed 19 Nov, B10/B13 commit): `sync --proposal ID` skips an inactive proposal that was already crawled. `lcodb/ingest.py:215`.
 - [ ] **B14** (main, photometry): a GSPC star within 2″ can be relabelled as the AGN. `photometry/reference.py`
   (`assign_star_ids`).
 - [ ] **B15** (main, photometry): R/I frames with an APASS-fallback catalogue raise `KeyError 'lco_R'`.

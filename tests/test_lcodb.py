@@ -397,3 +397,43 @@ def test_std_match_only_standards_with_reference_spectra(cfg, cons, tmp_path):
     standards.rebuild(con, n_nearest=5, max_dt_days=30, usable=use, usable_radius_arcsec=300)
     assert [r[0] for r in con.execute('SELECT std_id FROM std_match ORDER BY rank')] == [3]
     assert standards.reference_positions(tmp_path / 'missing') is None
+
+
+def _sync_calls(monkeypatch, cfg, cons, props, only=None, state_rows=()):
+    """Run ingest.sync with a stubbed proposal list and crawler; returns {proposal: crawl start date}."""
+    c, state = cons
+    for pid, until, full_done in state_rows:
+        state.execute('INSERT INTO sync_state (proposal_id, title, active, is_standard_source, synced_until, '
+                      'full_crawl_done) VALUES (?,?,?,?,?,?)', (pid, '', 0, 0, until, full_done))
+    state.commit()
+    monkeypatch.setattr(ingest, 'discover_proposals', lambda client, cfg: list(props))
+    starts = {}
+
+    def crawl(client, cfg, router, pid, w0, w1, standards_only=False):
+        starts.setdefault(pid, w0)
+        return 0
+    monkeypatch.setattr(ingest, 'crawl_window', crawl)
+    ingest.sync(None, cfg, c, state, only=only, until=datetime(2026, 11, 19))
+    return starts
+
+
+def test_sync_named_proposals_not_listed_are_still_crawled(cfg, cons, monkeypatch):
+    """B10: --proposal A B crawled only A when discovery listed A but not B."""
+    props = [('KEY2026B-007', 'now', 1, 0), ('KEY2023B-001', 'old', 1, 0)]
+    starts = _sync_calls(monkeypatch, cfg, cons, props, only=['KEY2026B-007', 'LCO2015B-005'])
+    assert sorted(starts) == ['KEY2026B-007', 'LCO2015B-005']
+
+
+def test_sync_named_inactive_complete_proposal_is_crawled(cfg, cons, monkeypatch):
+    """B13: --proposal ID skipped an inactive proposal whose full crawl was done (the config says to use exactly
+    that command for inactive proposals); a plain sync still skips it."""
+    props = [('KEY2018B-001', 'co-I', 0, 0)]
+    rows = [('KEY2018B-001', '2026-09-01T00:00:00', '2026-09-01T00:00:00')]
+    starts = _sync_calls(monkeypatch, cfg, cons, props, only=['KEY2018B-001'], state_rows=rows)
+    assert starts['KEY2018B-001'].date().isoformat() == '2026-08-25'        # synced_until - overlap (7 d)
+
+
+def test_sync_plain_still_skips_inactive_complete(cfg, cons, monkeypatch):
+    props = [('KEY2018B-001', 'co-I', 0, 0)]
+    rows = [('KEY2018B-001', '2026-09-01T00:00:00', '2026-09-01T00:00:00')]
+    assert _sync_calls(monkeypatch, cfg, cons, props, state_rows=rows) == {}

@@ -857,3 +857,17 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   Each science spectrum would then be calibrated with the model at its own time and airmass, not with one
   standard. This should reduce the night-to-night scatter, give a consistent red end, quantify the absolute flux
   error, and tie the blue and red arms together.
+
+## B10 / B13: `lcodb sync --proposal` (19 Nov 2026)
+
+- **B10.** `sync --proposal A B` kept only the proposals that discovery listed. It fell back to the bare ids only
+  when *none* was listed, so B was dropped without a message when A was listed (B not in `proposals.ids`, no
+  `include_regex` match, or the portal was down).
+  - Fix: every named proposal is crawled. The discovered ones keep their title and active flag, and the others
+    are logged and crawled as named.
+- **B13.** `sync --proposal ID` skipped an inactive proposal whose full crawl was done. Yet `lcodb_config.yaml`
+  says inactive proposals are crawled on request with exactly that command, so the only ways left were `--full`
+  (a full recrawl) or `--since`.
+  - Fix: a named proposal is always crawled, from `synced_until − overlap_days`. A plain `sync` still skips it.
+- Tests: `test_sync_named_proposals_not_listed_are_still_crawled`, `test_sync_named_inactive_complete_proposal_is_crawled`,
+  `test_sync_plain_still_skips_inactive_complete`.

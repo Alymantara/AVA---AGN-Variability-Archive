@@ -193,7 +193,13 @@ def crawl_window(client, cfg, router, pid, start, end, standards_only):
 def sync(client, cfg, cons, state, full=False, only=None, since=None, until=None, daily=False):
     props = discover_proposals(client, cfg)
     if only:
-        props = [p for p in props if p[0] in only] or [(pid, '', 1, 0) for pid in only]
+        # every named proposal is crawled: the discovered ones with their title / active flag, the others
+        # (not in proposals.ids, no include_regex match, portal down) as they are (B10)
+        found = {p[0]: p for p in props}
+        missing = [pid for pid in only if pid not in found]
+        if missing:
+            log.info('not in the discovered proposals, crawled as named: %s', ', '.join(missing))
+        props = [found.get(pid, (pid, '', 1, 0)) for pid in dict.fromkeys(only)]
     elif daily:
         props = daily_proposals(props, cfg)
     router = Router(cfg, cons, state)
@@ -212,8 +218,8 @@ def sync(client, cfg, cons, state, full=False, only=None, since=None, until=None
         elif full or st is None or not st['synced_until']:
             start = semester_start(pid) - timedelta(days=31)
         else:
-            if not active and st['full_crawl_done']:
-                log.info('%s: inactive, already complete; skipped (use --full to recrawl)', pid)
+            if not active and st['full_crawl_done'] and not only:   # a named proposal is always crawled (B13)
+                log.info('%s: inactive, already complete; skipped (lcodb sync --proposal %s to update it)', pid, pid)
                 continue
             start = datetime.fromisoformat(st['synced_until']) - timedelta(days=cfg['overlap_days'])
         log.info('%s (%s): %s -> %s', pid, title[:50], start.date(), end.date())
