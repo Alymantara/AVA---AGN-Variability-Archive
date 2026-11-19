@@ -222,7 +222,7 @@ The small reference files (`data/reference/`, `data/literature/*.csv`, `data/ava
 |------|------|--------------------|-------------------|
 | AVA database (targets, properties, releases) | 0.4 MB | `/Users/juan/astro/AVA/data/ava.db` | `/data3/jvhs1/ava/ava.db` |
 | LCO photometry frames | 440 MB | `/Users/juan/astro/AVA/data/lcodb/photometry.sqlite` | `/data3/jvhs1/ava/lcodb/photometry.sqlite` |
-| LCO spectra frames | 250 MB | `/Users/juan/astro/AVA/data/lcodb/spectra.sqlite` | `/data3/jvhs1/ava/lcodb/spectra.sqlite` |
+| LCO spectra frames | 65 MB | `/Users/juan/astro/AVA/data/lcodb/spectra.sqlite` | `/data3/jvhs1/ava/lcodb/spectra.sqlite` |
 | LCO crawl state | 0.03 MB | `/Users/juan/astro/AVA/data/lcodb/state.sqlite` | `/data3/jvhs1/ava/lcodb/state.sqlite` |
 
 The Linux paths are the ones the configuration points at (step 6): `paths.database` in `ava_config.yaml`
@@ -252,11 +252,32 @@ sqlite3 data/ava.db ".backup $HOME/ava_dbs_transfer/ava.db"
 for d in photometry spectra state; do sqlite3 data/lcodb/$d.sqlite ".backup $HOME/ava_dbs_transfer/$d.sqlite"; done
 ```
 
+Then clear, **in the copies only**, the rows that describe files on the Mac. These are test downloads and
+test reductions, with `/Users/juan/...` paths. On the new machine they would mislead the cleanup job: a
+standard star with a `spec_qc` row counts as reduced and could be deleted before the new machine reduces it.
+They would also mislead the spectra download, which would start the PG 0804+761 / PG 0923+201 "new nights"
+from the day of the Mac test. The new machine rebuilds all three tables itself.
+
+```bash
+sqlite3 ~/ava_dbs_transfer/spectra.sqlite "DELETE FROM spec_qc; DELETE FROM local_files; DELETE FROM spec_lines; VACUUM;"
+```
+
+```bash
+sqlite3 ~/ava_dbs_transfer/ava.db "DELETE FROM download_state; VACUUM;"
+```
+
+```bash
+for f in ~/ava_dbs_transfer/*; do echo "$f $(sqlite3 $f 'PRAGMA integrity_check')"; done
+```
+
+Each line should end in `ok`.
+
 ```bash
 ls -lh ~/ava_dbs_transfer
 ```
 
-You should see four files, about 0.4 MB, 440 MB, 250 MB and 0.03 MB.
+You should see four files, about 0.4 MB, 440 MB, 65 MB and 0.04 MB. The spectra database shrank from
+250 MB when its stored full headers were deleted (`lcodb purge-headers`, 19 Nov 2026).
 
 ## 7c. Upload: send them to the Linux machine
 
