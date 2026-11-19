@@ -732,8 +732,9 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
             z = fits[f]
             sols[f].meta.update(zp=zps[f][0], zp_err=zps[f][1], zp_fit={k: v for k, v in z.items() if k != "stars"},
                                 agn_colour=float(z["agn_colour"]))
+        (Path(phot_dir) / "pytics").mkdir(parents=True, exist_ok=True)   # first full fit: not created yet
         pd.concat([fits[f]["stars"].assign(filter=f) for f in fits]).to_parquet(
-            phot_dir / "pytics" / "absolute_zp_stars.parquet", index=False)
+            Path(phot_dir) / "pytics" / "absolute_zp_stars.parquet", index=False)
 
     # ---- 4. AGN light curves ------------------------------------------------------------------
     lcs = []

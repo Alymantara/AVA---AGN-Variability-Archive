@@ -91,3 +91,16 @@ def test_webplot_skips_target_without_photometry(tmp_path, monkeypatch):
     monkeypatch.setattr(task_mod, "get_run_logger", lambda: logging.getLogger("test"))
     out = task_mod.webplot.fn("spec_only")
     assert out == {"target": "spec_only", "plots": [], "skipped": "no photometry"}
+
+
+def test_ensemble_skips_target_without_photometry(tmp_path, monkeypatch):
+    """A target without measurements.parquet (no catalogues yet) is skipped by PyTICS, not failed
+    (host run 18 Nov 2026: FileNotFoundError for Mrk_1220)."""
+    import importlib
+    import logging
+
+    task_mod = importlib.import_module("ava.pipeline.tasks.ensemble")
+    monkeypatch.setattr(task_mod.cfg, "phot_dir", lambda t: tmp_path / t)
+    monkeypatch.setattr(task_mod, "get_run_logger", lambda: logging.getLogger("test"))
+    out = task_mod.ensemble.fn("no_catalogues")
+    assert out == {"target": "no_catalogues", "skipped": "no photometry"}

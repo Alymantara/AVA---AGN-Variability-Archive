@@ -197,6 +197,11 @@ def load_pytics(phot_dir: Path, db: Path, data_id: str, filt: str | None = None,
         fq = fq[fq["filter"] == filt]
     if qc_only:
         fq = fq[fq["qc_pass"] == 1]
+    if fq.empty:
+        # No (passing) frame in this filter, e.g. Y for most targets. pyarrow rejects an empty "in" filter
+        # ("large_string vs null", host run 18 Nov 2026), so return the empty table directly.
+        cols = list(MEAS_DTYPES) + ["MJD", "Filter", "telid", "camera", "airmass", "seeing"]
+        return pd.DataFrame({c: pd.Series(dtype=MEAS_DTYPES.get(c, "object")) for c in cols})
     meas = pd.read_parquet(Path(phot_dir) / "measurements.parquet",
                            filters=[("frame", "in", list(fq["frame"]))] if len(fq) < 50000 else None)
     t = meas.merge(fq[["frame", "mjd_mid", "filter", "tel", "camera", "airmass", "fwhm_arcsec"]], on="frame")

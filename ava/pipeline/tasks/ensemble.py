@@ -144,6 +144,10 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
     logger = get_run_logger()
     ec = cfg.ensemble
     phot = cfg.phot_dir(target)
+    if not (phot / "measurements.parquet").exists():
+        # no calibrated photometry (no catalogues yet, or a spectroscopy-only target): skip, like webplot
+        logger.info("%s: no measurements.parquet (nothing calibrated yet) — PyTICS skipped", target)
+        return {"target": target, "skipped": "no photometry"}
     sct = ec.get("scope_colour_terms", "auto")
     sct = list(sct) if isinstance(sct, (list, tuple)) else (sct if sct == "auto" else bool(sct))
     report = E.run_target(

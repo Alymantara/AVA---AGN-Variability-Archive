@@ -186,3 +186,55 @@ def test_intercal_per_season_offsets():
     ep = out[out.scope == "2m001-ep04"]
     for s, b in ((0, -0.5), (1, -0.8)):
         assert abs(ep[ep.season == s].ic_b.iloc[0] - b) < 0.02
+
+
+def test_load_pytics_filter_without_frames(tmp_path):
+    """A filter with no passing frame (Y for most targets) gives an empty table, not an ArrowTypeError
+    (host run 18 Nov 2026: pyarrow rejects an empty "in" filter on the string frame column)."""
+    from ava.photometry import store
+
+    db = tmp_path / "phot.sqlite"
+    store.write_frame_qc(db, [dict(frame="f1", data_id="T", filter="gp", mjd_mid=61000.25, qc_pass=1,
+                                   tel="1m008", camera="fa05", airmass=1.2, fwhm_arcsec=2.0)])
+    store.update_measurements(tmp_path / "measurements.parquet", pd.DataFrame(
+        {"frame": ["f1", "f1"], "star_id": [1, 2], "is_agn": [True, False], "mag_inst": [-9.0, -10.0],
+         "magerr": [0.01, 0.01], "x": [1.0, 2.0], "y": [1.0, 2.0], "sex_flags": [0, 0],
+         "sep_arcsec": [0.1, 0.1], "used_in_zp": [False, True]}))
+    d = E.load_target(tmp_path, db, "T", "Y")
+    assert d.empty and "frame" in d and "scope" in d and d["frame"].nunique() == 0
+    assert len(E.load_target(tmp_path, db, "T", "gp")) == 2
+
+
+def test_run_target_end_to_end_first_full_fit(tmp_path):
+    """The whole PyTICS step on a fresh target folder (no pytics/ yet), with a filter that has no frames:
+    both crashed on the Linux host on 18 Nov 2026 (empty-filter ArrowTypeError; absolute_zp_stars.parquet
+    written before pytics/ existed)."""
+    from ava.photometry import store
+
+    rng = np.random.default_rng(3)
+    n_stars, n_ep = 30, 60
+    stars = 1000 + np.arange(n_stars)
+    g_true = np.sort(rng.uniform(13, 17, n_stars))
+    ref = pd.DataFrame({"star_id": np.r_[stars, -1], "lco_g": np.r_[g_true, np.nan], "lco_g_err": 0.01,
+                        "lco_i": np.r_[g_true - 0.5 + rng.normal(0, 0.2, n_stars), np.nan], "lco_i_err": 0.01,
+                        "quality_ok": np.r_[np.ones(n_stars, bool), False], "is_agn": np.r_[np.zeros(n_stars, bool), True]})
+    ref.to_csv(tmp_path / "reference_stars.csv", index=False)
+    qc, meas = [], []
+    for k, filt in enumerate(("gp", "ip")):
+        for t in range(n_ep):
+            frame, cam = f"{filt}{t:04d}", ("fa05", "fa11")[t % 2]
+            zp = -23.5 + rng.normal(0, 0.1)
+            qc.append(dict(frame=frame, data_id="T", filter=filt, mjd_mid=60000.0 + t, qc_pass=1, tel="1m00" + cam[-1],
+                           camera=cam, airmass=1.2, fwhm_arcsec=2.0))
+            mags = np.r_[g_true - 0.5 * k, 15.0 + 0.2 * np.sin(t / 5)] + zp + rng.normal(0, 0.005, n_stars + 1)
+            for sid, m, agn in zip(np.r_[stars, -1], mags, np.r_[np.zeros(n_stars, bool), True]):
+                meas.append(dict(frame=frame, star_id=int(sid), is_agn=bool(agn), mag_inst=m, magerr=0.005, x=1.0,
+                                 y=1.0, sex_flags=0, sep_arcsec=0.1, used_in_zp=not agn))
+    db = tmp_path / "phot.sqlite"
+    store.write_frame_qc(db, qc)
+    store.update_measurements(tmp_path / "measurements.parquet", pd.DataFrame(meas))
+    rep = E.run_target(tmp_path, db, "T", ["up", "gp", "ip", "Y"], mode="auto", log=lambda *a: None)
+    assert set(rep) == {"gp", "ip"}
+    assert (tmp_path / "pytics" / "absolute_zp_stars.parquet").exists()
+    lc = pd.read_csv(tmp_path / "agn_lightcurve_pytics.csv")
+    assert set(lc["Filter"]) == {"gp", "ip"} and len(lc) == 2 * n_ep
