@@ -480,6 +480,8 @@ deletes. A file is deleted only when all its checks pass:
 # 9. First-time setup and backfill
 
 Step-by-step commands (for a Linux machine already running the old pipeline): **`docs/guides/linux_setup.md`**.
+For the production VM (fresh install), tick through **`docs/guides/production_vm_checklist.md`**, which builds in the
+lessons of the Linux test day (18 Nov 2026).
 In short:
 
 1. conda environment, configuration outside the repository (`AVA_CONFIG`, `LCODB_CONFIG`), LCO token,

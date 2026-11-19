@@ -50,26 +50,28 @@ tell the user. Commit only when asked.
 **The checklist is `docs/notes/linux_test_day_checklist.md`.** When a step finishes, tick it there (`[x]`) and add
 a one-line note (what it printed, what was decided). Commit it only when the user asks.
 
-Progress (updated 18 Nov 2026, from the Mac help-desk session):
+Progress (updated 18 Nov 2026 15:25, end of the first Linux session; details in the checklist):
 
-- **Step 1 done.** SExtractor 2.25.0. Still to confirm which name runs it (`command -v source-extractor sex`);
-  that name goes into `binary:` in step 6.
-- **Step 2 done.** `conda 23.1.0`: older than 23.10 (classic solver), so **plan B**. Do not install
-  `conda-libmamba-solver` into the old Anaconda's `base`, even though 23.1 could take it.
-- **Next: Miniforge, then steps 3–5 (plan B).**
-
-```bash
-cd ~ && curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
-bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
-~/miniforge3/bin/conda --version          # expect conda 24.x or newer
-```
-
-If GitHub cannot be reached, use plan C (venv) instead. Then step 3 (clone, if not done), step 4 (folders), and:
-
-```bash
-cd ~/code/AVA && ~/miniforge3/bin/conda env create -f environment.yml
-source ~/miniforge3/bin/activate ava && pip install -e .
-python -c "import ava, prefect; print(prefect.__version__)"   # expect 3.x
-```
-
-Step 6's `~/.bashrc` block uses the plan B alias `alias ava-env='source ~/miniforge3/bin/activate ava'`.
+- **Layout:** code `/data2/jvhs1/AVA` (git checkout, `main`), data `/data2/jvhs1/AVA/data` (git-ignored), configs
+  `data/config/{ava,lcodb}_config.yaml` (absolute paths), Miniforge `/data2/jvhs1/miniforge3` (env `ava`; env
+  `banzai` = banzai-floyds `rm-improvements@3e8e796` in `/data2/jvhs1/banzai-floyds`, run via `/data2/jvhs1/benv`).
+  Home (`~`) is a CIFS network share: keep environments, Prefect state and secrets off it.
+  `~/.bashrc`: `ava-env` alias (clears `PYTHONPATH`), `AVA_CONFIG`, `LCODB_CONFIG`, `PREFECT_HOME`
+  (`data/prefect`), `PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90`. A terminal opened before an edit
+  needs `source ~/.bashrc`.
+- **Done:** steps 1–10, 9b (banzai-floyds, tests pass), 12a–c (462,978 + 257 catalogues and 13,727 FLOYDS raw
+  frames copied), 13 (40,943 frames / 1.51 TB and 6,371 spectra to download; re-run it, it predates the 257).
+- **Step 11:** all 91 target folders. Reference catalogues: user wants **Gaia GSPC only** (`fallback: ""` on the
+  host). CDS VizieR's query service was down (404) all afternoon; the CfA mirror's Gaia copies are incomplete in
+  some fields (NGC 7469: 34 stars), so the ESA Gaia Archive was added (`gea.esac.esa.int` in `vizier_servers`,
+  order CDS → ESA → CfA). Catalogues built from CfA are being moved aside (`*.cfa_bak`) and rebuilt from ESA;
+  check each target's `reference_stars_meta.yaml` (`catalogue:` names the source). APASS catalogues kept as
+  `*.apass_bak`.
+- **Code changes today** (committed and pushed by the user unless noted): `lcodb daily` crawls only active
+  proposals matching `daily.include_regex: '^KEY2026'`; SExtractor `default.param` 16 apertures; ESA Gaia
+  fallback in `ava/photometry/reference.py`; deployment guide (banzai pin, Prefect, daily scope).
+- **Next:** finish the ESA rebuild; step 14 (`-c`, test on Mrk_817 first); step 15 downloads (ask first, LCO);
+  website test (needs PHP: `sudo apt install php-cli php-sqlite3`); move the LCO token off the network home;
+  review the 3 `target_link` names flagged by `lcodb link`; fold the checklist's "Lessons" into `linux_setup.md`.
+- Claude in this session can read/write files in `/data2/jvhs1/AVA` but cannot run commands on the host: the
+  user runs them (and git).

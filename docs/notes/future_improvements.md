@@ -526,6 +526,18 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 
 ## Linux host: code and data in one folder (18 Nov 2026, test day)
 
+- **PyTICS crashed on filters without frames** (pandas 3 / pyarrow 26): `store.load_pytics` passed an empty list to
+  `read_parquet(filters=[("frame", "in", [])])`, which pyarrow rejects (`ArrowTypeError: large_string vs null`).
+  Fixed 18 Nov: empty table returned directly (the fit loop then skips the filter). Test added.
+- **PyTICS first full fit wrote `pytics/absolute_zp_stars.parquet` before `pytics/` existed** (the folder was made
+  later by `Solution.save`). Fixed 18 Nov (mkdir). End-to-end test of `run_target` on a fresh folder added — the PyTICS
+  step had never run to the end on a new target before the host run.
+- **PyTICS on a target without catalogues** raised `FileNotFoundError` (measurements.parquet); the ensemble task now
+  skips it (fixed 18 Nov, test added).
+- **QC `min_matched: 30` cannot be met in sparse fields** (PG_2304+043: 57 GSPC stars, median 15.5 matched per frame,
+  0 % pass; Mrk_1298: median 32). Make it scale with the field (fraction of reference stars in the footprint) or per
+  target. **u band:** fields with few GSPC u stars (MR_2251-178: 10) get no u zero point at all (QC-0001).
+
 - Decision (user): everything lives in `/data2/jvhs1/AVA`. Code is the git checkout there (in place of `~/code/AVA`);
   the data folder is `/data2/jvhs1/AVA/data` (in place of `/data3/jvhs1/ava`), already git-ignored (`data/*`), with
   `archive/`, `lcodb/`, `config/`, `logs/`, `web/`, `releases/`. `/data2` has 2.7 TB free.
@@ -563,6 +575,15 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - **Prefect on the host:** `PREFECT_HOME` must be on a local disk (`/data2/jvhs1/AVA/data/prefect`): with the
   default `~/.prefect` on the CIFS home the ephemeral API server timed out at start (SQLite on a network share).
   Also `PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90`.
+- **Reference catalogues: ESA Gaia Archive as a third source** (18 Nov 2026). CDS VizieR's query service answered 404
+  all afternoon (`/viz-bin/votable`, `/viz-bin/asu-tsv`; home page up), the CfA mirror lacks Gaia DR3 / GSPC / parts of
+  APASS DR9, and the other mirrors do not answer from the host: 39 of 91 reference catalogues failed (`-o`). Now
+  `photometry.reference.vizier_servers` may list `gea.esac.esa.int`: `ava.photometry.reference.vizier_query` then
+  runs an ADQL query on the ESA archive (async, no row cap) for `I/355/gaiadr3`, `I/355/paramp` and `I/360/syntphot`
+  and returns the VizieR column names, so the GSPC builder is unchanged; the catalogue metadata records the source.
+  APASS is not on ESA (the `apass_model` fallback still needs VizieR, or `apass_source: aavso`).
+  Test: `test_esa_gaia_fallback_gives_vizier_columns`. **To check:** a GSPC catalogue built from ESA matches the
+  VizieR one for a field built earlier today (same Gaia DR3 data; expect identical rows).
 
 ## QC-0002: reference positions rounded to 6 significant figures (18 Nov 2026; fixed in 0d3024f)
 
