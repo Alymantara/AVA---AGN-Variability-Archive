@@ -92,15 +92,25 @@ def main(run_tests: bool) -> int:
     if bad:
         report("WARN", "config/ava_config.yaml contains /Users/... paths", "set the paths for this machine (setup step 6)")
 
-    # 3. LCO token (presence only; never printed)
+    # 3. LCO token (presence only; never printed). Checked the way a CRON job finds it: from the token file, with the
+    #    environment variables ignored (cron has none). A token only in $LCO_API_TOKEN / $LCO_TOKEN works in this
+    #    shell but not in the scheduled jobs (production VM, 19 Nov 2026).
     try:
-        tok = cfg.lco_token
-        report("OK" if tok else "FAIL", "LCO API token", "found" if tok else "missing: put it in ~/.lco_token")
+        from ava.lco.token import describe, find_token
+
+        tok, src, tried = find_token(ava_cfg=cfg, use_env=False)
+        if tok:
+            report("OK", "LCO API token (as cron sees it)", f"from {src}")
+            mode = Path(src).stat().st_mode
+            if mode & 0o077:
+                report("WARN", f"{src} is readable by other users", f"run: chmod 600 {src}")
+        else:
+            env_tok = find_token(ava_cfg=cfg)[0]
+            report("FAIL", "LCO API token (as cron sees it)",
+                   ("only in an environment variable, which cron jobs do not have; " if env_tok else "not found; ")
+                   + "put it in the file lco.token_file names. Looked at: " + describe(tried))
     except Exception as exc:  # noqa: BLE001
         report("FAIL", "LCO API token", str(exc).splitlines()[0])
-    tf = Path("~/.lco_token").expanduser()
-    if tf.exists() and (tf.stat().st_mode & 0o077):
-        report("WARN", "~/.lco_token is readable by other users", "run: chmod 600 ~/.lco_token")
 
     # 4. Databases
     try:

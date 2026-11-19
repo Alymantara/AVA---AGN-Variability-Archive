@@ -154,6 +154,52 @@ def check_data(rep: Report, cfg, lcfg):
     (rep.ok if v else rep.warning)(f"data: newest reduced spectrum: {v or 'none yet'}")
 
 
+def probe(rep: Report, cfg, log_dir: Path) -> None:
+    """What a cron job needs, checked in the environment this process has (make_crontab.py --check runs it under
+    ``env -i`` plus the crontab's variables): token from its file, configs, SExtractor, banzai-floyds, writable
+    log folder and Prefect home, pipeline import."""
+    import importlib
+    import tempfile
+
+    from ava.lco.token import describe, find_token
+    from ava.lcodb.config import load_config
+
+    rep.ok(f"python {sys.executable}; AVA config {cfg._path}")
+    try:
+        lcfg = load_config(cfg.lcodb_config_path)
+        rep.ok(f"lcodb config {lcfg.path}; databases {lcfg.db_dir}")
+    except Exception as exc:  # noqa: BLE001
+        rep.failure(f"lcodb config: {type(exc).__name__}: {exc}")
+    tok, src, tried = find_token(ava_cfg=cfg)
+    (rep.ok if tok else rep.failure)(f"LCO token: {'from ' + src if tok else 'NOT found. Looked at: ' + describe(tried)}")
+    try:
+        from ava.pipeline.tasks.sextract import sextractor_binary
+        exe = sextractor_binary(cfg.photometry.sextractor.binary)
+        (rep.ok if exe else rep.failure)(f"SExtractor: {exe or 'not found (' + str(cfg.photometry.sextractor.binary) + ')'}")
+        from ava.pipeline.tasks.spec_reduce import reduction_settings
+        py = reduction_settings()["python"]
+        (rep.ok if py and Path(py).exists() else rep.failure)(f"banzai-floyds python: {py}")
+    except Exception as exc:  # noqa: BLE001
+        rep.failure(f"pipeline import: {type(exc).__name__}: {exc}")
+    home = os.environ.get("PREFECT_HOME")
+    for label, folder in (("log folder", log_dir), ("PREFECT_HOME", Path(home) if home else None)):
+        if folder is None:
+            rep.warning(f"{label}: not set (Prefect uses ~/.prefect)")
+            continue
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=folder):
+                pass
+            rep.ok(f"{label} writable: {folder}")
+        except OSError as exc:
+            rep.failure(f"{label} {folder}: {exc}")
+    try:
+        importlib.import_module("ava.pipeline.flows")
+        rep.ok("pipeline flows import (Prefect " + importlib.import_module("prefect").__version__ + ")")
+    except Exception as exc:  # noqa: BLE001
+        rep.failure(f"pipeline flows import: {type(exc).__name__}: {exc}")
+
+
 def main(argv=None) -> int:
     from ava.config import cfg
     from ava.lcodb.config import load_config
@@ -163,6 +209,9 @@ def main(argv=None) -> int:
     p.add_argument("--since", default=None, help="UTC time: only runs that started after it count (test runs)")
     p.add_argument("--jobs", nargs="+", default=None, help=f"job names to check (default: {' '.join(JOBS)})")
     p.add_argument("--no-data", action="store_true", help="skip the database checks (jobs only)")
+    p.add_argument("--probe", action="store_true",
+                   help="instead: check what a cron job needs in THIS environment (token file, configs, SExtractor, "
+                        "banzai-floyds, writable folders, imports); scripts/make_crontab.py --check runs it under env -i")
     a = p.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -173,6 +222,10 @@ def main(argv=None) -> int:
 
     print(f"AVA daily check  {now:%Y-%m-%d %H:%M}Z  host {os.uname().nodename}  logs {log_dir}")
     rep = Report()
+    if a.probe:
+        probe(rep, cfg, log_dir)
+        print(f"\n{'FAILED' if rep.fail else 'PASSED'}: {rep.fail} failure(s), {rep.warn} warning(s)")
+        return 1 if rep.fail else 0
     if time.strftime("%Z") not in ("UTC", "GMT"):
         rep.warning(f"system time zone is {time.strftime('%Z')}: cron runs the schedule in local time unless the "
                     "crontab sets CRON_TZ=UTC (cronie) or the machine runs in UTC")

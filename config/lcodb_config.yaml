@@ -1,9 +1,10 @@
 # lcodb configuration. Every run reads this file; edit it and re-run, no code changes needed.
 
 # --- credentials -----------------------------------------------------------
-# File holding ONLY your LCO API token (observe.lco.global -> Profile -> API token).
-# The env var LCO_TOKEN, if set, takes precedence.
-token_file: ~/.lco_token
+# File holding ONLY your LCO API token (observe.lco.global -> Profile -> API token), chmod 600. Relative to this
+# file's folder (config/): <install root>/.secrets/lco_token, the same file as the AVA config's lco.token_file.
+# One lookup for the whole package (ava.lco.token): $LCO_API_TOKEN, AVA's lco.token_file, this file, ~/.lco_token.
+token_file: ../../.secrets/lco_token
 
 # --- where the databases live ---------------------------------------------
 db_dir: ../data/lcodb                  # relative to this file

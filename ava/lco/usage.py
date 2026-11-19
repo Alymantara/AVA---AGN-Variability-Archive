@@ -660,7 +660,7 @@ def seed_snapshots(path: Path, seed: Path | None = None, log=print) -> bool:
 def take_snapshot(cfg, live: bool = False, now: datetime | None = None, log=print) -> int:
     """One snapshot of the charged totals: ONE paged GET of the portal's proposal list (read only).
 
-    Dry run (default) only says what it would request.  Live: token from ``cfg.lco_token`` (``~/.lco_token`` or
+    Dry run (default) only says what it would request.  Live: token from ``ava.lco.token`` (the token file, or
     the env var), the lcodb client (rate limit, retries); rows appended to ``lco_usage.snapshots.file``.
     """
     st = settings(cfg)
@@ -670,9 +670,9 @@ def take_snapshot(cfg, live: bool = False, now: datetime | None = None, log=prin
             f"the {st['snapshot_prefix']}* charged totals to {st['snapshot_file']}; nothing requested")
         return 0
     from ava.lcodb.api import Client
-    token = cfg.lco_token
-    if not token:
-        raise RuntimeError("live snapshot needs the LCO token (~/.lco_token or LCO_API_TOKEN)")
+    from ava.lco.token import require_token
+
+    token = require_token(ava_cfg=cfg)
     rows = parse_proposals(Client(token).proposals(), prefix=st["snapshot_prefix"])
     seed_snapshots(st["snapshot_file"], log=log)
     n = append_snapshot(st["snapshot_file"], rows, now)

@@ -373,7 +373,8 @@ def test_take_snapshot_live_mocked(tmp_path, monkeypatch):
 
     class FakeClient:
         def __init__(self, token, **kw):
-            assert token == "t0ken"
+            if token != "t0ken":             # never let pytest print a real token in a failure message
+                raise AssertionError("FakeClient got a token other than the test's")
 
         def proposals(self):
             return _portal(10.0, 2.0)
@@ -381,7 +382,7 @@ def test_take_snapshot_live_mocked(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "Client", FakeClient)
     monkeypatch.setattr(U, "SNAPSHOT_SEED", tmp_path / "no_seed.csv")
     cfg = _cfg(tmp_path, snapshots={"file": str(tmp_path / "snap.csv")})
-    cfg.lco_token = "t0ken"
+    monkeypatch.setenv("LCO_API_TOKEN", "t0ken")       # the single token lookup (ava.lco.token) reads it first
     assert U.take_snapshot(cfg, live=False, log=lambda *_: None) == 0 and not (tmp_path / "snap.csv").exists()
     assert U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 6), log=lambda *_: None) == 2
     assert U.read_snapshots(tmp_path / "snap.csv")["utc"].tolist() == ["2026-11-17T06:00:00Z"] * 2
@@ -404,7 +405,7 @@ def test_live_snapshot_seeds_log_outside_checkout(tmp_path, monkeypatch):
     monkeypatch.setattr(U, "SNAPSHOT_SEED", seed)
     live = tmp_path / "volume" / "lco_usage" / "snapshots.csv"
     cfg = _cfg(tmp_path, snapshots={"file": str(live)})
-    cfg.lco_token = "t0ken"
+    monkeypatch.setenv("LCO_API_TOKEN", "t0ken")       # the single token lookup (ava.lco.token) reads it first
     U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 6), log=lambda *_: None)
     U.take_snapshot(cfg, live=True, now=_dt(2026, 11, 17, 12), log=lambda *_: None)
     assert U.read_snapshots(live)["utc"].unique().tolist() == [

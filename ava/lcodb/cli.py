@@ -36,8 +36,9 @@ def _open(cfg):
 
 def _client(cfg, rate=None):
     if not cfg.token:
-        log.warning('no API token found (%s / LCO_TOKEN): only public data, 100 frames per page',
-                    cfg.get('token_file'))
+        from ava.lco.token import describe, find_token
+        log.warning('no API token found (%s): only public data, 100 frames per page',
+                    describe(find_token(lcodb_raw=cfg.raw, lcodb_dir=cfg._base_dir)[2]))
         cfg.raw['page_size'] = min(cfg['page_size'], 100)
     rate = rate if rate is not None else cfg.get('sync_rate_per_s')   # listing requests (sync, crawls)
     return Client(cfg.token, cfg['request_timeout'], cfg['max_retries'], rate,

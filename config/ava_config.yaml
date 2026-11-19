@@ -104,10 +104,11 @@ paths:
 #  LCO API
 # ============================================================
 lco:
-  # API token for the LCO archive and observation portal.
-  # Preferred: store ONLY the token in ~/.lco_token (chmod 600)
-  # or set env var LCO_API_TOKEN.  Do NOT paste the token here.
-  token_file: "~/.lco_token"
+  # API token for the LCO archive and observation portal: a file holding ONLY the token (chmod 600). Do NOT paste
+  # the token here. Default: <install root>/.secrets/lco_token (relative to ava_root; production checklist F1), the
+  # same file as lcodb's token_file. One lookup for the whole package (ava.lco.token): $LCO_API_TOKEN, then this file,
+  # then lcodb's token_file, then ~/.lco_token. Cron jobs have no environment: the FILE is what they use.
+  token_file: "../.secrets/lco_token"
 
   # LCO archive / portal account name (not secret).  Passwords are never
   # stored anywhere: all API access uses the token above.

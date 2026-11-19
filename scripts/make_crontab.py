@@ -130,6 +130,33 @@ def test(cfg, log_dir: Path, mailto: str | None, target: str, start_in: int, gap
     return lines, t0
 
 
+def cron_env(lines: list[str]) -> dict:
+    """The KEY=VALUE lines of the generated block: the whole environment a job will have under cron."""
+    env = {}
+    for l in lines:
+        if "=" in l and not l.startswith("#") and " " not in l.split("=", 1)[0]:
+            k, v = l.split("=", 1)
+            env[k] = v
+    return env
+
+
+def run_like_cron(lines: list[str], cmd: list[str]) -> int:
+    """Run ``cmd`` in the repository with ``env -i`` plus the block's variables, as cron would."""
+    return subprocess.run(["env", "-i", *[f"{k}={v}" for k, v in cron_env(lines).items()], *cmd], cwd=REPO).returncode
+
+
+def run_test_jobs_now(lines: list[str]) -> int:
+    """Run every test job of the block once, now, in order, as cron would (through cron_job.sh), then the check."""
+    rc = 0
+    for l in lines:
+        if not l or l.startswith("#") or "scripts/cron_job.sh" not in l:
+            continue
+        cmd = l.split("&& ", 1)[1]
+        print(f"# running now, as cron would: {cmd[:120]}...", file=sys.stderr)
+        rc = run_like_cron(lines, ["bash", "-c", cmd]) or rc
+    return rc
+
+
 def current_crontab() -> list[str]:
     r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
     return r.stdout.splitlines() if r.returncode == 0 else []
@@ -180,6 +207,13 @@ def main(argv=None) -> int:
                    help="production: cleanup deletes (--live). Default: dry run, so the first nights only list "
                         "what would be deleted; read <logs>/cleanup.log, then re-run with --cleanup-live")
     p.add_argument("--no-archive", action="store_true", help="test: no LCO archive request (lcodb status instead)")
+    p.add_argument("--check", action="store_true",
+                   help="before installing: run scripts/daily_check.py --probe under `env -i` + the crontab's variables "
+                        "(token file, configs, SExtractor, banzai-floyds, writable folders, imports); with --install, "
+                        "nothing is installed if it fails")
+    p.add_argument("--run-now", action="store_true",
+                   help="test: run every test job once NOW, in order, as cron would (env -i + the block), then the "
+                        "check; nothing is installed")
     p.add_argument("--with-publish", action="store_true", help="test: also publish to the website (-w)")
     a = p.parse_args(argv)
 
@@ -207,6 +241,14 @@ def main(argv=None) -> int:
         print(f"# test: first job at {t0:%H:%M} local time, daily_check at "
               f"{t0 + timedelta(minutes=a.check_after):%H:%M}; result in {log_dir}/daily_check_test.log",
               file=sys.stderr)
+    if a.check:
+        print("# --check: the cron environment probe (env -i + the crontab's variables)", file=sys.stderr)
+        rc = run_like_cron(lines, [sys.executable, "scripts/daily_check.py", "--probe", "--log-dir", str(log_dir)])
+        if rc:
+            print("# --check FAILED: fix the above before installing (nothing installed)", file=sys.stderr)
+            return rc
+    if a.test and a.run_now:
+        return run_test_jobs_now(lines)
     if a.install:
         install(lines, log_dir)
     print("\n".join(lines))

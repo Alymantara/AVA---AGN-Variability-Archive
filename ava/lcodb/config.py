@@ -57,12 +57,11 @@ def load_config(path=None):
     path = Path(path or os.environ.get('LCODB_CONFIG') or (LOCAL_CONFIG if LOCAL_CONFIG.exists() else DEFAULT_CONFIG))
     path = path.resolve()
     raw, base = load_layered(path)
-    token = os.environ.get('LCO_TOKEN') or os.environ.get('LCO_API_TOKEN')   # same variables as ava.config
-    if not token and raw.get('token_file'):
-        tf = Path(os.path.expanduser(raw['token_file']))
-        if tf.exists():
-            token = tf.read_text().strip() or None
+    rel_dir = base.parent if base is not None else path.parent
+    from ava.lco.token import find_token, _ava_cfg     # the package's single lookup (env, AVA's, this file's token_file)
+
+    token = find_token(ava_cfg=_ava_cfg(), lcodb_raw=raw, lcodb_dir=rel_dir)[0]
     if raw.get('archive_url') or raw.get('portal_url'):
         from . import api
         api.set_urls(raw.get('archive_url'), raw.get('portal_url'))
-    return Config(raw=raw, path=path, token=token, rel_dir=base.parent if base is not None else None)
+    return Config(raw=raw, path=path, token=token, rel_dir=rel_dir if base is not None else None)

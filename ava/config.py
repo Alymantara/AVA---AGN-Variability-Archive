@@ -278,18 +278,11 @@ class AVAConfig:
 
     @property
     def lco_token(self) -> Optional[str]:
-        """LCO API token: env var LCO_API_TOKEN (or LCO_TOKEN) takes precedence, then the file named by
-        lco.token_file (default ~/.lco_token).  The token is never read from the config file itself."""
-        env = os.environ.get("LCO_API_TOKEN") or os.environ.get("LCO_TOKEN")   # same variables as lcodb
-        if env:
-            return env.strip()
-        token_file_str = self._raw.get("lco", {}).get("token_file", "~/.lco_token")
-        tf = Path(token_file_str).expanduser()
-        if tf.exists():
-            tok = tf.read_text().strip()
-            if tok:
-                return tok
-        return None
+        """LCO API token from the package's single lookup (ava.lco.token): $LCO_API_TOKEN / $LCO_TOKEN, then the file
+        of lco.token_file, then lcodb's token_file, then ~/.lco_token. Never read from the config file itself."""
+        from ava.lco.token import find_token
+
+        return find_token(ava_cfg=self)[0]
 
     @property
     def lco_username(self) -> Optional[str]:
@@ -302,13 +295,9 @@ class AVAConfig:
 
         Raises ``RuntimeError`` if no token is configured.
         """
-        token = self.lco_token
-        if not token:
-            raise RuntimeError(
-                "No LCO API token: put it in the file named by lco.token_file "
-                "(default ~/.lco_token, chmod 600) or set LCO_API_TOKEN."
-            )
-        return {"Authorization": f"Token {token}"}
+        from ava.lco.token import require_token
+
+        return {"Authorization": f"Token {require_token(ava_cfg=self)}"}
 
     # -------------------------------------------------------------------
     # Aperture helpers

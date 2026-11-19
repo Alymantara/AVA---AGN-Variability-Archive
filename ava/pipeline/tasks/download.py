@@ -45,9 +45,9 @@ def archive_client():
 
         lco = cfg._raw.get("lco", {}) or {}
         api.set_urls(lco.get("archive_url"), lco.get("base_url"))
-        token = cfg.lco_token
-        if not token:
-            raise RuntimeError("No LCO API token (lco.token_file / LCO_API_TOKEN)")
+        from ava.lco.token import require_token
+
+        token = require_token(ava_cfg=cfg)        # the error lists every place looked at
         dl = cfg.download
         _CLIENT = Client(token=token, rate_per_s=float(dl.rate_per_s),
                          server_error_retries=int(dl.get("server_error_retries", 1)),
