@@ -839,17 +839,26 @@ def agn_zero_points(sols: dict, ref: pd.DataFrame, agn_lc: dict | None = None, c
     """{filter: (zp_at_AGN_colour, err)} with the AGN colour from its own calibrated
     mean magnitudes (iterated; the colour term is then evaluated at the AGN's colour)."""
     fits = {f: absolute_zp(s, ref, colour_term=colour_term, **(zp_kw or {})) for f, s in sols.items()}
-    c_agn = float(np.nanmedian([f["c0"] for f in fits.values()]))
+    # start from the median star colour of the fits that worked (a failed fit has no stars and c0 = 0)
+    usable = [z["c0"] for z in fits.values() if z["n"] > 0 and np.isfinite(z["zp"])]
+    c_agn = float(np.median(usable)) if usable else float("nan")
     for _ in range(n_iter):
         if agn_lc is None or not all(k in agn_lc for k in colour):
             break
-        mags = {k: float(np.median(agn_lc[k])) + fits[k]["zp"] + fits[k]["C"] * (c_agn - fits[k]["c0"])
+        mags = {k: float(np.nanmedian(agn_lc[k])) + fits[k]["zp"] + fits[k]["C"] * (c_agn - fits[k]["c0"])
                 for k in colour}
-        c_agn = mags[colour[0]] - mags[colour[1]]
+        new = mags[colour[0]] - mags[colour[1]]
+        if not np.isfinite(new):        # g or i without a zero point: keep the star-colour estimate
+            break
+        c_agn = new
     out = {}
     for f, z in fits.items():
-        dz = z["C"] * (c_agn - z["c0"])
-        out[f] = (z["zp"] + dz, float(np.hypot(z["zp_err"], z["C_err"] * abs(c_agn - z["c0"]))))
+        dc = c_agn - z["c0"]
+        if z["C"] == 0 or not np.isfinite(dc):   # no colour term (or no AGN colour): the plain ZP
+            dz, dz_err = 0.0, 0.0
+        else:
+            dz, dz_err = z["C"] * dc, z["C_err"] * abs(dc)
+        out[f] = (z["zp"] + dz, float(np.hypot(z["zp_err"], dz_err)))
         z["agn_colour"] = c_agn
         z["zp_agn"] = out[f][0]
     return out, fits

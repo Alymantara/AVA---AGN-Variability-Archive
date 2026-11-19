@@ -671,3 +671,37 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   needed for those.
 - Tests: `tests/test_lcodb_requests.py`.
 
+## B02: ensemble task crashed when no camera gets an intercal fit (19 Nov 2026)
+
+- **Bug.** `intercalibrate` returned a table with no columns when no scope could be fitted, so
+  `intercal_lightcurve` failed with `KeyError: 'scope'`. This happens with a single camera, fewer than
+  `intercal_min_pairs` overlapping nights, or MuSCAT only (a lone reference scope is never fitted). By then
+  `run_target` had already rewritten `agn_lightcurve_pytics.parquet` without `mag_ic` / `F_ic`, and the merged
+  CSV and plots were never made. Such a target failed every night.
+- **Fix.** The intercal table always has its columns (`intercal.TABLE_COLUMNS`, also for the per-season table).
+  With no fits nothing is corrected (`F_ic = F`), and `intercal.csv` is written with a header only. Also, the
+  error model no longer warns on an empty table (`errors.sigma_rand`).
+- Checked: the whole ensemble task on a synthetic single-camera target (merged CSV and the six web plots).
+  Tests: `test_intercal_with_no_camera_fitted` (Sinistro only, MuSCAT only, with and without per-season offsets).
+
+## B12 / B4ₚ / C08: a filter without an absolute zero point (19 Nov 2026)
+
+- **Bugs.**
+  - `agn_zero_points` started the AGN colour from the median `c0` of *all* filters. A failed fit (no stars) has
+    `c0 = 0`, and a NaN g or i ZP made `c_agn` NaN. Since `NaN × 0 = NaN`, that turned the ZP of every filter into
+    NaN, even filters without a colour term (B12).
+  - The NaN `mag_ic` of a filter without a ZP then reached the error model, and `fit_s_cam` raised in `brentq`
+    ("f(0) is NaN"). This hit Fairall 9 and NGC 4151 in the test-archive run, through Y with 2 stars (B4ₚ).
+  - `brentq` also raised when even 0.5 mag of camera term was not enough (C08).
+- **Fix.**
+  - The AGN colour starts from the fits that worked and keeps the last finite value.
+  - A filter with `C = 0` (or with no AGN colour) gets its plain ZP.
+  - Only the failed filter stays NaN.
+  - `errors.pairs` skips non-finite magnitudes.
+  - `fit_s_cam` returns 0 when it cannot be computed and caps at `s_max` (0.5 mag) instead of raising.
+- Not covered here: B5ₚ, dense fields where none of the 100 PyTICS stars has GSPC g and i, which gives a NaN ZP
+  in every filter (MCG+08-11-011). That needs a colour-free fallback or a different star selection, and is a
+  science decision.
+- Tests: `test_agn_zero_points_one_failed_filter_does_not_spoil_the_others`,
+  `test_error_model_ignores_filter_without_zero_point`, `test_fit_s_cam_caps_instead_of_raising`.
+

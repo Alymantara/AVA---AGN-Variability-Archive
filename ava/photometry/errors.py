@@ -45,7 +45,7 @@ def _var(th, p, t):
 def pairs(lc: pd.DataFrame, max_dt: float, same: bool, mag: str = "mag") -> pd.DataFrame:
     """Pairs of good epochs (same filter) within ``max_dt`` days: consecutive epochs of one
     scope (``same=True``) or epochs of different scopes up to 3 neighbours apart."""
-    x = lc[lc["good"]].copy()
+    x = lc[lc["good"] & np.isfinite(lc[mag].to_numpy(float))].copy()   # a filter without a ZP has NaN mags
     x["fam"] = family(x["camera"])
     out = []
     groups = x.groupby(["Filter", "scope"]) if same else x.groupby("Filter")
@@ -109,16 +109,22 @@ def sigma_rand(lc: pd.DataFrame, table: pd.DataFrame) -> np.ndarray:
     """σ_rand per row of ``lc`` from the fitted table (Filter, family -> k, beta, s0)."""
     key = pd.MultiIndex.from_arrays([lc["Filter"].to_numpy(), family(lc["camera"])])
     t = table.set_index(["Filter", "family"])
-    th = {c: t[c].reindex(key).fillna(PYTICS[c]).to_numpy() for c in ("k", "beta", "s0")}
+    th = {c: t[c].reindex(key).astype(float).fillna(PYTICS[c]).to_numpy() for c in ("k", "beta", "s0")}
     return np.sqrt(_var(th, lc["magerr"].to_numpy(float), lc["rms_t"].to_numpy(float)))
 
 
-def fit_s_cam(Pc: pd.DataFrame, sr1, sr2) -> float:
-    """camera-to-camera term: robust σ of Δm / √(σr₁²+σr₂²+2 s²) = 1 (0 if already ≤ 1)."""
+def fit_s_cam(Pc: pd.DataFrame, sr1, sr2, s_max: float = 0.5) -> float:
+    """camera-to-camera term: robust σ of Δm / √(σr₁²+σr₂²+2 s²) = 1 (0 if already ≤ 1 or not
+    computable; ``s_max`` if even that is not enough, instead of a brentq error)."""
     f = lambda s: rob(Pc.dm / np.sqrt(sr1 ** 2 + sr2 ** 2 + 2 * s ** 2)) - 1.0
-    if len(Pc) == 0 or f(0.0) <= 0:
+    if len(Pc) == 0:
         return 0.0
-    return float(brentq(f, 0.0, 0.5))
+    f0 = f(0.0)
+    if not np.isfinite(f0) or f0 <= 0:
+        return 0.0
+    if f(s_max) > 0:
+        return float(s_max)
+    return float(brentq(f, 0.0, s_max))
 
 
 def fit_error_model(lc: pd.DataFrame, *, max_dt: float = 1 / 24, max_dt_cross: float = 0.25,

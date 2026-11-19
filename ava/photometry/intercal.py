@@ -85,6 +85,12 @@ def fit_linear(x, xe, y, ye, clip=4.0, n_iter=10):
     return float(a), float(ae), float(b), float(be), float(chi), use
 
 
+#: columns of the intercalibration table (also when no scope could be fitted: a single camera, too few
+#: overlapping nights, MuSCAT only), so that callers can always select and write them
+TABLE_COLUMNS = ["filter", "scope", "n_pairs", "n_used", "a", "a_err", "b", "b_err", "chi2nu", "b1", "b1_err",
+                 "chi2nu_b1", "dmag_const", "F_mean", "b_frac", "rms_before", "rms_after", "rms_const", "rms_b1"]
+
+
 def intercalibrate(lc: pd.DataFrame, ref_scopes, scopes=None, max_gap: float = 3.0, min_pairs: int = 10) -> pd.DataFrame:
     """Flux-flux fit of every scope (per filter) against the reference scopes."""
     rows = []
@@ -117,7 +123,7 @@ def intercalibrate(lc: pd.DataFrame, ref_scopes, scopes=None, max_gap: float = 3
                              rms_before=float(np.std((y - x)[use])), rms_after=float(np.std((y - a * x - b)[use])),
                              rms_const=float(np.std((y - c * x)[use])),
                              rms_b1=float(np.std((y - x - b1)[use]))))
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=TABLE_COLUMNS)
 
 
 def seasons(mjd, gap_days: float = 60.0) -> np.ndarray:
@@ -138,7 +144,8 @@ def intercalibrate_by_season(lc: pd.DataFrame, ref_scopes, scopes, season_col: s
         t = intercalibrate(h, ref_scopes, scopes=scopes, max_gap=max_gap, min_pairs=min_pairs)
         if len(t):
             rows.append(t.assign(season=int(s), MJD_min=h["MJD"].min(), MJD_max=h["MJD"].max()))
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+    return (pd.concat(rows, ignore_index=True) if rows
+            else pd.DataFrame(columns=TABLE_COLUMNS + ["season", "MJD_min", "MJD_max"]))
 
 
 def apply_intercal(lc: pd.DataFrame, table: pd.DataFrame, scopes=None, min_sigma: float = 3.0,

@@ -238,3 +238,103 @@ def test_run_target_end_to_end_first_full_fit(tmp_path):
     assert (tmp_path / "pytics" / "absolute_zp_stars.parquet").exists()
     lc = pd.read_csv(tmp_path / "agn_lightcurve_pytics.csv")
     assert set(lc["Filter"]) == {"gp", "ip"} and len(lc) == 2 * n_ep
+
+
+def _target_folder(tmp_path, cams=("fa05",), filters=("gp", "ip"), n_stars=30, n_ep=60, seed=3):
+    """A fresh target folder (reference stars, frame QC, measurements) observed by ``cams`` only."""
+    from ava.photometry import store
+
+    rng = np.random.default_rng(seed)
+    stars = 1000 + np.arange(n_stars)
+    g_true = np.sort(rng.uniform(13, 17, n_stars))
+    ref = pd.DataFrame({"star_id": np.r_[stars, -1], "lco_g": np.r_[g_true, np.nan], "lco_g_err": 0.01,
+                        "lco_i": np.r_[g_true - 0.5 + rng.normal(0, 0.2, n_stars), np.nan], "lco_i_err": 0.01,
+                        "quality_ok": np.r_[np.ones(n_stars, bool), False], "is_agn": np.r_[np.zeros(n_stars, bool), True]})
+    ref.to_csv(tmp_path / "reference_stars.csv", index=False)
+    qc, meas = [], []
+    for k, filt in enumerate(filters):
+        for t in range(n_ep):
+            frame, cam = f"{filt}{t:04d}", cams[t % len(cams)]
+            zp = -23.5 + rng.normal(0, 0.1)
+            qc.append(dict(frame=frame, data_id="T", filter=filt, mjd_mid=60000.0 + t, qc_pass=1,
+                           tel="1m00" + cam[-1], camera=cam, airmass=1.2, fwhm_arcsec=2.0))
+            mags = np.r_[g_true - 0.5 * k, 15.0 + 0.2 * np.sin(t / 5)] + zp + rng.normal(0, 0.005, n_stars + 1)
+            for sid, m, agn in zip(np.r_[stars, -1], mags, np.r_[np.zeros(n_stars, bool), True]):
+                meas.append(dict(frame=frame, star_id=int(sid), is_agn=bool(agn), mag_inst=m, magerr=0.005, x=1.0,
+                                 y=1.0, sex_flags=0, sep_arcsec=0.1, used_in_zp=not agn))
+    db = tmp_path / "phot.sqlite"
+    store.write_frame_qc(db, qc)
+    store.update_measurements(tmp_path / "measurements.parquet", pd.DataFrame(meas))
+    return db
+
+
+@pytest.mark.parametrize("per_season", [False, True])
+@pytest.mark.parametrize("cams", [("fa05",), ("ep04",)])
+def test_intercal_with_no_camera_fitted(tmp_path, cams, per_season):
+    """B02: a target seen by one camera only (or by MuSCAT only) has no intercal fit; the ensemble task
+    crashed with KeyError 'scope' after rewriting the light curve without mag_ic / F_ic."""
+    from ava.config import cfg
+    from ava.pipeline.tasks import ensemble as _  # noqa: F401  (registers the module)
+    import sys
+    T = sys.modules["ava.pipeline.tasks.ensemble"]
+
+    db = _target_folder(tmp_path, cams=cams)
+    E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="auto", log=lambda *a: None)
+    import copy
+    ec = copy.copy(cfg.ensemble)
+    ec.intercal_per_season = per_season
+    out = T.intercal_lightcurve(tmp_path, ec)
+    assert {"mag_ic", "F_ic", "Ferr_ic"} <= set(out.columns)
+    assert np.allclose(out["F_ic"], out["F"])                       # nothing to correct
+    tab = pd.read_csv(tmp_path / "pytics" / "intercal.csv")
+    assert len(tab) == 0 and {"filter", "scope", "b1", "corrected"} <= set(tab.columns)
+    merged = T.export_merged_csv(out, tmp_path / "T_LCO_merged_lightcurve.csv", "T")
+    assert len(merged) > 0
+
+
+def _fake_zp(zp, C, c0, n, zp_err=0.002, C_err=0.004):
+    return dict(zp=zp, zp_err=zp_err, C=C, C_err=C_err, c0=c0, n=n)
+
+
+def test_agn_zero_points_one_failed_filter_does_not_spoil_the_others(monkeypatch):
+    """B12 / B4p: a filter whose absolute ZP failed (Y with 2 stars; or g / i) made the AGN colour NaN and
+    with it the ZP of EVERY filter."""
+    fits = {"gp": _fake_zp(23.9, 0.045, 0.8, 60), "ip": _fake_zp(23.3, 0.027, 0.8, 60),
+            "rp": _fake_zp(23.7, 0.0, 0.8, 60), "Y": _fake_zp(np.nan, np.nan, 0.0, 0)}
+    monkeypatch.setattr(E, "absolute_zp", lambda s, ref, **k: dict(fits[s]))
+    agn = {"gp": np.array([-9.0, np.nan]), "ip": np.array([-9.6]), "rp": np.array([-9.3]), "Y": np.array([np.nan])}
+    out, z = E.agn_zero_points({f: f for f in fits}, None, agn)
+    assert all(np.isfinite(out[f][0]) for f in ("gp", "ip", "rp")) and np.isnan(out["Y"][0])
+    c_agn = (-9.0 + 23.9) - (-9.6 + 23.3)                     # converges here (equal pivots)
+    assert z["gp"]["agn_colour"] == pytest.approx(c_agn, abs=0.01)
+    assert out["rp"][0] == 23.7                                # no colour term: the plain ZP
+    # the colour band itself fails: the others fall back to the star colour, not NaN
+    fits["ip"] = _fake_zp(np.nan, np.nan, 0.0, 0)
+    out, z = E.agn_zero_points({f: f for f in fits}, None, agn)
+    assert np.isfinite(out["gp"][0]) and np.isfinite(out["rp"][0]) and np.isnan(out["ip"][0])
+    assert z["gp"]["agn_colour"] == pytest.approx(0.8)
+
+
+def test_error_model_ignores_filter_without_zero_point():
+    """B4p: NaN mag_ic (filter with a NaN absolute ZP) crashed fit_s_cam: brentq 'f(0) is NaN'."""
+    from ava.photometry import errors as ER
+
+    rng = np.random.default_rng(5)
+    rows = []
+    for f in ("gp", "Y"):
+        for i in range(400):
+            cam = ("fa05", "fa11")[i % 2]
+            m = 15.0 + rng.normal(0, 0.01) if f == "gp" else np.nan
+            rows.append(dict(Filter=f, scope=f"1m00{cam[-1]}-{cam}", camera=cam, MJD=60000 + i * 0.02, good=True,
+                             magerr=0.005, rms_t=0.002, mag_ic=m))
+    lc = pd.DataFrame(rows)
+    tab = ER.fit_error_model(lc, mag="mag_ic", min_pairs=50, min_cross_pairs=10)
+    assert "Y" not in set(tab["Filter"]) and np.isfinite(tab["s_cam"]).all()
+
+
+def test_fit_s_cam_caps_instead_of_raising():
+    from ava.photometry import errors as ER
+
+    Pc = pd.DataFrame({"dm": np.random.default_rng(1).normal(0, 2.0, 200)})   # 2 mag scatter: no root below 0.5
+    assert ER.fit_s_cam(Pc, np.full(200, 0.01), np.full(200, 0.01)) == 0.5
+    assert ER.fit_s_cam(Pc.assign(dm=np.nan), np.full(200, 0.01), np.full(200, 0.01)) == 0.0

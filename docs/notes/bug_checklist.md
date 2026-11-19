@@ -13,7 +13,7 @@ line in `future_improvements.md`.
 
 - [x] **B01** (main, lcodb; fixed in `797debc`; also: headers reduced to the slit width, stored headers purged on the Mac): a repeated HTTP 500 is retried 7×, and the header step never stops. This could exceed
   the 5000 requests/day limit. `ava/lcodb/api.py:96`, `ava/lcodb/headers.py:43`.
-- [ ] **B02** (main, ensemble): the ensemble task crashes when no camera gets an intercalibration fit (single camera,
+- [x] **B02** (main, ensemble; fixed 19 Nov, see the B02 commit; = B3ₚ of the PyTICS test-archive run): the ensemble task crashes when no camera gets an intercalibration fit (single camera,
   fewer than 10 overlap nights, MuSCAT only). `ava/pipeline/tasks/ensemble.py:46`.
 
 ## 2. Medium
@@ -36,7 +36,7 @@ line in `future_improvements.md`.
 
 ## 3. Low
 
-- [ ] **B12** (main, ensemble): a failed g or i absolute ZP makes the ZP of every filter NaN.
+- [x] **B12** (main, ensemble; fixed 19 Nov with B4ₚ, same commit as B02): a failed g or i absolute ZP makes the ZP of every filter NaN.
   `photometry/ensemble.py:845`.
 - [ ] **B13** (main, lcodb): `sync --proposal ID` skips an inactive proposal that was already crawled. `lcodb/ingest.py:215`.
 - [ ] **B14** (main, photometry): a GSPC star within 2″ can be relabelled as the AGN. `photometry/reference.py`
@@ -69,7 +69,7 @@ line in `future_improvements.md`.
 - [ ] **C05**: signed S3 URLs (valid 48 h) appear in download error logs.
 - [ ] **C06**: the spectra download filter has no instrument check (a SOAR spectrum with the same target name would be kept).
 - [ ] **C07**: `arm_offsets` keeps stale offsets after the `align_*` settings change.
-- [ ] **C08**: `errors.fit_s_cam` (`brentq` up to 0.5 mag) can raise.
+- [x] **C08** (fixed with B12: capped at 0.5 mag): `errors.fit_s_cam` (`brentq` up to 0.5 mag) can raise.
 - [ ] **C09**: `colour_term_check` ignores `intercal_min_pairs`; `run_target` hard-codes `g − i`.
 - [ ] **C10**: fa08 `up` gets no zero point (0 of 172 frames). Hardware or a U/up label? (Look at it together with B04.)
 - [ ] **C11**: stars with NaN RUWE pass `quality_ok`.
