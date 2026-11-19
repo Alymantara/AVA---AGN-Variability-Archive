@@ -85,6 +85,30 @@ line in `future_improvements.md`.
   every filter (MCG+08-11-011). Recheck MCG+08-11-011 after `5f45417` ("absolute ZP from all stars").
 - [x] **B22** (fixed 19 Nov, B22 commit; no other file has a SyntaxWarning): `ava/plots/webplots.py:41` SyntaxWarning, invalid escape `'\ '` in a docstring.
 
+## 3d. Production operations: to do first (user, 19 Nov)
+
+- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: C01 `nightly_steps`, and the weekly backup.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
+  for the Prefect flow, `scripts/cleanup.py --live`, `scripts/lco_usage.py --live-snapshot`), but the crontab is
+  only written out in `deployment_guide.md` §7, with `/opt/ava` example paths. To do:
+  - a `deploy/` folder with `crontab.example` and systemd units for the Prefect server and worker;
+  - `AVA_CONFIG` / `LCODB_CONFIG` and log redirection on every line;
+  - one consistent timetable. Today they disagree: the guide has `lcodb daily` at 01:00 and the flow at 02:00,
+    while `pipeline.prefect.schedule_cron` is 10:30, with a comment saying `lcodb daily` runs at 09:30;
+  - production `nightly_steps` set (C01: no `pytics`, `spec_*` now);
+  - the weekly backup (job 5, "TO BUILD").
+- [x] **O02: daily health check.** *(19 Nov: `scripts/daily_check.py`, not committed.)* Nothing reports whether the daily update ran. `lcodb status` prints
+  sync state and the last runs (table `runs`), but by hand only. To do: `scripts/daily_check.py`, run by cron
+  after the daily jobs. It checks:
+  - the last `lcodb daily` run (status, age);
+  - `synced_until` of the active proposals;
+  - the newest frame in the databases;
+  - per-target `download_state`;
+  - the newest `frame_qc.processed_utc`;
+  - the last Prefect flow run;
+  - the cleanup and LCO-usage logs.
+
+  It prints one summary and exits non-zero when anything is stale or failed, so cron mail / alerting fires.
+
 ## 4. QC items already opened by the QC session
 
 - [ ] **QC-0001** (QC): sparse fields fail `min_matched: 30` (PG 2304+043: 0 % pass); fields with few GSPC u

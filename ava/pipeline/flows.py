@@ -135,6 +135,7 @@ def ava_target_flow(
     target: str,
     init: bool = False,
     download_data: bool = False,
+    download_mode: str | None = None,
     extract: bool = False,
     calibrate_data: bool = False,
     pytics: bool = False,
@@ -207,7 +208,7 @@ def ava_target_flow(
     if download_data:
         results["download"] = download.with_options(
             tags=_target_tags(target, STAGE_TAGS["download"]),
-        )(target)
+        )(target, mode=download_mode)                     # None: download.mode from the config
 
     if extract:
         results["sextract"] = sextract.with_options(
@@ -294,6 +295,7 @@ def ava_pipeline(
     targets: list[str] | None = None,
     init: bool = False,
     download_data: bool = False,
+    download_mode: str | None = None,
     extract: bool = False,
     calibrate_data: bool = False,
     pytics: bool = False,
@@ -342,6 +344,7 @@ def ava_pipeline(
     stages = dict(
         init=init,
         download_data=download_data,
+        download_mode=download_mode,
         extract=extract,
         calibrate_data=calibrate_data,
         pytics=pytics,
@@ -356,7 +359,8 @@ def ava_pipeline(
         spec_reduce_data=spec_reduce_data,
         spec_products_data=spec_products_data,
     )
-    active_stages = [k for k, v in stages.items() if v and k not in ("pytics_mode", "spec_nights", "spec_mode")]
+    active_stages = [k for k, v in stages.items()
+                     if v and k not in ("pytics_mode", "spec_nights", "spec_mode", "download_mode")]
     stage_tags = []
     for s in active_stages:
         stage_tags += STAGE_TAGS.get(s, STAGE_TAGS.get(s.removesuffix("_data"), []))

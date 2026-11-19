@@ -32,6 +32,8 @@ from ava.config import cfg  # noqa: E402
               help="Open/initialise target folders and build the reference catalogue.")
 @click.option("-d", "--download", "download_data", is_flag=True,
               help="Download new data from the LCO archive.")
+@click.option("--download-mode", type=click.Choice(["dry_run", "live"]), default=None,
+              help="Photometry download: override download.mode for this run (dry_run: search only, fetch nothing).")
 @click.option("-e", "--extract", is_flag=True,
               help="Extract source catalogues with SExtractor.")
 @click.option("-c", "--calibrate", "calibrate_data", is_flag=True,
@@ -66,13 +68,14 @@ from ava.config import cfg  # noqa: E402
               help="Run a single target (its data_id, e.g. fairall_9) instead of the full list.")
 @click.option("--targets-file", type=click.Path(exists=True, dir_okay=False, path_type=Path),
               default=None, help="Override the target list YAML from the config.")
-def main(init, download_data, extract, calibrate_data, pytics, pytics_full, plot, merge_data, save,
+def main(init, download_data, download_mode, extract, calibrate_data, pytics, pytics_full, plot, merge_data, save,
          spec_init, spec_download_data, spec_nights, spec_mode, spec_reduce_data, spec_products_data, publish, target,
          targets_file):
     """AGN Variability Archive — update the archive with new data."""
     steps = dict(
         init=init,
         download_data=download_data,
+        download_mode=download_mode,
         extract=extract,
         calibrate_data=calibrate_data,
         pytics=pytics or pytics_full,
@@ -88,7 +91,7 @@ def main(init, download_data, extract, calibrate_data, pytics, pytics_full, plot
         spec_products_data=spec_products_data,
         publish=publish,
     )
-    if not any(v for k, v in steps.items() if k not in ("pytics_mode", "spec_nights", "spec_mode")):
+    if not any(v for k, v in steps.items() if k not in ("pytics_mode", "spec_nights", "spec_mode", "download_mode")):
         raise click.UsageError("Nothing to do: specify at least one step flag (-o -d -e -c -t -p -m -s -O -D -R -P -w).")
 
     # Imported here so `--help` works without Prefect installed.

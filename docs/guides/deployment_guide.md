@@ -291,7 +291,55 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 | after 2 | **3. Process and publish** — catalogues, calibration, PyTICS, spectra reduction and products, database updates, website | yes (Prefect steps) |
 | 05:00 daily | **4. Delete raw frames AVA has finished with** (photometry images, FLOYDS nights) | yes (`scripts/cleanup.py`) |
 | weekly | 5. Back up databases and products (section 10) | **TO BUILD** |
+| 07:00 daily | **7. Health check**: did every job run and succeed (`scripts/daily_check.py`) | yes |
 | every 6 h | **6. LCO time-usage plots** (website Live Updates page): snapshot of LCO's charged totals, plot, publish | yes (`scripts/lco_usage.py --live-snapshot`) |
+
+## 7.0 Installing the schedule: test first, then production
+
+`scripts/make_crontab.py` writes the crontab for the machine it runs on, with its own Python, repository,
+`AVA_CONFIG` / `LCODB_CONFIG` (taken from the environment it is run in) and log folder (`paths.logs`). Every
+line goes through `scripts/cron_job.sh`, which logs to `<logs>/<job>.log` and appends one line per run (job,
+start, end, exit code) to `<logs>/cron_runs.tsv`. `scripts/daily_check.py` reads that record.
+
+**1. Test (safe):** every job runs once, a few minutes apart, with nothing downloaded or deleted:
+
+```bash
+python scripts/make_crontab.py --test --install
+```
+
+| Test job | What it runs |
+|---|---|
+| `lcodb_daily_test` | `lcodb daily`: the real incremental crawl, a few hundred listing requests at most. `--no-archive` swaps in `lcodb status` (no request). |
+| `pipeline_test` | `run_pipeline.py --target <first active target>` with the nightly steps; `--download-mode dry_run --spec-mode dry_run` (search only); no publish (`--with-publish` adds it). |
+| `cleanup_test` | `cleanup.py` in dry run. |
+| `lco_usage_test` | `lco_usage.py` without the live snapshot, without publishing. |
+| `daily_check_test` | `daily_check.py` for the four test jobs, 45 min after the first (`--check-after`). |
+
+The command prints when the jobs will run. Afterwards, read `<logs>/daily_check_test.log`: it ends in `PASSED`
+or `FAILED`, and for a failed job it shows the end of that job's log. Each job's full output is in
+`<logs>/<job>_test.log`. The test lines have a fixed day and month, so they do not repeat, but replace them
+anyway.
+
+**2. Production**, once the test passes:
+
+```bash
+python scripts/make_crontab.py --production --mailto <address> --install
+```
+
+This sets: 01:00 `lcodb_daily`, 02:00 `pipeline` (`run_pipeline.py` with `pipeline.prefect.nightly_steps`, all
+targets), 05:00 `cleanup --live`, every 6 h `lco_usage --live-snapshot`, and 07:00 `daily_check`.
+- `daily_check` exits non-zero when a job did not run in time or failed, or when the archive tables are older
+  than 30 h, so cron mails its output to `MAILTO`.
+- The times are UTC (`CRON_TZ=UTC`, honoured by cronie; otherwise run the machine in UTC).
+- The `pipeline` line replaces the Prefect deployment of section 7.3; use one or the other.
+- `--install` replaces only the block between the AVA markers in the user's crontab, and saves the previous
+  crontab to `<logs>/crontab.before.<time>`. `--remove` takes the block out again.
+
+Run the health check by hand at any time:
+
+```bash
+python scripts/daily_check.py
+```
 
 ## 7.1 Job 1 — update the archive tables (01:00)
 

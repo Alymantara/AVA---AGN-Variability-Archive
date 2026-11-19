@@ -973,3 +973,28 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   - `datetime.utcnow()` in `ava/lcodb/db.py:49` → `datetime.now(timezone.utc)`.
 - **Pins.** Turgon (backfill) and the VM (production) must run the same versions. `environment.yml` is to be pinned
   to the VM's set once agreed (not changed yet). Pin numba as well, to the VM's version: numba refuses a newer numpy than it was built for (the Mac's 0.62.1 stops at numpy 2.3).
+
+## Scheduling: test the crontab first, then production; health check (19 Nov 2026)
+
+- **Problem.** The job scripts existed, but the crontab was only written out in the deployment guide, with
+  example paths. The schedules disagreed (guide: `lcodb daily` 01:00, flow 02:00; config `schedule_cron` 10:30), and
+  nothing reported whether the daily update had run. The production databases are freshly copied and the data
+  folders are empty, so every job had to be testable safely before going live.
+- **Added.**
+  - `scripts/cron_job.sh` wraps every job: log per job, and one line per run in `<paths.logs>/cron_runs.tsv`. With
+    `flock`, a job still running is not started twice.
+  - `scripts/daily_check.py` checks the jobs' last runs (missing, failed, stale), the lcodb crawl (last run,
+    active proposals synced within 30 h) and the newest data (warnings only). It exits 1 on any failure.
+  - `scripts/make_crontab.py` writes the crontab for this machine:
+    - `--test` runs each job once, safely: downloads dry run (new `run_pipeline.py --download-mode`), cleanup dry
+      run, no LCO snapshot, one target, no publish, and a health check at the end;
+    - `--production` sets the timetable;
+    - `--install` replaces only the AVA block (previous crontab saved);
+    - `--remove` takes the block out.
+- **Production timetable (UTC):** 01:00 lcodb daily, 02:00 pipeline (`run_pipeline.py` with `nightly_steps`),
+  05:00 cleanup, every 6 h LCO usage, 07:00 health check. The `pipeline` cron line replaces the Prefect deployment.
+- **Still open.**
+  - C01: `nightly_steps` lacks `pytics` and the spectroscopy steps. Without them the merged light curves, the
+    photometric F_var, the Hβ products and `line_variability` are not refreshed by the nightly run.
+  - The weekly backup (job 5).
+- Tests: `tests/test_cron_tools.py`.
