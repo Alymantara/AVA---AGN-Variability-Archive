@@ -725,3 +725,15 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
   - C04: cleanup frees a standard only by its own night name, so it can delete a standard that an unreduced
     night elsewhere still needs.
 - Tests: `tests/test_spec_stage_standards.py`.
+
+## B05: a run without new frames re-did the colour check against itself (19 Nov 2026)
+
+- **Bug.** `run_target` took the filters to refit from `sol.meta["mode"] == "full"`. `update()` with no new frames
+  returns the stored solution unchanged, and its meta still says `"full"`. So every quiet run went through step 2
+  again: it fitted a colour-term solution and compared it with the stored one, which already had colour terms. The
+  gain came out about 0, and `colour_check.use = False` was written while the terms stayed on. The absolute ZP was
+  refitted for nothing, and each filter cost an extra fit per run. This is where the stale Mrk 817 record found on
+  18 Nov came from.
+- **Fix.** "Refitted" now means fully fitted in this run (`report[f]["mode"]` is `full` or `update->full`).
+- Test: `test_rerun_without_new_frames_keeps_colour_check`. The synthetic cameras get colour slopes (±0.06 mag per
+  mag), so the first run turns the terms on (gain +93 %). Before the fix, the rerun rewrote this to −4 %, `use=False`.

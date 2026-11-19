@@ -240,17 +240,21 @@ def test_run_target_end_to_end_first_full_fit(tmp_path):
     assert set(lc["Filter"]) == {"gp", "ip"} and len(lc) == 2 * n_ep
 
 
-def _target_folder(tmp_path, cams=("fa05",), filters=("gp", "ip"), n_stars=30, n_ep=60, seed=3):
-    """A fresh target folder (reference stars, frame QC, measurements) observed by ``cams`` only."""
+def _target_folder(tmp_path, cams=("fa05",), filters=("gp", "ip"), n_stars=30, n_ep=60, seed=3, ck=None):
+    """A fresh target folder (reference stars, frame QC, measurements) observed by ``cams`` only.
+    ``ck``: {camera: colour slope (mag per mag of g-i)}, applied to the stars and the AGN (g-i = 0.3)."""
     from ava.photometry import store
 
     rng = np.random.default_rng(seed)
     stars = 1000 + np.arange(n_stars)
     g_true = np.sort(rng.uniform(13, 17, n_stars))
     ref = pd.DataFrame({"star_id": np.r_[stars, -1], "lco_g": np.r_[g_true, np.nan], "lco_g_err": 0.01,
-                        "lco_i": np.r_[g_true - 0.5 + rng.normal(0, 0.2, n_stars), np.nan], "lco_i_err": 0.01,
+                        "lco_i": np.r_[g_true - (rng.uniform(0.0, 2.5, n_stars) if ck else 0.5 + rng.normal(0, 0.2, n_stars)),
+                                       np.nan], "lco_i_err": 0.01,
                         "quality_ok": np.r_[np.ones(n_stars, bool), False], "is_agn": np.r_[np.zeros(n_stars, bool), True]})
     ref.to_csv(tmp_path / "reference_stars.csv", index=False)
+    colour = np.r_[(ref["lco_g"] - ref["lco_i"]).to_numpy()[:n_stars], 0.3]
+    colour = colour - np.median(colour[:n_stars])
     qc, meas = [], []
     for k, filt in enumerate(filters):
         for t in range(n_ep):
@@ -259,6 +263,8 @@ def _target_folder(tmp_path, cams=("fa05",), filters=("gp", "ip"), n_stars=30, n
             qc.append(dict(frame=frame, data_id="T", filter=filt, mjd_mid=60000.0 + t, qc_pass=1,
                            tel="1m00" + cam[-1], camera=cam, airmass=1.2, fwhm_arcsec=2.0))
             mags = np.r_[g_true - 0.5 * k, 15.0 + 0.2 * np.sin(t / 5)] + zp + rng.normal(0, 0.005, n_stars + 1)
+            if ck:
+                mags = mags + ck.get(cam, 0.0) * colour
             for sid, m, agn in zip(np.r_[stars, -1], mags, np.r_[np.zeros(n_stars, bool), True]):
                 meas.append(dict(frame=frame, star_id=int(sid), is_agn=bool(agn), mag_inst=m, magerr=0.005, x=1.0,
                                  y=1.0, sex_flags=0, sep_arcsec=0.1, used_in_zp=not agn))
@@ -338,3 +344,26 @@ def test_fit_s_cam_caps_instead_of_raising():
     Pc = pd.DataFrame({"dm": np.random.default_rng(1).normal(0, 2.0, 200)})   # 2 mag scatter: no root below 0.5
     assert ER.fit_s_cam(Pc, np.full(200, 0.01), np.full(200, 0.01)) == 0.5
     assert ER.fit_s_cam(Pc.assign(dm=np.nan), np.full(200, 0.01), np.full(200, 0.01)) == 0.0
+
+
+def test_rerun_without_new_frames_keeps_colour_check(tmp_path):
+    """B05: update() with no new frames returns the stored solution (meta mode 'full'), so the run counted
+    the filter as refitted, redid the colour check against itself and stored use=False (gain ~0) while
+    keeping the colour terms — the stale record found on Mrk 817."""
+    import json
+
+    db = _target_folder(tmp_path, cams=("fa05", "fa11"), ck={"fa05": 0.06, "fa11": -0.06}, n_ep=120)
+    rep1 = E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="auto", scope_colour_terms="auto",
+                        log=lambda *a: None)
+    meta1 = {f: json.loads((tmp_path / "pytics" / f / "meta.json").read_text()) for f in ("gp", "ip")}
+    assert all(r["mode"] == "full" for r in rep1.values())
+    assert all("colour_check" in m for m in meta1.values())
+    assert any(m["colour_terms"] and m["colour_check"]["use"] for m in meta1.values())   # the case that broke
+    rep2 = E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="auto", scope_colour_terms="auto",
+                        log=lambda *a: None)
+    meta2 = {f: json.loads((tmp_path / "pytics" / f / "meta.json").read_text()) for f in ("gp", "ip")}
+    for f in ("gp", "ip"):
+        assert rep2[f]["mode"] == "update" and rep2[f]["new_epochs"] == 0
+        assert meta2[f]["colour_check"] == meta1[f]["colour_check"]
+        assert meta2[f]["colour_terms"] == meta1[f]["colour_terms"]
+        assert meta2[f]["zp"] == meta1[f]["zp"]

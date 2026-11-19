@@ -696,7 +696,9 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
         sols[f], data[f] = sol, d
         report[f] = {**info, "seconds": round(time.time() - t0, 3), "n_epochs": len(sol.epochs),
                      "loops": sol.meta.get("loops"), "converged": sol.meta.get("converged")}
-    refitted = [f for f, s in sols.items() if s.meta.get("mode") == "full"]
+    # filters fully fitted in THIS run (B05: an update without new frames returns the stored solution, whose
+    # meta still says mode "full"; counting it re-ran the colour check against itself)
+    refitted = [f for f in sols if report[f]["mode"] in ("full", "update->full")]
     agn = {f: data[f][data[f]["is_agn"]] for f in sols}
 
     def zero_points():

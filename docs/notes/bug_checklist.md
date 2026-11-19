@@ -22,7 +22,7 @@ line in `future_improvements.md`.
   `spectroscopy/download.py:117`, `reduce.py:109`.
 - [ ] **B04** (QC): the `zp_offset` check uses the median ZP per camera *family*, not per camera, and drops all
   173 fa08 B frames. Needs a decision on fa08. `photometry/process.py:141`.
-- [ ] **B05** (main, ensemble): a run with no new frames re-runs the colour check against itself and writes a stale
+- [x] **B05** (main, ensemble; fixed 19 Nov, see the B05 commit): a run with no new frames re-runs the colour check against itself and writes a stale
   record. `photometry/ensemble.py:472`, `:699`.
 - [ ] **B06** (main, spectroscopy): `spec_products` crashes when 5100 Å is not covered (z ≈ 0.095–0.114).
   `spectroscopy/products.py:126`.
