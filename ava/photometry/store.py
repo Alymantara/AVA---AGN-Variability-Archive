@@ -44,6 +44,7 @@ FRAME_QC_COLUMNS = {
     "zp": "REAL", "zp_err": "REAL", "zp_scatter": "REAL", "zp_chi2nu": "REAL",
     "n_zp": "INTEGER", "n_zp_candidates": "INTEGER", "colour_slope": "REAL",
     "agn_matched": "INTEGER", "agn_flags": "INTEGER",
+    "agn_peak": "REAL",                # AGN FLUX_MAX + BACKGROUND (ADU): QC flag agn_saturated vs saturate
     "qc_flags": "TEXT",                # comma-separated reasons; '' = clean
     "qc_pass": "INTEGER",
     "pipeline_version": "TEXT", "processed_utc": "TEXT",

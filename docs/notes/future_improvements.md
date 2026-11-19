@@ -164,6 +164,25 @@ Newest decisions first within each section.
     `comment="#"`. Website Data and calibration pages updated. The photometry manual (LaTeX, user's) still
     describes the old columns.
 
+- **PyTICS error bars: pair test on all 36 AGN (19 Nov 2026; `docs/reports/pytics_update/pair_test_all_agn.md`,
+  `tools/pytics_validation/pair_scatter_*.py`, figures `docs/figures/pytics_errors/`).**
+  - The core is Gaussian. The PyTICS random error has the right mean width (0.95) but the wrong shape;
+    the fitted model (k 1.07, β 0.11, s₀ 1.1 mmag) gives width 1.00, held out across nights.
+  - Tails: 1.7 % beyond 3σ (Gaussian 0.27 %).
+    - **28 %** from bright epochs: the ~1.1 mmag floor PyTICS lacks plus outliers, not non-linearity on Sinistro.
+    - **12 %** from MuSCAT, SBIG and Spectral.
+    - **The rest** are isolated single-frame events at 1.1 %.
+  - **NGC 4151 MuSCAT is saturated** (2024–25, after the mirror realuminisation). Fixed: `camera_defaults.ep`
+    and the `agn_saturated` QC flag (`photometry.qc.max_agn_peak_frac` 0.8). Needs `-c` then `--pytics-full`
+    on turgon.
+  - **Done (user, 19 Nov 2026): the floor is part of the model.** `ensemble.error_model: fitted` is the default;
+    the fallbacks and the MuSCAT "scale" fit use `error_model_default` (k 1.07, β 0.11, s0 1.1 mmag), not the
+    PyTICS form; `error_model_min_floor` 1 mmag.
+  - **Decide:**
+    - the floor s₀ from star pairs too (1.0–1.2 mmag in quiet frames, 1.5 for the brightest);
+    - a larger s_cam in B and z (cross-camera pairs 1.45 within 1 h);
+    - the peak cut for comparison stars.
+
 ## Reference catalogue
 
 - Mirror reliability: `vizier.cfa.harvard.edu` lacks GSPC + APASS DR9 around NGC 5548; CDS (first in

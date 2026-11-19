@@ -116,4 +116,4 @@ def update_from_config(cfg, dry_run: bool = False) -> dict[str, dict]:
     """Pipeline entry point (publish step): settings ``ensemble.fvar_error``, ``ensemble.fvar_min_epochs``."""
     ec = cfg._raw.get("ensemble", {}) or {}
     return update_from_merged(cfg.db_path, cfg.phot_dir, str(ec.get("fvar_error", "total")),
-                              int(ec.get("fvar_min_epochs", 10)), str(ec.get("error_model", "pytics")), dry_run)
+                              int(ec.get("fvar_min_epochs", 10)), str(ec.get("error_model", "fitted")), dry_run)

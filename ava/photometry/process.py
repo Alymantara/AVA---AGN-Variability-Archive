@@ -86,7 +86,7 @@ def process_catalog(cat_path: Path, ref: pd.DataFrame, meta: dict, data_id: str,
                                    naxis2=meta.get("naxis2"), settings=settings)
     row.update(zp=zp.zp, zp_err=zp.zp_err, zp_scatter=zp.zp_scatter, zp_chi2nu=zp.chi2_nu, n_zp=zp.n_used,
                n_zp_candidates=zp.n_candidates, colour_slope=zp.colour_slope,
-               agn_flags=agn.get("sex_flags") if agn else None)
+               agn_flags=agn.get("sex_flags") if agn else None, agn_peak=agn.get("peak") if agn else None)
     cal["frame"] = frame
     out = cal[["frame", "star_id", "is_agn", "mag_inst", "magerr", "x", "y", "sex_flags", "sep_arcsec",
                "used_in_zp"]].copy()
@@ -121,6 +121,10 @@ def qc_flags(row: dict, q: dict) -> list[str]:
         f.append("agn_missing")
     elif row.get("agn_flags") not in (0, None) and np.isfinite(num("agn_flags")):
         f.append("agn_flagged")
+    # AGN close to saturation: non-linear before SExtractor's saturation flag (pair test, 19 Nov 2026;
+    # NGC 4151 on MuSCAT after the 2-m mirror was realuminised). Needs the frame's saturation level.
+    elif q.get("max_agn_peak_frac") and num("agn_peak") >= float(q["max_agn_peak_frac"]) * num("saturate"):
+        f.append("agn_saturated")
     if num("zp_scatter") > q["max_zp_scatter"]:
         f.append("zp_scatter")
     if num("fwhm_arcsec") > q["max_fwhm_arcsec"]:

@@ -345,7 +345,7 @@ photometry:
     # the saturation level and image size, which the listing lacks, from these per-camera values (by 2-letter
     # prefix).  A camera missing here gets no saturation / edge cut beyond SExtractor's own FLAGS (4 saturated,
     # 8 truncated), which already exclude such stars.  Sinistro: BANZAI headers, Nov 2026 (SATURATE 128800-129200).
-    # MuSCAT (ep) and Spectral (fs): read SATURATE / NAXIS1 / NAXIS2 from one of their e91 images and add them.
+    # MuSCAT (ep): from the legacy catalogues (below); Spectral (fs): 2016 headers. Check both against a current e91 header.
     camera_defaults:
       fa: {saturate: 128000, naxis1: 4096, naxis2: 4096}
       fl: {saturate: 128000, naxis1: 4096, naxis2: 4096}
@@ -353,6 +353,9 @@ photometry:
       # Spectral 2 m, 2x2, gain 7.7 (lco.global): SATURATE 500000 (fs02 ogg) / 512006 (fs01 coj), 2016 headers;
       # size varies (2009x2009 fs02, 2045x2013 fs01): the smaller, so the edge cut errs on the safe side.
       fs: {saturate: 500000, naxis1: 2009, naxis2: 2009}
+      # MuSCAT3 (ep02-ep05): peak counts (FLUX_MAX + BACKGROUND) pile up at 119k (ep03) - 134k (ep05) ADU in the
+      # legacy Mrk 817 catalogues (2021); the lowest, so the cut is safe for every camera. 2048x2048 (catalogue extent).
+      ep: {saturate: 118000, naxis1: 2048, naxis2: 2048}
 
   # Frame QC (flags stored in frame_qc.qc_flags; qc_pass = no flag).
   qc:
@@ -360,6 +363,10 @@ photometry:
     max_zp_scatter: 0.05       # mag, star-to-star scatter about the frame zero point
     max_fwhm_arcsec: 4.5
     max_zp_dev: 0.5            # mag, |ZP - median ZP of the target's camera/filter| (clouds, focus)
+    # AGN peak (FLUX_MAX + BACKGROUND) above this x the frame's saturation level: flag agn_saturated (19 Nov 2026).
+    # Same fraction as the zero-point standards (calibration.max_peak_frac). Saturated MuSCAT frames of NGC 4151
+    # (2024-25) passed without it; below ~0.8 of saturation the pair test shows no non-linearity on Sinistro.
+    max_agn_peak_frac: 0.8
     # Per-filter overrides (~2x the typical value; Mrk 817, Nov 2026).  z_s and Y scatter
     # more until LCO<->SDSS-z / PS1-y colour terms exist; u has few standards.
     # Per-camera overrides (applied after per_filter).  MuSCAT3's 9' field holds only
@@ -537,16 +544,22 @@ ensemble:
   fvar_error: "total"     # errors in the excess variance: "total" (conservative) | "random"
   fvar_min_epochs: 10     # bands with fewer good epochs are not measured
 
-  # --- AGN error model (ava.photometry.errors; UNDER VERIFICATION) ---
-  # Always fitted and written (pytics/error_model.csv, columns mag_err_model[_rand],
-  # Ferr_model[_rand]) so it can be checked; "fitted" also uses it for the CSV and plots.
+  # --- AGN error model (ava.photometry.errors) ---
+  # Always fitted and written (pytics/error_model.csv, columns mag_err_model[_rand], Ferr_model[_rand]).
   #   σ_rand² = (k σ_phot)² + (β rms_t)² + s0²  per filter x camera family, from same-camera
   #   AGN pairs < error_model_max_dt_hours; σ_tot² = σ_rand² + s_cam² from different-camera
   #   pairs < error_model_cross_dt_days.
-  error_model: "pytics"            # "pytics" (σ_phot ⊕ rms_t ⊕ rms_sc) | "fitted"
+  # Default "fitted" since 19 Nov 2026: the pair test of all AGN (docs/reports/pytics_update/pair_test_all_agn.md)
+  # shows the PyTICS error lacks a ~1.1 mmag floor s0 and over-counts rms_t (only ~11 % applies); the model
+  # gives unit width, held out across nights.
+  error_model: "fitted"            # "fitted" | "pytics" (σ_phot ⊕ rms_t ⊕ rms_sc)
+  # Model where a group cannot be fitted (too few pairs, filter or camera family missing) and shape of the
+  # one-factor "scale" fit: pooled fit of all Sinistro back-to-back AGN pairs (36 AGN, Nov 2026).
+  error_model_default: {k: 1.07, beta: 0.11, s0: 0.0011}
+  error_model_min_floor: 0.001     # mag; s0 never below this (AGN and stars: 1.0-1.2 mmag in quiet frames)
   error_model_max_dt_hours: 1.0
   error_model_cross_dt_days: 0.25
-  error_model_min_pairs: 150       # fewer: pooled over the filter, then PyTICS
+  error_model_min_pairs: 150       # fewer: pooled over the filter, then error_model_default
   error_model_min_cross_pairs: 30
   error_model_min_error_range: 2.5 # p90/p10 of the quoted errors below which only a scale factor is fitted
 

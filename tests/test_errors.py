@@ -37,10 +37,23 @@ def test_recovers_error_scale():
         assert (r.groupby(pd.qcut(true, 4)).median().sub(1).abs() < 0.25).all()
 
 
-def test_scale_fallback_and_pytics_default():
+def test_scale_fallback_and_default_keep_the_floor():
+    """19 Nov 2026: the fallbacks use the default model (with the floor), not the PyTICS form (no floor)."""
     lc = _lc(n_nights=60)
     lc["magerr"] = 0.003; lc["rms_t"] = 0.001                # no dynamic range -> scale only
     t = ER.fit_error_model(lc, min_pairs=50)
-    assert (t.source == "scale").all() and np.allclose(t.k, t.beta) and (t.s0 == 0).all()
-    t = ER.fit_error_model(lc, min_pairs=10_000)             # too few pairs -> PyTICS
-    assert (t.source == "pytics").all() and np.allclose(t[["k", "beta"]], 1)
+    d = ER.DEFAULT
+    assert (t.source == "scale").all() and (t.s0 > 0).all()
+    assert np.allclose(t.k / t.beta, d["k"] / d["beta"]) and np.allclose(t.k / t.s0, d["k"] / d["s0"])
+    t = ER.fit_error_model(lc, min_pairs=10_000)             # too few pairs -> the default model
+    assert (t.source == "default").all()
+    assert np.allclose(t[["k", "beta", "s0"]].to_numpy(), [[d["k"], d["beta"], d["s0"]]])
+
+
+def test_min_floor_and_missing_group_get_a_floor():
+    lc = _lc(s0=0.0)                                         # data without a floor: the fit finds s0 ~ 0
+    t = ER.fit_error_model(lc, min_pairs=100, min_floor=0.001)
+    assert (t.s0 >= 0.001).all()
+    bright = pd.DataFrame({"Filter": ["rp"], "camera": ["fa05"], "magerr": [0.0003], "rms_t": [0.0]})
+    sig = ER.sigma_rand(bright, t)                            # rp not in the table -> DEFAULT
+    assert sig[0] >= ER.DEFAULT["s0"]

@@ -385,6 +385,16 @@ Since 19 Nov 2026 the fit uses every star in the frames, not only the comparison
 Without it, dense fields and Y had no usable anchors. After upgrading, run a full PyTICS refit
 (`--pytics-full`) once, so every target's zero point is recomputed.
 
+Saturated AGN (19 Nov 2026): calibration stores the AGN's peak counts (`frame_qc.agn_peak`), and frame QC flags
+`agn_saturated` above `photometry.qc.max_agn_peak_frac` (0.8) × the frame's saturation level. Frames without
+their image take that level from `photometry.calibration.camera_defaults`, which now includes MuSCAT (`ep`).
+Existing frames need a recalibration (`-c`) to get `agn_peak`.
+
+Error bars (19 Nov 2026): the products use the fitted error model by default (`ensemble.error_model: fitted`,
+`ava/photometry/errors.py`). It always includes a floor: `ensemble.error_model_default` (k 1.07, β 0.11,
+s0 1.1 mmag) where a fit is not possible, and `ensemble.error_model_min_floor` (1 mmag). Evidence:
+`docs/reports/pytics_update/pair_test_all_agn.md`.
+
 PyTICS products per target (`-t`; `ensemble.export_csv`, `ensemble.export_qc_csv`):
 - `<target>_LCO_merged_lightcurve.csv`: the **shareable** light curve, published as a download. It has a `#`
   header describing every column; read it with `comment="#"`. Columns: target, MJD, filter, telescope, camera,

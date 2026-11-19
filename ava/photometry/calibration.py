@@ -146,5 +146,7 @@ def calibrate_frame(meas: pd.DataFrame, ref: pd.DataFrame, *, filt: str, exptime
         r = a.iloc[0]
         agn = dict(mag_inst=float(r["mag_inst"]), magerr_inst=float(r["magerr"]),
                    mag=float(r["mag_inst"] + zp.zp), mag_err=float(np.hypot(r["magerr"], zp.zp_err)),
-                   sex_flags=int(r["sex_flags"]))
+                   sex_flags=int(r["sex_flags"]),
+                   # peak counts (FLUX_MAX + BACKGROUND, ADU): frame QC flags near-saturated AGN
+                   peak=float(r["flux_max"] + r["background"]) if {"flux_max", "background"} <= set(r.index) else np.nan)
     return m.drop(columns=[c for c in m.columns if c.startswith("lco_")]), zp, agn

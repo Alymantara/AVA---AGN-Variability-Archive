@@ -68,17 +68,21 @@ def intercal_lightcurve(phot: Path, ec) -> pd.DataFrame:
 
 def add_error_model(lc: pd.DataFrame, phot: Path, ec) -> pd.DataFrame:
     """Fit the empirical error model (ava.photometry.errors) on the AGN pairs and add
-    mag_err_model[_rand] / Ferr_model[_rand]; always computed (for verification), used for
-    the products only when ``error_model: fitted``."""
+    mag_err_model[_rand] / Ferr_model[_rand]; always computed, used for the products when
+    ``error_model: fitted`` (the default since 19 Nov 2026: it has the floor the PyTICS errors lack)."""
     from ava.photometry import errors as ER
 
+    d = ec.get("error_model_default")
+    d = vars(d) if hasattr(d, "__dict__") else d
+    default = {k: float(v) for k, v in (d or ER.DEFAULT).items()}
     table = ER.fit_error_model(lc, mag="mag_ic", max_dt=float(ec.get("error_model_max_dt_hours", 1.0)) / 24,
                                max_dt_cross=float(ec.get("error_model_cross_dt_days", 0.25)),
                                min_pairs=int(ec.get("error_model_min_pairs", 150)),
                                min_cross_pairs=int(ec.get("error_model_min_cross_pairs", 30)),
-                               min_error_range=float(ec.get("error_model_min_error_range", 2.5)))
+                               min_error_range=float(ec.get("error_model_min_error_range", 2.5)),
+                               default=default, min_floor=float(ec.get("error_model_min_floor", 0.0)))
     table.to_csv(phot / "pytics" / "error_model.csv", index=False)
-    out = ER.apply_error_model(lc, table)
+    out = ER.apply_error_model(lc, table, default)
     k = out["F_ic"] * np.log(10) / 2.5
     out["Ferr_model"] = k * out["mag_err_model"]
     out["Ferr_model_rand"] = k * out["mag_err_model_rand"]
@@ -300,7 +304,7 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         return {"target": target, "skipped": "no filter with enough passing frames"}
     lc = intercal_lightcurve(phot, ec)
     files = []
-    error_model = str(ec.get("error_model", "pytics"))
+    error_model = str(ec.get("error_model", "fitted"))
     merged_csv = None
     if ec.get("export_csv", True):
         csv = phot / f"{target}_LCO_merged_lightcurve.csv"
@@ -323,7 +327,7 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
 
         fd = wp.load_filter_dict(cfg._resolve(cfg.plots.filter_dict))
         merged = pd.DataFrame({"mjd_mid": lc["MJD"], "filter": lc["Filter"], "mag": lc["mag_ic"],
-                               "mag_err": lc["mag_err_model" if ec.get("error_model", "pytics") == "fitted" else "mag_ic_err"],
+                               "mag_err": lc["mag_err_model" if ec.get("error_model", "fitted") == "fitted" else "mag_ic_err"],
                                "qc_pass": lc["good"].astype(int)})
         merged = merged[np.isfinite(merged["mag"].to_numpy(float))]     # no absolute ZP -> NaN mag: not plotted
         spec, last = spectroscopy_epochs(target)
