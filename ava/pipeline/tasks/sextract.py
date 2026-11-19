@@ -50,10 +50,20 @@ from ava.config import cfg
 from ava.photometry.process import imaging_frame_ok  # noqa: E402  (imaging_camera_prefixes, camera_telescopes)
 
 
+def newest_first_key(name: str) -> tuple:
+    """Sort key for 'newest first': the observing date and frame number in the LCO name
+    (``<site><tel>-<camera>-<YYYYMMDD>-<NNNN>-e91``), then the name. Sorting by name alone ordered by site and
+    telescope (B18), so a capped run (``max_frames_per_run``) extracted whole sites before recent frames."""
+    parts = name.split("-")
+    date = parts[2] if len(parts) > 3 and parts[2].isdigit() else ""
+    num = parts[3] if len(parts) > 3 and parts[3].isdigit() else ""
+    return date, num, name
+
+
 def frames_to_extract(target: str) -> tuple[list[Path], int, int]:
     """(frames without a catalogue, newest first; n frames; n catalogues)."""
     raw, catdir = cfg.phot_raw(target), cfg.sextractor_dir(target)
-    frames = sorted(raw.glob("2*/*e91.fits.fz"), key=lambda p: p.name, reverse=True)
+    frames = sorted(raw.glob("2*/*e91.fits.fz"), key=lambda p: newest_first_key(p.name), reverse=True)
     # imaging cameras only (Sinistro fa/fl, Spectral fs, MuSCAT ep, SBIG kb on the 1 m) — FLOYDS (en) products
     # are handled by the spectroscopy pipeline; the legacy glob extracted them too.
     frames = [f for f in frames if imaging_frame_ok(f.name)]

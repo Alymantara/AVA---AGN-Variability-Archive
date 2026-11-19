@@ -940,3 +940,10 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   position fix (`0d3024f`); check those two after the planned catalogue rebuild.
 - Test: `tests/test_agn_relabel.py`.
 
+## B18: SExtractor "newest first" was ordered by site (19 Nov 2026)
+
+- **Bug.** `frames_to_extract` sorted the raw frames by file name, which starts with site and telescope (`coj…`,
+  `lsc…`, `ogg…`, `tfn…`). A capped run (`photometry.sextractor.max_frames_per_run`) on a backlog therefore
+  extracted whole sites first, not the recent frames.
+- **Fix.** `newest_first_key` sorts by observing date and frame number from the LCO name, then by name.
+- Test: `tests/test_sextract_order.py`.

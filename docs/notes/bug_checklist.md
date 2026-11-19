@@ -46,7 +46,7 @@ line in `future_improvements.md`.
 - [x] **B16** (QC; fixed 19 Nov, B16 commit): a NaN `saturate`/`naxis` rejects every standard, so the frame silently gets `no_zp`.
   `photometry/calibration.py:76`.
 - [x] **B17** (QC; fixed 19 Nov, B17 commit): frames that raised an exception are never retried. `photometry/process.py:227`.
-- [ ] **B18** (main, photometry): "newest first" in SExtractor sorts by site, not by date. `pipeline/tasks/sextract.py:56`.
+- [x] **B18** (main, photometry; fixed 19 Nov, B18 commit): "newest first" in SExtractor sorts by site, not by date. `pipeline/tasks/sextract.py:56`.
 
 ## 3b. Found on 19 Nov (high-z spectra download and reduction test)
 
