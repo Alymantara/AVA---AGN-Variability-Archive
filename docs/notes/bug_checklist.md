@@ -112,6 +112,30 @@ line in `future_improvements.md`.
 - [ ] **C11**: stars with NaN RUWE pass `quality_ok`.
 - [ ] **C12**: the website's `ava_stats()` sums over all targets, without the target filter.
 
+## 6. PyTICS error bars and calibration: decisions from the pair test (19 Nov 2026)
+
+Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and
+`docs/reports/abscal/report_abscal.md`. Done in `6b7dc5e`: the floor is part of the error model,
+`error_model: fitted` is the default, MuSCAT saturation is set, and there is an AGN peak check.
+
+- [ ] **E01** (turgon, action): recalibrate (`-c`) so frames get `agn_peak` and the `agn_saturated` flag (NGC 4151
+  MuSCAT 2024–25), then `--pytics-full` for every target (new anchors, error model, file format).
+- [ ] **E02**: a per-epoch floor. $s_0$ follows the conditions: 1.5 mmag at ≤ 30 s against 0.95 at ≥ 60 s,
+  1.1 → 1.7 from airmass 1.2 to 1.7, 1.0 → 1.7 from 1.5″ to 3.5″ seeing, 0.4 mmag night to night. Model it as
+  scintillation (Young: D, airmass, exposure) plus a seeing term? Needs `exptime` / `airmass` / seeing per epoch.
+- [ ] **E03**: the camera-to-camera term `s_cam` is too small in B and z (cross-camera pairs within 1 h: width
+  1.45). Raise it, or fit it per camera family.
+- [ ] **E04**: the peak cut for the comparison stars too (`measurements.parquet` needs the peak). The bright-star tail
+  is the same as the AGN's.
+- [ ] **E05**: fit the floor on star pairs as well (8 M pairs; per camera: fa08 1.5 mmag against 0.9–1.2 elsewhere).
+- [ ] **E06**: check MuSCAT `saturate` (118000, from catalogue pile-up) and Spectral (2016 headers) against a current
+  e91 header.
+- [ ] **E07**: the AGN magnitude system. Publish in the LCO natural AB system, with reference-system fluxes as a
+  derived product (emission lines: up to 0.18 mag in r)? See the calibration report.
+- [ ] **E08**: per-camera passbands (mirrors; MuSCAT, SBIG, Spectral) and the B/V/i synthetic-vs-empirical colour-term
+  mismatch, before relying on B, V, i, u at the 1 % level.
+- [ ] **E09**: PS1 DR2 y anchors for 12.5 < G < 14.2 (dec > −30°), so Y has bright anchors.
+
 ## Already fixed elsewhere (for reference)
 
 - [x] PyTICS crashes from the first host run: empty pyarrow filter, missing `pytics/` folder, a target without
