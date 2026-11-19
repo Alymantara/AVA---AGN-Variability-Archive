@@ -205,6 +205,9 @@ def load_pytics(phot_dir: Path, db: Path, data_id: str, filt: str | None = None,
         return pd.DataFrame({c: pd.Series(dtype=MEAS_DTYPES.get(c, "object")) for c in cols})
     meas = pd.read_parquet(Path(phot_dir) / "measurements.parquet",
                            filters=[("frame", "in", list(fq["frame"]))] if len(fq) < 50000 else None)
+    # rows written before B11 (19 Nov 2026) may hold SExtractor's 99 "no measurement" magnitude / error
+    ok = np.isfinite(meas["mag_inst"]) & np.isfinite(meas["magerr"]) & (meas["mag_inst"] < 90) & (meas["magerr"] < 90)
+    meas = meas[ok]
     t = meas.merge(fq[["frame", "mjd_mid", "filter", "tel", "camera", "airmass", "fwhm_arcsec"]], on="frame")
     return t.rename(columns={"mjd_mid": "MJD", "filter": "Filter", "tel": "telid",
                              "fwhm_arcsec": "seeing"}).sort_values(["MJD", "star_id"]).reset_index(drop=True)

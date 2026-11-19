@@ -871,3 +871,17 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
   - Fix: a named proposal is always crawled, from `synced_until − overlap_days`. A plain `sync` still skips it.
 - Tests: `test_sync_named_proposals_not_listed_are_still_crawled`, `test_sync_named_inactive_complete_proposal_is_crawled`,
   `test_sync_plain_still_skips_inactive_complete`.
+
+## B11: SExtractor "no measurement" rows (19 Nov 2026)
+
+- **Bug.** SExtractor writes `MAG_APER = MAGERR_APER = 99` when the aperture flux is ≤ 0. These rows went into
+  `measurements.parquet` and on into PyTICS.
+  - Mrk 817: 4865 of 2.2 M rows, 3310 of them with FLAGS 0, which the flag cut keeps.
+  - The error was also absurd on some other rows (up to 813 mag).
+- **Fix.**
+  - `catalogs.measurements` drops rows whose magnitude or error is non-finite or ≥ 90 (`SEX_NO_MAG`).
+  - `store.load_pytics` drops them from measurements already written, so no re-extraction is needed.
+- **Effect on Mrk 817:** none. A full PyTICS fit with and without the cut gives the same 17,473 epochs and
+  0.000 mmag difference in every filter; with 99 mag errors the rows had no weight. They are still not
+  measurements, though: they counted towards star selection and could reach an unweighted step.
+- Tests: `tests/test_sentinel_mags.py` (both fail on the previous commit).

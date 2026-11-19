@@ -42,6 +42,9 @@ SCALAR_COLS = {
 APERDIAM_KEY = "APERDIAM"
 
 
+#: SExtractor magnitudes / errors at or above this are its "no measurement" value (99)
+SEX_NO_MAG = 90.0
+
 def format_aperdiam(diameters) -> str:
     return ",".join(str(int(d)) for d in diameters)
 
@@ -232,8 +235,11 @@ def measurements(cat: Catalog, matched: pd.DataFrame, aperture_index: int) -> pd
     x, y, fwhm_px, flags, ... ; plus the frame basename.
     """
     m = matched["star_id"].notna().to_numpy()
+    mag, err = cat.mag_aper[:, aperture_index], cat.magerr_aper[:, aperture_index]
+    # SExtractor writes 99 for the magnitude and its error when the aperture flux is <= 0: no measurement (B11)
+    m &= np.isfinite(mag) & np.isfinite(err) & (mag < SEX_NO_MAG) & (err < SEX_NO_MAG)
     out = matched.loc[m].copy()
-    out["mag"] = cat.mag_aper[m, aperture_index]
-    out["magerr"] = cat.magerr_aper[m, aperture_index]
+    out["mag"] = mag[m]
+    out["magerr"] = err[m]
     out.insert(0, "frame", cat.path.name.replace("_cat.fits", ""))
     return out.reset_index(drop=True)

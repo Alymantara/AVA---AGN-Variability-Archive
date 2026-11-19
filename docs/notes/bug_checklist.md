@@ -31,7 +31,7 @@ line in `future_improvements.md`.
   PDS 456 (z ≳ 0.11). `spectroscopy/lines.py:79`, `products.py:84`.
 - [x] **B09** (main, lcodb; fixed in `797debc` with B01): a run of short 429s makes `Client.get` return `None`. `lcodb/api.py:85`.
 - [x] **B10** (main, lcodb; fixed 19 Nov, B10/B13 commit): `sync --proposal A B` silently drops B when discovery doesn't list it. `lcodb/ingest.py:196`.
-- [ ] **B11** (QC): `MAG_APER = 99` rows go into `measurements.parquet` and PyTICS. `photometry/catalogs.py:228`,
+- [x] **B11** (QC; fixed 19 Nov, B11 commit; no change on Mrk 817): `MAG_APER = 99` rows go into `measurements.parquet` and PyTICS. `photometry/catalogs.py:228`,
   `process.py:91`.
 
 ## 3. Low
