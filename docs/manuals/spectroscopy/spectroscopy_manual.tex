@@ -138,9 +138,22 @@ Table & Contents \\
 
 \subsection{Standard-star coverage}
 
-As of November 2026 the archive contains 9\,524 science spectra across 71 AGN.
-\textbf{All 9\,524 have at least one matched spectrophotometric standard observed
-on the same night from the same site.}  Zero science frames lack a flux calibrator.
+As of November 2026 the spectra database holds 9\,160 AGN science spectra.  A
+standard is only useful if banzai-floyds has a reference spectrum for it: a star it
+does not know is treated as a science target, and in a fresh calibration database the
+night gets no flux calibration.  The fork now carries reference spectra for 12
+standards (\path{banzai_floyds/data/standards/}): the original 7 (Feige\,110,
+Feige\,34, Feige\,67, GD\,108, GD\,153, EG\,274, BD+28\,4211) plus GD\,71, HZ\,44,
+G191-B2B, Feige\,66 and CD-32\,9927, added on 19 November 2026 from the ESO
+spectrophotometric standards.
+
+The standard matching in \texttt{lcodb} (view \texttt{spectrum\_standards}) only
+considers standards within \texttt{standards.usable\_radius\_arcsec} (300$''$) of a
+reference position (\texttt{standards.reference\_dir}).  With this restriction
+\textbf{8\,959 of the 9\,160 AGN spectra (98\,\%) have a usable standard} within
+60\,d, with a median separation of 0.29\,d; before the five additions only about
+46\,\% did.  The standards without a reference spectrum (L745-46A, EG\,21) are no
+longer chosen.
 
 %%============================================================
 \section{Download Stage}
@@ -325,6 +338,78 @@ The [O\,\textsc{iii}]\,5007 flux anchors the relative epoch-to-epoch flux
 calibration: narrow-line variability is assumed negligible on monitoring
 timescales.
 
+\subsection{Choice of arm for H$\beta$ and 5100\,\AA}
+
+The blue arm ends at 5608\,\AA\ observed at OGG and 5765\,\AA\ at COJ; the red arm
+starts at 4893 and 4524\,\AA\ and runs to about 10\,000\,\AA\
+(Fig.~\ref{fig:arm-coverage}).  Above $z \approx 0.09$ the blue arm no longer reaches
+the 5100\,\AA\ continuum window, and above $z \approx 0.1$--0.2 not the H$\beta$
+window either, while the red arm covers both.  H$\beta$, [O\,\textsc{iii}] and the
+continuum are therefore measured in one arm per target:
+\texttt{spectroscopy.products.hbeta\_arm: auto} uses the blue arm below
+\texttt{hbeta\_red\_arm\_above\_z} (0.09) and the red arm above it (PG\,0804+761,
+Mrk\,876, 3C\,273, PDS\,456, PG\,0923+201, \dots).  A target never mixes arms: on
+PG\,0804+761 the red-arm H$\beta$/[O\,\textsc{iii}] is 6--13\,\% above the blue-arm
+value, in line with the blue/red offset found by the absolute-calibration study.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/floyds_arm_coverage}
+  \caption{\emph{Left:} rest-frame reach of the two FLOYDS arms against redshift
+    (solid COJ, dashed OGG), with the H$\beta$ fit window and the 5100\,\AA\ continuum
+    window, and every target with FLOYDS spectra at $z \ge 0.08$.  \emph{Right:} a
+    Fairall\,9 spectrum: the arms overlap between 4520 and 5766\,\AA\ and agree there.}
+  \label{fig:arm-coverage}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{spectroscopy/pg0923_hbeta_red_arm}
+  \caption{H$\beta$ fit of PG\,0923+201 ($z=0.193$) in the red arm.  In the blue arm
+    the H$\beta$ window is not covered at this redshift.  The lower panel shows
+    $\chi$, the residual divided by its error.}
+  \label{fig:pg0923-red}
+\end{figure}
+
+\subsection{Sensitivity to the choice of standard star}
+
+To see how much the result depends on the standard, two nights of PG\,0804+761
+(OGG) were reduced twice, each time with a single standard: on 2026 November 10
+with G191-B2B of the same night and with BD+28\,4211 taken 15\,d earlier; on 2026
+October 19 with BD+28\,4211 of the same night and with G191-B2B taken 13\,d later
+(Fig.~\ref{fig:std-compare}).
+
+\begin{itemize}
+  \item \textbf{Overall flux level: very different.}  The flux scale changes by a
+        factor 0.58--0.62 and 0.83--0.84.  This grey factor comes from the
+        conditions of the standard's own night (transparency, slit losses), so a
+        single FLOYDS spectrum is not an absolute flux to better than tens of per
+        cent unless the standard is from the same night.
+  \item \textbf{Shape of the calibration: agrees to a few per cent.}  Within
+        $\pm$2--4\,\% along the blue arm; in the red arm a 5\,\% tilt between 5000 and
+        7000\,\AA\ and larger structure at the telluric bands (7200, 7600, 8200,
+        9300\,\AA), which differ from night to night.
+  \item \textbf{H$\beta$ after the [O\,\textsc{iii}] scaling: unchanged.}  The
+        light curve uses H$\beta$/[O\,\textsc{iii}], which changes by $-1.3$ to
+        $+2.8$\,\% between the two standards, within the fit errors of 3--6\,\%; the
+        5100\,\AA\ continuum by at most $\pm$2\,\%.
+\end{itemize}
+
+The nearest usable standard, even two weeks away, is therefore adequate for the
+H$\beta$ light curve.  Absolute fluxes and the red end of the spectrum are where the
+choice of standard matters.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{spectroscopy/floyds_standard_comparison}
+  \caption{PG\,0804+761 reduced with two different standards per night.
+    \emph{Left:} ratio of the two flux calibrations (B/A, each scaled to its median),
+    blue and red arm; the grey factor B/A is given in each title.  \emph{Right:}
+    H$\beta$/[O\,\textsc{iii}] with standard B over that with standard A, per exposure
+    and arm, the quantity the light curve uses.}
+  \label{fig:std-compare}
+\end{figure}
+
 \subsection{H$\beta$ time series}
 
 \begin{figure}[htbp]
@@ -461,6 +546,18 @@ list, the AVA database, and the \path{config/ava_config.yaml} configuration.
         above 7000\,\AA\ (O$_2$ B band at 6900\,\AA, A band at 7600\,\AA).
   \item \textbf{H$\alpha$ fitting.}  Planned for the red arm; deferred until
         flux calibration is fully validated across both sites.
+  \item \textbf{A model of the flux calibration.}  Each night is now calibrated
+        with one standard, so the result carries that night's grey factor and
+        telluric absorption (Section~\ref{sec:products}).  With several thousand
+        standard-star spectra per site, a model could be fitted to all of them
+        together: a smooth instrument response per site, arm and slit as a function of
+        wavelength and time (it drifts slowly with coatings, alignment and
+        re-aluminisation), an atmospheric extinction curve per site, a grey term per
+        night, and a telluric template scaled with airmass and water vapour.  Each
+        science spectrum would then be calibrated with the model evaluated at its own
+        time and airmass rather than with one standard, which would reduce the
+        night-to-night scatter, give a consistent red end and quantify the absolute
+        flux uncertainty.  The same model could tie the blue and red arms together.
   \item \textbf{Public data release.}  Final reduced spectra and RM products
         for completed targets will be released at
         \path{https://alymantara.com/ava}.

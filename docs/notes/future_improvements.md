@@ -821,3 +821,20 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
 - **B23, new.** The COJ arcs of April 2021 are marked bad without a message, even in a fresh DB, so those nights
   still give no spectra. This is in the fork's wavelength step.
 - The Hβ-fit plot's residual axis is now labelled χ.
+
+## FLOYDS: sensitivity to the standard star, and a calibration model (19 Nov 2026)
+
+- **Test.** PG 0804+761, two OGG nights, each reduced twice with a single standard (G191-B2B against BD+28 4211,
+  same night against 13–15 d away). Spectroscopy manual, "Sensitivity to the choice of standard star".
+  - The grey factor differs by 0.58–0.84.
+  - The shape agrees within 2–4 % in the blue arm. The red arm has a 5 % tilt and telluric structure.
+  - Hβ/[O III] changes by −1.3 to +2.8 %, within the fit errors.
+- **Idea (user, 19 Nov 2026): a model of the flux calibration from all the standards.** Per site, arm and slit:
+  - a smooth response in wavelength and time;
+  - extinction per site;
+  - a grey term per night;
+  - a telluric template scaled with airmass and water vapour.
+
+  Each science spectrum would then be calibrated with the model at its own time and airmass, not with one
+  standard. This should reduce the night-to-night scatter, give a consistent red end, quantify the absolute flux
+  error, and tie the blue and red arms together.
