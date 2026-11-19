@@ -5,6 +5,7 @@
 \usepackage{mathptmx}
 \usepackage[a4paper,top=2.3cm,bottom=2.5cm,left=2.4cm,right=2.4cm,headsep=0.6cm]{geometry}
 \usepackage{graphicx}
+\usepackage[section]{placeins}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{tabularx}
@@ -68,10 +69,10 @@
 \noindent
 \raisebox{-0.5\height}{\includegraphics[height=1.4cm]{../st_logo_horizontal}}%
 \hfill
-\raisebox{-0.5\height}{\includegraphics[height=1.0cm]{../../lco_logo}}
+\raisebox{-0.5\height}{\includegraphics[height=1.0cm]{../lco_logo}}
 \vspace*{0.8cm}
 {\color{avaInkBlue}\rule{\textwidth}{1.5pt}}\\[6pt]
-{\centering\includegraphics[width=\textwidth,height=1.4cm,keepaspectratio=false]{../../banner}\\[6pt]}
+{\centering\includegraphics[width=\textwidth,height=1.4cm,keepaspectratio=false]{../banner}\\[6pt]}
 {\LARGE\bfseries\color{avaAbyss} PyTICS ensemble calibration in the AVA pipeline: integration, validation and per-camera colour terms\par}
 \vspace{6pt}
 {\large\itshape\color{avaInkBlue} Mrk\,817 test archive $\cdot$ 15--16 November 2026\par}
@@ -90,6 +91,351 @@
 \clearpage
 
 %%============================================================
+\chapter{PyTICS in AVA: model and changes}
+\label{ch:methods}
+%%============================================================
+
+This report describes how the PyTICS ensemble calibration of Vieliute et~al.~\cite{Vieliute2025} was built into the
+AVA photometry pipeline, what was changed relative to the published code
+(\url{github.com/Astroberta/PyTICS}, commit \texttt{003bcbd}, \texttt{Filter.Corr} and
+\texttt{Filter.AGN\_LC}), and how it performs on the Mrk\,817 test archive (LCO 1-m Sinistro and
+2-m MuSCAT3, 2020--2026). All numbers quoted here come from the stored solutions in
+\texttt{<phot>/pytics/} and from the statistics files written by the figure scripts in
+\texttt{tools/pytics\_validation/} (\texttt{docs/figures/pytics/*.json}, \texttt{*.csv}).
+
+Figure~\ref{fig:workflow} at the end of this chapter shows the whole ensemble stage at a glance: what
+goes in, which steps come from the published PyTICS and which were added for AVA, and what comes out.
+Table~\ref{tab:notation} lists every symbol used in the equations of this report; each one is also
+defined where it first appears.
+
+\begin{table}[!htbp]
+\centering
+\caption{Notation. Magnitudes are in mag unless stated; ``scope'' $k$ is one telescope + camera, ``epoch''
+  $t$ one frame, ``star'' $s$ one comparison star.}
+\label{tab:notation}
+\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+Symbol & Meaning \\
+\midrule
+$m_\mathrm{obs}$ & Instrumental magnitude of a source in one frame, in the science aperture
+  ($-2.5\log_{10}$ of counts per second). \\
+$\sigma_\mathrm{phot}$ & Photometric error of $m_\mathrm{obs}$ from SExtractor (photon and background noise). \\
+$m^\star_s$ & Mean magnitude of comparison star $s$ on the ensemble's internal system. \\
+$\Delta T_t$ (\texttt{DMAGT}) & Correction for epoch $t$: everything that shifts all stars in one frame
+  together (extinction, transparency, exposure-time errors). \\
+$\Delta S_k$ (\texttt{DMAGS}) & Constant offset of scope $k$ (throughput of telescope + filter + detector). \\
+$\mathrm{rms}_t$, $\mathrm{rms}_{\mathrm{sc},k}$, $\mathrm{rms}_{\star,s}$ & Extra scatter (added in
+  quadrature to $\sigma_\mathrm{phot}$) needed to make the data of one epoch, one scope or one star
+  consistent with the model. $\mathrm{rms}_\star$ is large for variable stars. \\
+$\sigma_\mathrm{tot}$ & Total error of one comparison-star measurement in the fit (Eq.~\ref{eq:pytics}). \\
+$c_s$ & Colour $g-i$ of star $s$ from the reference catalogue (Gaia XP synthetic photometry, GSPC). \\
+$c_0$, $c_0'$ & Median $g-i$ of the comparison stars in the ensemble fit ($c_0$) and of the stars used in
+  the absolute zero point ($c_0'$); colours are measured from these pivots. \\
+$CK_k$ & Colour slope of scope $k$ relative to the ensemble (mag per mag of $g-i$), with weighted mean zero over the scopes. \\
+$o_{s,k}$, $\sigma_o$ & Mean residual of star $s$ on scope $k$ after the full model, and its error. \\
+$m_{\mathrm{ref},s}$, $\sigma_\mathrm{ref}$ & Reference (GSPC) magnitude of star $s$ in the LCO band, and its error. \\
+$\sigma_{m^\star}$ & Error of the fitted star mean $m^\star_s$. \\
+$ZP$, $C$ & Absolute zero point and colour slope of one filter: they map $m^\star$ onto $m_\mathrm{ref}$ (Eq.~\ref{eq:abszp}). \\
+$c_\mathrm{AGN}$, $ZP_\mathrm{AGN}$ & $g-i$ of the AGN (in the aperture, host included), and the zero point evaluated at that colour. \\
+$F$ & Flux density in mJy, from the AB magnitude: $F = 3631\times10^{3}\times10^{-0.4m}$\,mJy. \\
+$F_k$, $F_\mathrm{ref}$ & Nightly AGN flux of scope $k$, and of the reference cameras on the same night. \\
+$a$, $b$ & Slope and additive offset of the flux--flux fit $F_k = aF_\mathrm{ref}+b$; $b_1$ is $b$ with $a\equiv1$. \\
+$\Delta m$, $\sigma_z$ & Magnitude difference of two epochs of the AGN; $\sigma_z$ is the robust standard
+  deviation ($1.4826\times$ median absolute deviation) of a residual divided by its quoted error. $\sigma_z=1$
+  means the errors are right; $<1$ too large, $>1$ too small. \\
+$k$, $\beta$, $s_0$, $s_\mathrm{cam}$ & Parameters of the empirical error model,
+  $\sigma_\mathrm{rand}^2=(k\sigma_\mathrm{phot})^2+(\beta\,\mathrm{rms}_t)^2+s_0^2$ and
+  $\sigma_\mathrm{tot}^2=\sigma_\mathrm{rand}^2+s_\mathrm{cam}^2$ (Sect.~\ref{sec:agnlc}). \\
+$p$, $\sigma_p$ & Any fitted parameter and its error (in the convergence test). \\
+$\chi^2_\nu$ & Reduced chi-square of a fit. \\
+\texttt{safe}, \texttt{tiny}, \texttt{atol} & Damping factor (0.6), PyTICS convergence threshold ($10^{-4}$
+  of the error) and AVA stationarity threshold ($10^{-5}$\,mag). \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{The PyTICS model}
+
+The input, per target and filter, is one row per QC-pass frame and detected star (the AGN included):
+the instrumental magnitude $m_\mathrm{obs}$ in the science aperture, its photometric error
+$\sigma_\mathrm{phot}$ and the SExtractor \texttt{FLAGS}. A \emph{scope} $k$ is one
+telescope + camera combination (e.g.\ \texttt{1m006-fa08}), and an \emph{epoch} $t$ is one frame.
+For every measurement of comparison star $s$ at epoch $t$ on scope $k$ PyTICS fits
+\begin{equation}
+  m_\mathrm{obs} = m^\star_s + \Delta T_t + \Delta S_k ,
+  \qquad
+  \sigma_\mathrm{tot}^2 = \sigma_\mathrm{phot}^2 + \mathrm{rms}_{\star,s}^2 + \mathrm{rms}_t^2 + \mathrm{rms}_{\mathrm{sc},k}^2 ,
+  \label{eq:pytics}
+\end{equation}
+where $m_\mathrm{obs}$ and $\sigma_\mathrm{phot}$ are the measured magnitude and its photometric
+error, $\sigma_\mathrm{tot}$ the total error used to weight the measurement,
+$m^\star_s$ is the mean magnitude of the star, $\Delta T_t$ (\texttt{DMAGT}) the
+correction of the epoch (extinction, transparency, exposure), and $\Delta S_k$ (\texttt{DMAGS}) a
+constant offset per scope. Each set of parameters has its own extra variance: $\mathrm{rms}_t$ is the
+scatter of the comparison stars about the model in one epoch beyond their photometric errors,
+$\mathrm{rms}_\mathrm{sc}$ the extra scatter of one scope, and $\mathrm{rms}_\star$ the extra scatter
+(variability) of one star.
+
+Each parameter group is estimated with \texttt{arx}, K.~Horne's \emph{avgrmsx} optimal average: for a
+set of data $d_i\pm\sigma_i$ it finds, iteratively, the mean and the extra rms that, added in
+quadrature to the $\sigma_i$, make the data consistent, together with the errors of both. One loop of
+the solution has five steps:
+\begin{enumerate}
+  \item \textbf{Epochs.} Inverse-variance star means are taken per scope; for every epoch,
+        \texttt{arx} of ($m$ minus these means) gives $\Delta T_t$ and $\mathrm{rms}_t$. After the
+        first loop the change in $\Delta T_t$ is damped by the factor \texttt{safe} (0.6).
+        $\Delta T_t$ is made zero-mean within each scope.
+  \item \textbf{Scopes.} With provisional star means, \texttt{arx} per scope of
+        ($m - \Delta T - m^\star$) gives $\Delta S_k$ and $\mathrm{rms}_\mathrm{sc}$; $\Delta S$ is made
+        zero-mean over all data.
+  \item \textbf{Stars.} \texttt{arx} per star of ($m - \Delta T - \Delta S$) gives $m^\star_s$ and
+        $\mathrm{rms}_\star$ (damped by \texttt{safe}); the data are shifted by $\Delta T + \Delta S$.
+  \item \textbf{Reference star.} The mean of the brightest comparison star is subtracted (and added
+        back at the end), which fixes the overall magnitude level.
+  \item \textbf{Convergence.} The loop stops when every traced parameter changes by less than
+        \texttt{tiny} $=10^{-4}$ of its own error ($\max|\Delta p|/\sigma_p<10^{-4}$, where $\Delta p$ is
+        the change of parameter $p$ in the loop and $\sigma_p$ its error), or after \texttt{max\_loops} = 200.
+\end{enumerate}
+The comparison stars are chosen as in PyTICS (\texttt{Brightest\_Reduced} + \texttt{Star\_Lim}): stars
+with more than \texttt{frac} = 0.5 times the largest number of measurements of any star, and of
+those the \texttt{star\_lim} = 100 brightest. The AGN is then calibrated with the fitted epoch and
+scope terms (\texttt{AGN\_LC}):
+\begin{equation}
+  m_\mathrm{AGN} = m_\mathrm{obs} - \Delta T_t - \Delta S_k ,
+  \qquad
+  \sigma^2 = \sigma_\mathrm{phot}^2 + \mathrm{rms}_{\mathrm{sc},k}^2 + \mathrm{rms}_t^2 ,
+\end{equation}
+where $m_\mathrm{obs}$ and $\sigma_\mathrm{phot}$ are now those of the AGN in frame $t$ taken with scope
+$k$. The AGN takes no part in the fit; it only receives the corrections measured on the stars. Its
+magnitude is still on the internal system of the ensemble; Sect.~\ref{sec:colour} describes how that
+system is tied to the catalogue.
+
+\section{Changes relative to the published code}
+\label{sec:changes}
+
+The AVA module \texttt{ava/photometry/ensemble.py} keeps the model and the five-step loop, and every
+change can be switched off from the \texttt{ensemble:} block of \texttt{config/ava\_config.yaml}.
+
+\begin{enumerate}
+  \item \textbf{Vectorised, compiled \texttt{arx}.} The \texttt{arx} maths is copied unchanged into a
+        Numba kernel that processes all groups (all epochs, all scopes or all stars) in one call;
+        group means and sums use \texttt{numpy.bincount}. With the AVA extensions switched off the port
+        reproduces \texttt{Filter.Corr} to float precision (Fig.~\ref{fig:validation}) and is
+        40--70$\times$ faster.
+  \item \textbf{AGN never a comparison star.} The published \texttt{Corr} calls
+        \texttt{Brightest\_Reduced} without the AGN identifier, so the AGN, being among the brightest
+        sources, can enter the ensemble. AVA always excludes it (and any \texttt{bad\_ids}).
+  \item \textbf{Epochs keyed by frame, scopes by telescope + camera.} MJD keys can collide; a camera
+        change on one telescope is treated as a new instrument.
+  \item \textbf{SExtractor flag cut} (\texttt{bad\_flags} = 28). Comparison-star rows with
+        \texttt{FLAGS} 4 (saturated), 8 (truncated at the edge) or 16 (incomplete aperture data) are
+        dropped; AGN rows are kept. One MuSCAT edge star 2.6\,mag off made \texttt{arx} bistable and
+        u/B/g never converged without this cut.
+  \item \textbf{Floor on the rms errors in the convergence test} (\texttt{rms\_err\_floor} = 1\,mmag).
+        An extra rms that sits at zero has an error of ${\sim}10^{-9}$\,mag and can flip between 0 and
+        ${\sim}0.7$\,mmag forever, so the published test never stops.
+  \item \textbf{Stationary stopping rule} (\texttt{atol} = $10^{-5}$\,mag). The fit also stops when,
+        for three consecutive loops, the gauge-free solution moves by less than \texttt{atol}. The
+        model has a ``gauge'' freedom: adding a constant to all $\Delta S_k$ and subtracting it from all
+        $m^\star_s$ (or trading $\Delta T$ against $\Delta S$ within one scope) changes no prediction. The
+        gauge-free quantities are those that do not change under such shifts: the total
+        per-epoch correction $\Delta T_t + \Delta S_{k(t)}$ and the star means, each with its median
+        change removed, and the colour terms. A whole scope's $\Delta T$ can trade with its $\Delta S$
+        without changing any prediction, which keeps the published test alive. Which rule fired is
+        stored in \texttt{meta.stop}; on Mrk\,817 every filter stops on this rule.
+  \item \textbf{Per-camera colour terms} $CK_k$, decided automatically per target and filter
+        (Sect.~\ref{sec:colour}).
+  \item \textbf{Incremental update} (\texttt{update}) and automatic refit triggers
+        (Sect.~\ref{sec:update}).
+  \item \textbf{Absolute zero point} with a colour term, against the Gaia XP/GSPC LCO-band magnitudes
+        of the comparison stars (Sect.~\ref{sec:colour}).
+  \item \textbf{Flux--flux intercalibration} of cameras with different apertures (Sect.~\ref{sec:intercal}).
+  \item \textbf{AGN light curve}: a \texttt{good} flag per epoch, a separate random error, and an
+        optional empirical error model (Sect.~\ref{sec:agnlc}).
+  \item \textbf{Stored solution}: for each filter, the folder \texttt{<phot>/pytics/<filter>/} holds
+        the star, scope, epoch and star$\times$scope tables and a \texttt{meta.json}; the updates read
+        them back.
+\end{enumerate}
+
+\section{How colour is handled}
+\label{sec:colour}
+
+Colour enters the final AGN light curve in two places. They are complementary, not stacked.
+
+\subsection{(a) Per-camera colour term inside the ensemble fit}
+
+When colours are supplied, the model of Eq.~\ref{eq:pytics} gains one term per scope:
+\begin{equation}
+  m_\mathrm{obs} = m^\star_s + \Delta T_t + \Delta S_k + CK_k\,(c_s - c_0) ,
+  \label{eq:ck}
+\end{equation}
+where $CK_k$ is the colour slope of scope $k$ (mag per mag of colour), and $c_s$ is the GSPC $g-i$ colour of comparison star $s$ (from \texttt{reference\_stars.csv}) and
+$c_0$ the median colour of the comparison stars. Stars without a colour get $c_s = c_0$. In every
+loop, after step~2, the residual of each scope is regressed on $c_s - c_0$ (a weighted slope with a
+free intercept), damped by \texttt{safe} and accumulated into $CK_k$. The $CK_k$ are then constrained
+to a weighted mean of zero over the scopes (weights $\sum w\,(c_s-c_0)^2$, the colour leverage of each
+scope). The constraint is needed because a colour slope common to all cameras is degenerate with the
+star means $m^\star_s$; it means that $CK_k$ carries only the camera-to-camera differences in bandpass
+and detector response. The common colour dependence stays in the $m^\star_s$ and is dealt with by
+step~(b).
+
+The term is kept per filter only when it helps the AGN. On every full fit
+(\texttt{scope\_colour\_terms: auto}), \texttt{run\_target} fits without and with $CK_k$, builds the two
+absolute AGN light curves and scores both on the reference cameras (\texttt{fa}/\texttt{fl}, Sinistro)
+with \texttt{colour\_term\_check}: (i) the rms of each camera's additive AGN offset against the others
+(flux--flux fit with $a\equiv1$, in \% of the flux) and (ii) the robust $\sigma$ of the flux ratio on
+nights observed by two cameras less than 0.4\,d apart. The colour terms are kept if the mean relative
+improvement of (i) and (ii) is at least \texttt{colour\_check\_min\_gain} = 5\,\%; with fewer than
+two reference cameras the answer is ``off''. For Mrk\,817 the terms are on in u, B, g and V (gains of
+$+9$, $+15$, $+26$ and $+23$\,\%, Fig.~\ref{fig:colour-effect}) and off in r, i and z (gains $-9$, $-22$ and $-4$\,\%).
+The fitted $CK_k$ range from $-25$ to $+16$\,mmag\,mag$^{-1}$ in u, $-15$ to $+21$ in B, $-39$ to $+15$
+in g and $-23$ to $+7$ in V; the extreme values belong to \texttt{1m006-fa08} and the MuSCAT g camera
+\texttt{2m001-ep04} (both $-39$ in g) and \texttt{1m013-fa20} ($-25$ in u).
+
+On the AGN the term is evaluated at the AGN colour: the column \texttt{CKterm} $= CK_k\,(c_\mathrm{AGN}-c_0)$
+is subtracted from its magnitude. For Mrk\,817 $c_\mathrm{AGN}-c_0$ is $-0.31$ (u) to $-0.44$ (V), so
+\texttt{CKterm} is at most 16\,mmag (g, \texttt{fa08} and \texttt{ep04}) and typically 2--6\,mmag.
+
+\subsection{(b) Colour term in the absolute zero point}
+
+The ensemble puts all star means on one internal system tied to the reference star. The function
+\texttt{absolute\_zp} maps that system onto the reference catalogue (GSPC magnitudes in the LCO bands)
+with one zero point and one colour slope per filter:
+\begin{equation}
+  m_{\mathrm{ref},s} - m^\star_s = ZP + C\,(c_s - c_0') ,
+  \label{eq:abszp}
+\end{equation}
+where $m_{\mathrm{ref},s}$ is the GSPC magnitude of star $s$ in the LCO band of the filter, $ZP$ the
+zero point and $C$ the colour slope of the filter. The fit uses the comparison stars with
+\texttt{quality\_ok} reference photometry and
+$\mathrm{rms}_\star<50$\,mmag, weighted by $1/(\sigma_{m^\star}^2+\sigma_\mathrm{ref}^2+\mathrm{rms}_\star^2+(10\,\mathrm{mmag})^2)$
+(where $\sigma_{m^\star}$ is the error of the star mean, $\sigma_\mathrm{ref}$ the catalogue error and the
+10\,mmag floor allows for systematic errors of the catalogue), and it is clipped iteratively at 3
+robust $\sigma$; $c_0'$ is the median colour of these stars. The slope is
+fitted only with at least 6 stars and a colour range larger than 0.2\,mag; otherwise $C=0$. Errors
+are scaled by $\sqrt{\chi^2_\nu}$ when $\chi^2_\nu>1$.
+
+The zero point of the AGN is evaluated at its own colour, $ZP_\mathrm{AGN} = ZP + C\,(c_\mathrm{AGN}-c_0')$.
+$c_\mathrm{AGN}$ is the $g-i$ of the AGN from its own calibrated median g and i magnitudes; it depends on
+the zero points, so it is iterated three times (starting from the median star colour). For Mrk\,817
+$c_\mathrm{AGN} = 0.34$ (light in the 10.5$''$ aperture, i.e.\ AGN plus host).
+
+\subsection{Why the two are not counted twice}
+
+Because the $CK_k$ have zero weighted mean, the two terms split the colour dependence in the usual
+``system term + per-instrument deviation'' way. Writing out the calibrated AGN magnitude,
+\begin{equation}
+  m_\mathrm{AGN} = m_\mathrm{obs} - \Delta T_t - \Delta S_k - CK_k\,(c_\mathrm{AGN}-c_0) + ZP + C\,(c_\mathrm{AGN}-c_0') ,
+\end{equation}
+the colour slope applied to camera $k$ is $C - CK_k$: $C$ is the filter-wide slope between the
+ensemble system and the reference system, and $-CK_k$ the zero-mean deviation of camera $k$ from the
+ensemble. (The sign convention is that $CK_k$ describes instrumental minus ensemble magnitudes and $C$
+reference minus ensemble magnitudes.) The common part cannot be fitted twice: the constraint removes it
+from the $CK_k$, and step~(b) is the only place where it is measured.
+
+\subsection{What is not a colour correction}
+
+The per-frame calibration (\texttt{ava/photometry/calibration.py}) measures, for every frame, the slope
+of (reference $-$ instrumental) against $g-i$ when at least 5 standards span more than 0.3\,mag in
+colour. This \texttt{colour\_slope} is a QC number only; it is never applied. The per-frame AGN light
+curve (\texttt{agn\_lightcurve.parquet}) is therefore not colour-corrected, and in this report it is
+used only as the comparison curve (Figs~\ref{fig:agn-compare}, \ref{fig:star-rms} and \ref{fig:storm2-zoom}).
+
+\subsection{Caveats}
+
+\begin{itemize}
+  \item \textbf{One AGN colour.} $c_\mathrm{AGN}$ is a single value per target; there is no per-epoch
+        colour. The AGN becomes bluer as it brightens; the estimated effect on the zero point is
+        at most about 4\,mmag in g.
+  \item \textbf{Stellar slopes on a non-stellar spectrum.} Both $C$ and $CK_k$ are measured on stars.
+        An AGN + host spectrum with strong emission lines (H$\beta$ and [O\,\textsc{iii}] in g/V,
+        H$\alpha$ in r) need not follow the stellar colour relation.
+  \item \textbf{Extrapolation.} Mrk\,817 is at the blue end of the comparison stars. In the u, B, g and V
+        fits the comparison stars with colours span $g-i = -0.28$ to 2.7 (u: to 1.7) and only 3--5 of them
+        are bluer than the AGN.
+        In the absolute zero point 3--4 of 57--63 stars are bluer than the AGN in B, g, V and r, 1 of 63 in
+        i, and none in z (24 stars, bluest 0.54) and Y (15 stars, bluest 0.54). In z and Y the
+        correction at the AGN colour is therefore an extrapolation by 0.2\,mag in colour
+        (about 7\,mmag of lever arm for $C_z = -0.035$).
+\end{itemize}
+
+\section{Incremental update and refits}
+\label{sec:update}
+
+The daily run does not refit the archive. \texttt{update} keeps the stored star means, $\mathrm{rms}_\star$,
+$\Delta S_k$, $\mathrm{rms}_\mathrm{sc}$, $CK_k$ and the star$\times$scope residual offsets $o_{s,k}$
+(the per-scope star means that step~1 of the full fit measures epochs against). Each new epoch gets
+$\Delta T_t$ and $\mathrm{rms}_t$ from one \texttt{arx} of
+$m_\mathrm{obs} - m^\star_s - \Delta S_k - CK_k(c_s-c_0) - o_{s,k}$ over its comparison stars, with
+$\sigma^2 = \sigma_\mathrm{phot}^2 + \mathrm{rms}_\star^2 + \mathrm{rms}_\mathrm{sc}^2 + \sigma_o^2$.
+A scope not seen before gets $\Delta S_k$ from the weighted mean of its new epochs and $CK_k = 0$.
+The update reports \texttt{needs\_refit} when a new scope appears, when more than 10\,\% of the epochs
+come from updates, or when the median $\mathrm{rms}_t$ of the updated epochs exceeds twice that of the
+full fit plus 2\,mmag; with \texttt{auto\_refit} the full fit runs immediately. Updates reuse the stored
+absolute zero point, since the star means do not change.
+
+\section{Intercalibration of cameras with different apertures}
+\label{sec:intercal}
+
+PyTICS makes the comparison \emph{stars} agree between cameras. The AGN is extended: a camera whose
+science aperture is smaller in arcsec (MuSCAT3 8.9$''$ against Sinistro 10.5$''$) collects less host
+light, an \emph{additive} flux offset that no magnitude shift can remove. \texttt{intercal.py} fits, per
+filter and scope, nightly inverse-variance mean fluxes (mJy) against the reference light curve made of
+all other reference-camera scopes, interpolated linearly to the scope's nights when the gap is shorter
+than 3\,d (or within 0.3\,d of a reference night):
+\begin{equation}
+  F_k(t) = a\,F_\mathrm{ref}(t) + b ,
+\end{equation}
+where $F_k(t)$ is the nightly mean AGN flux of scope $k$ on night $t$, $F_\mathrm{ref}(t)$ that of the
+reference cameras on the same night, $a$ a scale factor and $b$ an additive offset (mJy). The fit uses
+effective-variance weights (errors in both axes) and 4$\sigma$ clipping. A second fit with $a\equiv1$ gives $b_1$, which
+is the correction applied ($F' = F - b_1$) to the cameras in \texttt{intercal\_correct\_cameras}: the
+comparison stars already fix the flux scale. All fits are written to \texttt{pytics/intercal.csv}.
+At the time of the figures the reference was the Sinistro cameras (\texttt{fa}) and only MuSCAT3
+(\texttt{ep}) was corrected; the configuration now uses \texttt{fa} + \texttt{fl} as reference and also
+corrects \texttt{kb} and \texttt{fs}. A per-season offset is available (\texttt{intercal\_per\_season})
+but off (Appendix~\ref{app:figs}).
+
+\section{AGN light curve and errors}
+\label{sec:agnlc}
+
+The final magnitude is
+$m_\mathrm{AGN} = m_\mathrm{obs} - \Delta T_t - \Delta S_k - CK_k(c_\mathrm{AGN}-c_0) + ZP_\mathrm{AGN}$,
+followed by the additive flux correction of Sect.~\ref{sec:intercal}. An epoch is \texttt{good} when
+$\mathrm{rms}_t < 50$\,mmag and it has at least 5 comparison stars; this removes thin cloud, gradients
+and scattered light (1.2--3.8\,\% of the epochs). Two errors are written: \texttt{mag\_err}
+$=\sqrt{\sigma_\mathrm{phot}^2+\mathrm{rms}_\mathrm{sc}^2+\mathrm{rms}_t^2}$ (PyTICS) and
+\texttt{mag\_err\_rand} $=\sqrt{\sigma_\mathrm{phot}^2+\mathrm{rms}_t^2}$, which leaves out
+$\mathrm{rms}_\mathrm{sc}$, a systematic common to all epochs of a camera. An empirical error model
+(\texttt{ava/photometry/errors.py}),
+$\sigma_\mathrm{rand}^2 = (k\sigma_\mathrm{phot})^2 + (\beta\,\mathrm{rms}_t)^2 + s_0^2$, rescales the
+photometric error by $k$ and the epoch scatter by $\beta$ and adds a floor $s_0$, separately per filter
+and camera family. They are fitted to pairs of AGN epochs less than 1\,h apart on the same camera, which
+should differ only by noise. A camera term $s_\mathrm{cam}$, added in quadrature for comparisons between
+different cameras ($\sigma_\mathrm{tot}^2=\sigma_\mathrm{rand}^2+s_\mathrm{cam}^2$), is fitted to pairs
+from different cameras. The model is fitted on every run but used for the products only when
+\texttt{error\_model: fitted}; it is off by default while under verification
+(Appendix~\ref{app:figs}).
+
+\section{Summary of the flow}
+
+Figure~\ref{fig:workflow} puts the pieces of this chapter together. Data enter at the top: the
+measurements of the comparison stars and the AGN, the frame QC table and the reference catalogue. The
+full fit (left) runs the PyTICS loop with the AVA additions and decides the colour terms; the incremental
+update (right) adds new frames to a stored solution until a refit trigger fires. Both feed the same tail:
+absolute zero point, AGN calibration, intercalibration and the outputs.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.78\textwidth]{pytics_workflow}
+  \caption{Flow of the AVA ensemble stage. Blue boxes are steps of the published PyTICS, orange boxes
+    AVA changes or additions, green boxes data in and out. The left branch is the full fit (on demand
+    or after a refit trigger), the right branch the daily incremental update.}
+  \label{fig:workflow}
+\end{figure}
+
+%%============================================================
 \chapter{What was built}
 \label{ch:built}
 %%============================================================
@@ -105,18 +451,20 @@ Module / file & What it does \\
 \midrule
 \texttt{ava/photometry/ensemble.py} &
   \texttt{fit} (full PyTICS), \texttt{update} (new epochs), \texttt{apply} (AGN),
-  \texttt{absolute\_zp}, \texttt{agn\_zero\_points}, \texttt{run\_target} \\
+  \texttt{colour\_term\_check}, \texttt{absolute\_zp}, \texttt{agn\_zero\_points}, \texttt{run\_target} \\
 \texttt{ava/photometry/intercal.py} &
   Flux-flux fit $F_\mathrm{scope} = a\cdot F_\mathrm{ref} + b$; \texttt{apply\_intercal} \\
+\texttt{ava/photometry/errors.py} &
+  Empirical AGN error model from epoch pairs (opt-in) \\
 \texttt{ava/pipeline/tasks/ensemble.py} &
-  Prefect task: runs the above, writes \texttt{agn\_lightcurve\_pytics.parquet/.csv}
-  and merged web plots \\
+  Prefect task: runs the above, writes \texttt{agn\_lightcurve\_pytics.parquet/.csv},
+  the shareable \texttt{<target>\_LCO\_merged\_lightcurve.csv} and the merged web plots \\
 \texttt{config/ava\_config.yaml} $\to$ \texttt{ensemble:} &
-  Filters, mode, loops, damping, star selection, bad flags, absolute/colour term,
-  cameras to correct \\
+  Filters, mode, loops, damping, star selection, bad flags, stopping rule, colour terms,
+  refit triggers, absolute ZP, intercalibration, error model \\
 \texttt{tests/test\_ensemble.py} &
-  6 tests (offline): recovers injected offsets, update $\equiv$ refit, flag cut,
-  save/load, intercal \\
+  9 offline tests: injected scope offsets and AGN recovered, update $\equiv$ refit, flag cut,
+  save/load, intercal offset, per-scope colour terms recovered, ZP summary, per-season intercal \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -124,10 +472,10 @@ Module / file & What it does \\
 \section{Usage}
 
 \begin{lstlisting}[style=shell]
-# Full PyTICS calibration (~40 s)
+# Full PyTICS calibration (all filters, on demand)
 python scripts/run_pipeline.py --target Mrk_817 --pytics-full
 
-# Daily incremental update (~15 s)
+# Daily incremental update (refits by itself when needed)
 python scripts/run_pipeline.py --target Mrk_817 -t
 \end{lstlisting}
 
@@ -136,24 +484,56 @@ python scripts/run_pipeline.py --target Mrk_817 -t
 \label{ch:validation}
 %%============================================================
 
-\begin{figure}[htbp]
+The port was validated against the published code on two g-band inputs from the test archive: a 2023
+subset (47\,k rows, 364 epochs, 4 cameras) and all g-band data (295\,k rows, 2858 epochs, 13 cameras).
+For this comparison the AVA extensions were switched off (\texttt{bad\_flags} = 0,
+\texttt{rms\_err\_floor} = 0, \texttt{atol} = 0, no colour terms); the published code was run with the
+AGN passed as a bad ID, so both use the same comparison stars. The full g input was cleaned of flagged
+rows beforehand, because the published code does not converge on it otherwise.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_01_validation}
-  \caption{Bit-precision validation of the AVA PyTICS port.  Star means, $\Delta T_t$,
-    $\Delta S_k$ and the AGN light curve agree to float precision
-    ($<10^{-10}$\,mmag) on two independent datasets.}
+  \caption{Validation of the AVA port against the published PyTICS. \emph{Top:} AGN magnitude, port
+    minus original, for every epoch of the 2023 subset (left) and of all g-band data (right); the
+    largest difference and the median ratio of the quoted errors are printed in each panel.
+    \emph{Bottom left:} epoch corrections $\Delta T_t$ of the two codes for all g-band data, with the
+    1:1 line. \emph{Bottom right:} wall time of a full fit (log scale): original (grey) and port
+    (colour) for the two inputs, and the port for all eight filters of Mrk\,817.}
   \label{fig:validation}
 \end{figure}
 
-The port follows \texttt{Filter.Corr} step by step, using the same \texttt{arx}
-(avgrmsx) algorithm compiled once with Numba.  Validation was run on two inputs:
-a g-band 2023 subset (47\,k rows, 364 epochs, 4 cameras) and the full g band
-(295\,k rows, 2858 epochs, 13 cameras).  Results are summarised in
-Table~\ref{tab:speed}.
+Figure~\ref{fig:validation} shows that the two codes give the same answer. The AGN magnitudes differ by
+at most $8.9\times10^{-12}$\,mmag (subset) and $6.6\times10^{-11}$\,mmag (all data), i.e.\ float
+rounding, and the quoted errors agree to four decimals (ratio 1.0000). The epoch corrections lie on the
+1:1 line over their full range ($-0.35$ to $+0.6$\,mag). Both codes need the same number of loops (38
+and 67). The port is 41$\times$ faster on the subset and 71$\times$ faster on all g data
+(Table~\ref{tab:speed}), because \texttt{arx} runs compiled over all groups at once instead of in a
+Python loop over epochs, scopes and stars.
 
 \begin{table}[htbp]
 \centering
-\caption{Full PyTICS fit parameters and timing for Mrk\,817.}
+\caption{Speed: published PyTICS against the AVA port. The 8-filter time is the wall time of the whole
+  run shown in Fig.~\ref{fig:validation}; the per-filter fits in Table~\ref{tab:fullfit} add up to 22\,s.}
+\label{tab:speed}
+\small
+\begin{tabular}{lrrl}
+\toprule
+Dataset & Published (s) & AVA port (s) & Speed-up \\
+\midrule
+g 2023 subset (364 epochs) & 33 & 0.8 & $41\times$ \\
+Full g band (2858 epochs) & 434 & 6.1 & $71\times$ \\
+Full 8-filter run (wall time) & --- & 53 & --- \\
+Incremental update per filter and night & --- & 0.016--0.036 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{The stored full PyTICS solutions for Mrk\,817 (final settings, colour terms on in u, B, g, V).
+  Bad epochs are AGN epochs flagged not \texttt{good} ($\mathrm{rms}_t\geq50$\,mmag or fewer than 5
+  comparison stars). Every filter stopped on the stationary rule.}
 \label{tab:fullfit}
 \small
 \begin{tabular}{lrrrrrrr}
@@ -161,7 +541,7 @@ Table~\ref{tab:speed}.
 Filter & Stars & Cameras & Epochs & Rows & Loops & Time (s) & Bad epochs \\
 \midrule
 u &  70 & 11 & 1\,716 & 103k & 29 & 2.4 & 65 (3.8\,\%) \\
-B &  99 & 11 & 2\,165 & 188k & 26 & 3.6 & 52 (2.4\,\%) \\
+B &  99 & 11 & 2\,165 & 188k & 26 & 3.6 & 53 (2.4\,\%) \\
 g & 100 & 13 & 2\,858 & 221k & 37 & 3.6 & 33 (1.2\,\%) \\
 V & 100 & 12 & 2\,355 & 227k & 26 & 2.6 & 43 (1.8\,\%) \\
 r & 100 & 13 & 2\,924 & 231k & 47 & 4.3 & 49 (1.7\,\%) \\
@@ -172,28 +552,23 @@ Y &  99 &  2 &     10 &   1k & 26 & 0.0 &  0 (0.0\,\%) \\
 \end{tabular}
 \end{table}
 
-\begin{table}[htbp]
-\centering
-\caption{Speed comparison: published PyTICS vs.\ AVA port.}
-\label{tab:speed}
-\small
-\begin{tabular}{lrrl}
-\toprule
-Dataset & Published (s) & AVA port (s) & Speed-up \\
-\midrule
-g 2023 subset (364 epochs) & 33 & 0.8 & $41\times$ \\
-Full g band (2858 epochs) & 434 & 6.1 & $71\times$ \\
-Full 8-filter run & --- & 24 & --- \\
-Incremental update per night & --- & $\leq 0.04$ & --- \\
-\bottomrule
-\end{tabular}
-\end{table}
+Figure~\ref{fig:convergence} shows why the stopping rule was changed. The quantity plotted is the
+PyTICS convergence measure, the largest change of any parameter in one loop divided by its error. It is
+dominated by the single worst parameter and jumps by orders of magnitude when an extra rms crosses zero.
+Without the flag cut (dashed) it oscillates between 30 and 1000 and the g fit runs into the 200-loop cap.
+With the flag cut (solid) it falls to ${\sim}1$, and the fit stops after 32 loops because the solution
+has become stationary. With the final settings (right panel) all filters stop after 26--47 loops; none
+reaches the PyTICS threshold of $10^{-4}$, the lowest values being 0.01--1. Stopping on the stationary
+rule changes the AGN by $\leq0.02$\,mmag compared with running to the PyTICS rule.
 
-\begin{figure}[htbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_02_convergence}
-  \caption{Convergence history.  Solid: AVA stopping rule (flag cut + stationary test,
-    26--47 loops).  Dashed: original PyTICS rule without flag cut (loops to 200-iteration cap).}
+  \caption{Convergence of the full fit. The y axis is the PyTICS criterion, $\max|\Delta p|/\sigma_p$
+    over all parameters in one loop; the grey line is the threshold $10^{-4}$. \emph{Left:} g band,
+    without (dashed) and with (solid) the SExtractor flag cut, both with the AVA stopping rule; the
+    number of loops is in the legend. \emph{Right:} all filters with the final settings but without
+    colour terms (loops in brackets). Each curve ends where the stationary rule stopped the fit.}
   \label{fig:convergence}
 \end{figure}
 
@@ -202,47 +577,146 @@ Incremental update per night & --- & $\leq 0.04$ & --- \\
 \label{ch:offsets}
 %%============================================================
 
-\begin{figure}[htbp]
+This chapter looks at the per-camera part of the solution: the offsets $\Delta S_k$ and extra scatter
+$\mathrm{rms}_{\mathrm{sc},k}$ of each telescope + camera (Eq.~\ref{eq:pytics}), and the colour slopes
+$CK_k$ (Eq.~\ref{eq:ck}). The first figure shows the offsets and scatter; the second whether any colour
+dependence is left after the fit; the third the evidence used to switch the colour terms on or off.
+
+\section{Offsets and extra scatter per camera}
+
+Figure~\ref{fig:offsets} has one column per telescope + camera, in the order of the archive (Sinistro
+\texttt{fa}/\texttt{fl} on the 1-m telescopes, then the MuSCAT3 cameras \texttt{ep} on the 2-m), and one colour per
+filter. A point high in the top panel means that camera records the stars as fainter (lower throughput) than
+the ensemble average; a point high in the bottom panel means one constant offset does not describe that
+camera well.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_03_scope_offsets}
-  \caption{Per-telescope offsets ($\Delta S_k$) and extra scatter ($\mathrm{rms}_\mathrm{sc}$)
-    for Mrk\,817.  Camera 1m006-fa08 has an anomalously large offset (+0.5\,mag) and scatter
-    (25\,mmag in $g$) and is flagged for investigation.}
+  \caption{Fitted scope terms per telescope + camera (x axis) and filter (colour). \emph{Top:}
+    offsets $\Delta S_k$ (mag), zero-mean over all data; error bars are smaller than the points.
+    \emph{Bottom:} extra scatter $\mathrm{rms}_\mathrm{sc}$ (mmag). The four MuSCAT3 cameras
+    (\texttt{2m001-ep02}--\texttt{ep05}) each observe one filter.}
   \label{fig:offsets}
 \end{figure}
 
-\begin{figure}[htbp]
+$\Delta S_k$ (Fig.~\ref{fig:offsets}, top) absorbs the difference in throughput between instruments.
+The Sinistro cameras lie within $-0.15$ and $+0.3$\,mag of each other in most filters. The MuSCAT3
+cameras are 1.0--2.0\,mag brighter in instrumental magnitude, as expected for the 2-m aperture, and set
+the zero of the other offsets below the Sinistro mean. Three Sinistro values stand out:
+\texttt{1m006-fa08} in g ($+0.56$\,mag) and V ($+0.27$\,mag), and \texttt{1m008-fa05} ($+0.52$\,mag) and
+\texttt{1m014-fa05} ($+0.38$\,mag) in u.
+
+$\mathrm{rms}_\mathrm{sc}$ (bottom) measures how well one constant offset describes a camera. It is
+0--10\,mmag for most cameras, and 0 for MuSCAT3. The outliers are \texttt{1m006-fa08} (21\,mmag in g,
+14\,mmag in V; no u or B frames of this camera pass QC), \texttt{1m006-fa16} in u (16\,mmag) and
+\texttt{1m013-fa20} in i and z (31 and 39\,mmag). Because $\mathrm{rms}_\mathrm{sc}$ enters
+\texttt{mag\_err}, every AGN epoch from these cameras carries that error.
+
+\section{Colour dependence left after the fit}
+
+If the cameras' bandpasses differ, a blue and a red star will not be shifted by the same amount between
+two cameras. Figure~\ref{fig:colour-terms} tests this directly. For each camera, it plots the mean
+residual of every comparison star on that camera ($o_{s,k}$, Table~\ref{tab:notation}) against the
+star's $g-i$ colour. A flat cloud means that the camera needs no further colour correction; a tilted cloud
+means that a colour slope is left. The red dotted line marks the colour of the AGN, where the slope
+matters for the light curve.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_09_scope_colour_terms}
-  \caption{Per-camera colour slopes (CK$_k$) relative to the ensemble mean.  Values
-    reach $\pm$40\,mmag\,mag$^{-1}$ in $g$; r, i and z are consistent with zero.}
+  \caption{Residual colour dependence per camera, after the final fit. Each point is one comparison
+    star on one camera: its star$\times$scope residual offset $o_{s,k}$ (mmag; the mean residual of the
+    star on that camera after the full model, $CK_k$ included where active) against its GSPC $g-i$.
+    Only stars with more than 20 measurements on the camera are shown. The lines are weighted linear
+    fits per camera (cameras with at least 8 stars; MuSCAT3 in black); the red dotted line is the AGN
+    colour (0.34). \emph{Bottom right:} the fitted residual slopes (mmag per mag of $g-i$) per camera
+    and filter, on the same $\pm40$ scale as the $CK_k$ map in Fig.~\ref{fig:colour-effect}.}
   \label{fig:colour-terms}
 \end{figure}
 
-\begin{figure}[htbp]
+Figure~\ref{fig:colour-terms} asks whether a colour dependence is left after the fit. It is built from
+the stored star$\times$scope offsets, so in u, B, g and V it shows what remains \emph{after} the $CK_k$
+were applied, and in r, i and z the full camera-to-camera colour dependence (no $CK_k$ there). The
+residual slopes are small: mostly 1--4\,mmag\,mag$^{-1}$, compared with $CK_k$ up to
+40\,mmag\,mag$^{-1}$. The largest are $+8.7\pm1.6$ for MuSCAT g, $-7.0\pm0.6$ for \texttt{1m006-fa08} in r,
+and $-7.3\pm0.7$, $+6.3\pm1.1$ and $+4.8\pm0.7$ for three Sinistro cameras in z. Evaluated at the AGN
+colour these slopes move the AGN by at most 4\,mmag (8\,mmag in z), below the AGN errors. In r and i
+this confirms that the colour terms are not needed; in z the slopes are larger but the check
+(Fig.~\ref{fig:colour-effect}) found no gain from them.
+
+\section{Do the colour terms help?}
+
+The colour terms are kept only if they make the AGN agree better between cameras
+(Sect.~\ref{sec:colour}). Figure~\ref{fig:colour-effect} compares two complete runs, one without and one
+with the $CK_k$, on six numbers: three for the comparison stars and three for the AGN. Each panel shows
+``before'' (grey) and ``after'' (colour) per filter; lower is better in all panels except the $CK_k$ map.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_15_colour_terms_effect}
-  \caption{Effect of per-camera colour terms.  Camera-to-camera AGN offsets drop 30--45\,\%
-    in B, g and V; same-night agreement between two Sinistro cameras improves by 8--12\,\%.}
+  \caption{Effect of the per-camera colour terms: a run with one offset per camera (grey, ``before'')
+    against the run with colour terms in u, B, g and V (colour, ``after''); r, i and z have no colour
+    terms in either run. \emph{Top left:} change in the robust rms of each comparison star over all
+    cameras (after $-$ before). \emph{Top centre:} median robust rms of the brightest 30\,\% of the
+    stars. \emph{Top right:} AGN, robust $\sigma$ of the flux ratio on nights seen by two Sinistro cameras
+    ($<0.4$\,d apart). \emph{Bottom left:} rms over the Sinistro cameras of the additive AGN offset of
+    each camera against the rest ($b/F$, flux--flux with $a\equiv1$). \emph{Bottom centre:} star scatter
+    in the absolute zero-point fit. \emph{Bottom right:} the fitted $CK_k$ (mmag per mag of $g-i$).}
   \label{fig:colour-effect}
 \end{figure}
+
+Figure~\ref{fig:colour-effect} is the evidence behind the automatic decision. The two AGN metrics on the
+right of the top row and the left of the bottom row are the ones \texttt{colour\_term\_check} uses.
+With colour terms the camera-to-camera AGN offsets drop from 1.00 to 0.70\,\% in B, 0.47 to 0.26\,\% in
+g and 1.00 to 0.62\,\% in V (30--45\,\%), and from 0.80 to 0.75\,\% in u. Same-night agreement between
+two Sinistro cameras improves by 12\,\% in u (1.37 to 1.20\,\%) and 8\,\% in g and V; it is unchanged in
+B. The comparison stars change much less: a few stars in g and V improve by 1--6\,mmag, the bright-star
+rms improves by 0.3\,mmag in B and g, and the absolute zero point scatter is unchanged within 0.4\,mmag.
+That is expected: the stars span a wide colour range around $c_0$, while the AGN, at the blue end, is
+where a camera's colour slope matters most. The $CK_k$ map shows that the large slopes belong to a few
+cameras (\texttt{1m006-fa08} and MuSCAT in g, \texttt{1m013-fa20} in u, \texttt{1m001-fa20} in B).
 
 %%============================================================
 \chapter{Incremental nightly update}
 \label{ch:incremental}
 %%============================================================
 
-\begin{figure}[htbp]
+The update was tested by holding data back from a full fit and adding them night by night
+(\texttt{tools/pytics\_validation/incr.py}, without colour terms). Test~A holds back the last 60 days
+(56--64 epochs per filter); test~B holds back everything from MJD\,61058 (248--299 epochs, 119--132
+nights), the date chosen in the test as the arrival of camera \texttt{1m006-fa11}. The result is compared epoch by epoch
+with a full refit of all data.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_07_incremental}
-  \caption{Incremental update vs.\ full refit.  Agreement is below the photometric
-    errors in all filters except u with a new camera ($\leq6$\,mmag, refitted automatically).}
+  \caption{Incremental update against a full refit. \emph{Top:} AGN magnitude of each new epoch, update
+    minus full refit, after removing the median difference, for test~A (left) and test~B (right).
+    \emph{Bottom left:} scatter of these differences (bars; A dark, B light), the size of the removed
+    constant offset in test~A (triangles) and the median AGN error (black lines). \emph{Bottom right:}
+    time of each nightly update against the number of new frames (dots), and time of a full refit per
+    filter (dashed lines).}
   \label{fig:incremental}
 \end{figure}
 
+The update reproduces the full refit to well below the AGN errors (Fig.~\ref{fig:incremental},
+Table~\ref{tab:incremental}). In test~A the scatter is 0.05--0.6\,mmag against AGN errors of
+4--9\,mmag. Test~B covers a longer stretch, and the scatter is 0.2--0.8\,mmag, except in u, where it is
+6\,mmag with single epochs up to 46\,mmag; there the solution fitted on the earlier data alone already
+differs from the full refit by 3\,mmag rms, so the update inherits a less stable u solution. A refit
+also shifts the whole history by a constant ($-8$ to 0\,mmag, the same for old and new epochs); this is
+the gauge of the solution, and the absolute zero point, refitted with it, removes it.
+
+Each nightly update takes 16--36\,ms per filter (median), against 4--14\,s for the full refit at the
+time of the test. In every test~B run the refit trigger fired before the end (10--14\,\% of the epochs
+from updates in u, B, g, V; rising $\mathrm{rms}_t$ in r, i, z), so in production the u band would have
+been refitted automatically. In test~A only i triggered, on the $\mathrm{rms}_t$ criterion.
+
 \begin{table}[htbp]
 \centering
-\caption{Incremental update performance.}
+\caption{Incremental update performance: scatter of update minus full refit for the new epochs
+  (constant offset removed), median time per nightly update (test~A) and median AGN error.}
 \label{tab:incremental}
 \small
 \begin{tabular}{lrrrr}
@@ -265,66 +739,203 @@ z & 0.09 & 0.67 & 33 & 5.8 \\
 \label{ch:zp}
 %%============================================================
 
-\begin{figure}[htbp]
+The ensemble gives magnitudes on its own internal system. This chapter shows the two steps that turn them
+into physical fluxes that agree between instruments: the absolute zero point, which ties the system to the
+Gaia GSPC catalogue (Eq.~\ref{eq:abszp}), and the flux--flux intercalibration, which removes the different
+amount of host-galaxy light in the MuSCAT3 aperture.
+
+\section{Absolute zero point}
+
+In Fig.~\ref{fig:abs-zp} each panel is one filter and each point one comparison star: the catalogue
+magnitude minus the ensemble mean magnitude, $m_{\mathrm{ref},s}-m^\star_s$, against the star's $g-i$
+colour. If the ensemble system and the catalogue system were identical up to a constant, the points would
+lie on a horizontal line at $ZP$. A tilt is the colour slope $C$. The AGN's zero point is read where the
+fitted line crosses the AGN colour (red dotted line).
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_08_absolute_zp}
-  \caption{Absolute zero-point fit against Gaia~DR3 GSPC.
-    Residuals show no colour-dependent trend; scatter is 9--12\,mmag in $griz$.}
+  \caption{Absolute zero point per filter (Eq.~\ref{eq:abszp}). Each point is one comparison star:
+    reference (GSPC) magnitude minus PyTICS star mean, against GSPC $g-i$. Filled points were used,
+    grey crosses were clipped. The black line is the fit $ZP + C(c-c_0')$; the red dotted line is the AGN
+    colour (0.34), where the zero point of the AGN is read off. The slope $C$ and the scatter of the used
+    stars are given above each panel.}
   \label{fig:abs-zp}
 \end{figure}
 
-\begin{figure}[htbp]
+Figure~\ref{fig:abs-zp} shows that the offset between the ensemble system and GSPC depends on colour in
+most filters: $C = +0.045\pm0.004$ (g), $+0.027\pm0.003$ (i), $+0.016\pm0.003$ (r), $-0.010\pm0.004$ (V),
+$-0.032\pm0.007$ (B) and $-0.035\pm0.007$ (z) mag per mag of $g-i$; in u ($+0.06\pm0.03$, 14 stars) and Y
+($-0.04\pm0.05$, 15 stars) it is not significant. The scatter about the line is 9--10\,mmag in g, r, i,
+z, 12--14\,mmag in B and V, 29\,mmag in u and 68\,mmag in Y; it includes the GSPC errors, and
+$\chi^2_\nu = 0.13$--0.94 in all filters except Y (6.0), so the star errors with their 10\,mmag floor
+are conservative. With 57--63 stars, $ZP$ is determined to 2\,mmag in B, g, V, r and i, 6\,mmag in z and
+9\,mmag in u. Because the AGN is bluer than most stars, $ZP_\mathrm{AGN}$ differs from $ZP$ by $-19$
+(g) to $+21$\,mmag (z); this is the reason for fitting $C$ at all. Y has 10 frames and 68\,mmag scatter
+and should be treated as unreliable.
+
+\section{MuSCAT3 intercalibration}
+
+PyTICS makes the comparison stars agree between cameras, but the AGN sits in a host galaxy and MuSCAT3's
+science aperture is smaller on the sky (8.9$''$ against 10.5$''$ for Sinistro), so it collects less host
+light. Figure~\ref{fig:intercal} shows how this is measured: for every night observed by both instruments,
+the MuSCAT3 AGN flux is plotted against the Sinistro flux. Points on the dotted 1:1 line would mean no
+difference; a parallel line below it means a constant missing flux, which is what a smaller aperture on
+a constant host should give.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_10_muscat_intercal}
-  \caption{Flux-flux intercalibration of MuSCAT3 against Sinistro.  The slope $a \approx 1$;
-    the additive offset $b$ (0.47--1.04\,mJy) is host-galaxy flux in the aperture difference.}
+  \caption{Flux--flux intercalibration of the four MuSCAT3 cameras against Sinistro in g, r, i and z.
+    \emph{Top:} nightly mean AGN flux of MuSCAT3 against the Sinistro reference flux interpolated to the
+    same night (mJy). Dotted: 1:1; solid: free fit $F_\mathrm{MuSCAT}=a\,F_\mathrm{Sin}+b$; red dashed:
+    fit with $a\equiv1$ (the applied correction). The title gives $b_1$ as a fraction of the mean flux and
+    the number of nights. \emph{Bottom:} AGN light curve in 2021--22: Sinistro (colour), MuSCAT3 before
+    (grey) and after (red) the additive correction.}
   \label{fig:intercal}
 \end{figure}
+
+Figure~\ref{fig:intercal} shows the additive host-light offset of MuSCAT3. On 50--53 matched nights the
+MuSCAT3 flux follows the Sinistro flux with a slope consistent with one ($a = 1.002\pm0.011$ in g,
+$1.04\pm0.02$ in r, $1.02\pm0.02$ in i, $1.08\pm0.06$ in z), shifted down by a constant:
+$b_1 = -0.47$, $-0.81$, $-0.98$ and $-1.04$\,mJy in g, r, i and z, or 6.4--9.8\,\% of the flux.
+A slope of one with an offset is what a smaller aperture predicts: the host light outside 8.9$''$ but
+inside 10.5$''$ is constant, while the variable AGN is a point source captured by both apertures. A
+constant magnitude shift would instead scale the variable part and would not fit. After subtracting
+$b_1$, the MuSCAT3 points fall on the Sinistro light curve (bottom row). The $a\equiv1$ fit is preferred
+because the comparison stars already fix the flux scale and its error is 14--32 times smaller.
 
 %%============================================================
 \chapter{AGN light curves}
 \label{ch:agn}
 %%============================================================
 
-\begin{figure}[htbp]
+This chapter compares the final PyTICS light curve with the older per-frame calibration, in which each
+frame gets its own zero point from the standards in that frame alone, and then shows the merged product.
+
+\section{PyTICS against the per-frame zero point}
+
+Figure~\ref{fig:agn-compare} compares the two calibrations of the same AGN measurements. The top panel
+shows their difference epoch by epoch; a flat band means that they agree apart from a constant. The
+bottom panel measures noise directly: Mrk\,817 cannot change measurably within one hour, so two frames
+taken less than an hour apart on one telescope should give the same magnitude. The spread of their
+difference ($/\sqrt2$, to give the error of a single epoch) is the calibration plus photometric noise,
+and lower is better.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_06_agn_vs_perframe}
-  \caption{PyTICS (black) vs.\ per-frame zero-point (grey) AGN light curves.
-    Intra-hour repeatability improves by 25--55\,\%.}
+  \caption{PyTICS against the per-frame zero point for the AGN, on the same QC-pass frames (PyTICS
+    before the MuSCAT3 correction). \emph{Top:} PyTICS minus per-frame magnitude per epoch and filter,
+    with the median difference (legend) removed. \emph{Bottom:} intra-hour repeatability of the AGN:
+    robust $\sigma$ of the magnitude difference of consecutive frames on the same telescope less than 1\,h
+    apart, divided by $\sqrt2$ (per-frame ZP grey, PyTICS colour).}
   \label{fig:agn-compare}
 \end{figure}
 
-\begin{figure}[htbp]
+The per-frame calibration ties each frame separately to GSPC with its own standards; PyTICS uses all
+frames together. The median offsets between the two (Fig.~\ref{fig:agn-compare}, legend) range from
+$-29$ (i) to $+24$\,mmag (z). They are mostly the colour term at the AGN colour, which only PyTICS
+applies: $C(c_\mathrm{AGN}-c_0')$ is $-19$\,mmag in g, $+12$ in B, $-18$ in i and $+21$ in z, against median
+offsets of $-20$, $+18$, $-29$ and $+24$\,mmag. Beyond the offset, the two agree to 3--12\,mmag (robust
+rms), with excursions of $+10$ to $+25$\,mmag in r, i and z during MJD\,59300--59480 and 59550--59660, the
+two MuSCAT3 seasons.
+
+The repeatability of the AGN on time-scales below one hour, where Mrk\,817 does not vary measurably, is
+a direct test of the calibration noise. PyTICS improves it in five filters: u from 7.7 to 3.3\,mmag
+(57\,\%), g 3.9 to 2.7 (29\,\%), r 3.3 to 2.5, i 4.1 to 3.0 and z 4.8 to 3.5\,mmag (24--27\,\%). In B
+(4.2) and V (4.3 to 4.0) it is unchanged or slightly better. The gain comes from the ensemble: a
+per-frame zero point rests on the standards measured in that frame, while $\Delta T_t$ is measured
+against star means defined by all frames, with outlying stars down-weighted by their extra rms.
+
+\section{The merged light curve}
+
+Figure~\ref{fig:merged} shows the final product: every good epoch of every camera, after the absolute
+zero point and the MuSCAT3 correction, converted to flux density. One panel per filter, from u (top) to z.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.85\textwidth]{pytics_12_merged_lightcurves}
-  \caption{Final merged PyTICS light curves for Mrk\,817 (2019--2024, all cameras,
-    MuSCAT3 host offset removed).  This is the content of
-    \texttt{Mrk\_817\_LCO\_merged\_lightcurve.csv}.}
+  \caption{Final merged PyTICS light curves of Mrk\,817 in flux (mJy; 1\,mJy = AB 16.4), 2020--2026
+    (MJD\,59040--61267), good epochs only, all cameras. Sinistro in colour, MuSCAT3 (g, r, i, z) in black
+    after the additive correction. This is the content of \texttt{Mrk\_817\_LCO\_merged\_lightcurve.csv}.}
   \label{fig:merged}
 \end{figure}
+
+Figure~\ref{fig:merged} is the product. The light curves are continuous across cameras and seasons, and
+the MuSCAT3 points of 2021--22 are indistinguishable from the Sinistro points around them. Mrk\,817
+varies by a factor of about two in u (5--11\,mJy) and by less towards the red (z 11--16\,mJy), where the
+host contributes more of the aperture flux. The same data, in the web-plot format, are in
+Appendix~\ref{app:figs}.
 
 %%============================================================
 \chapter{Error model and quality}
 \label{ch:errors}
 %%============================================================
 
-\begin{figure}[htbp]
+Two questions are asked here: are the quoted errors the right size, and does the model leave any
+systematic trend in the residuals?
+
+\section{Are the errors right?}
+
+The test is to divide each residual by its quoted error. If the errors are right, these normalised
+residuals follow a Gaussian of width $\sigma_z=1$; a width below 1 means the errors are too large, above 1
+too small. Figure~\ref{fig:errors} applies this test to the comparison stars, which are part of the fit,
+and to the AGN, which is not.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_16_error_model}
-  \caption{Error model verification: residual/$\sigma$ has $\sigma = 0.96$--1.01 at all
-    brightnesses and in all filters.  The AGN \texttt{mag\_err} is conservative because it
-    includes $\mathrm{rms}_\mathrm{sc}$; \texttt{mag\_err\_rand} is recommended for
-    epoch-to-epoch work.}
+  \caption{Are the PyTICS errors right? \emph{Top left:} comparison-star residuals divided by
+    $\sigma_\mathrm{tot}$ (Eq.~\ref{eq:pytics}), good epochs, per filter, with a unit Gaussian (dashed);
+    $\sigma_z$ is the robust width. \emph{Top right:} robust $\sigma_z$ in eight bins of star brightness.
+    \emph{Bottom left:} robust $\sigma$ of the normalised quantities: comparison-star residuals (grey) and
+    AGN pairs less than 1\,h apart on the same camera, normalised with \texttt{mag\_err} (light) or
+    \texttt{mag\_err\_rand} (dark); 1 means the errors are right, below 1 that they are too large.
+    \emph{Bottom right:} fraction of comparison measurements beyond $5\sigma$.}
   \label{fig:errors}
 \end{figure}
 
-\begin{figure}[htbp]
+For the comparison stars, the error model of Eq.~\ref{eq:pytics} is correct by construction and
+Fig.~\ref{fig:errors} confirms it: the normalised residuals follow a unit Gaussian to $|z|\approx3.5$
+with $\sigma_z = 0.96$--1.01 in every filter, and stay within 0.84--1.09 across star brightness. Beyond
+$5\sigma$ lie 0.06--0.12\,\% of the measurements, against $6\times10^{-5}$\,\% for a Gaussian; these
+tails are cosmic rays, blends and similar outliers.
+
+For the AGN the question is different, because the AGN is not part of the fit. Pairs of AGN epochs less
+than 1\,h apart on the same camera should differ only by noise. Normalised with \texttt{mag\_err}, their
+robust $\sigma$ is 0.53--0.79: the PyTICS AGN error is 1.3--1.9 times too large, because it contains
+$\mathrm{rms}_\mathrm{sc}$, which is the same for both epochs of a pair. With \texttt{mag\_err\_rand} it is
+0.86--0.98 (u 0.63). \texttt{mag\_err} should therefore be used for comparisons across cameras and for
+absolute fluxes, and \texttt{mag\_err\_rand} for epoch-to-epoch variability within a camera. The pair test
+in Appendix~\ref{app:figs} shows that even \texttt{mag\_err\_rand} has the wrong shape (too small for
+the best epochs, too large for the worst), which is what the opt-in error model addresses.
+
+\section{Residual systematics}
+
+A good model leaves residuals that do not depend on anything it does not include. Figure~\ref{fig:systematics}
+sorts the comparison-star residuals by airmass, seeing (FWHM), star colour, position on the detector and
+date, and shows the median residual in each bin. A flat line at zero means no trend; any slope or curvature
+is a systematic error that the model misses.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{pytics_17_residual_systematics}
-  \caption{Residual systematic trends.  Airmass and seeing: $\leq1$\,mmag.
-    A $\pm4$\,mmag trend with detector y-position remains in u and z.}
+  \caption{Comparison-star residuals (data minus full model, good epochs) against observing conditions
+    and star properties: airmass, FWHM, star colour, detector x and y (scaled to 0--1 per camera so that
+    Sinistro and MuSCAT3 share an axis) and time. Each point is the median residual in one of 12
+    quantile bins.}
   \label{fig:systematics}
 \end{figure}
+
+Figure~\ref{fig:systematics} looks for structure that the model does not describe. With airmass the
+median residual varies by 0.5--1.8\,mmag peak to peak, with FWHM by 0.2--1.1\,mmag and with time by
+1.3--1.8\,mmag (u 3.2): extinction, transparency and seeing are absorbed by $\Delta T_t$, as intended.
+The largest remaining trends are with detector position, up to $-4$\,mmag at the low-y edge in u and at
+both y edges in z (peak-to-peak ranges 5.8 and 6.4\,mmag; x: 1.6--2.5, z 5.4), a flat-field or vignetting
+signature that a position term could absorb; and with star colour in u and z (6.3 and 7.1\,mmag peak to
+peak; z has no colour terms), where the bins hold few stars and are noisy. All are below the AGN errors
+of 4--7\,mmag.
 
 %%============================================================
 \chapter{Open issues and next steps}
@@ -332,18 +943,281 @@ z & 0.09 & 0.67 & 33 & 5.8 \\
 %%============================================================
 
 \begin{enumerate}
-  \item \textbf{Camera 1m006-fa08} has DMAGS $+0.5$\,mag and $\mathrm{rms}_\mathrm{sc}$ 25\,mmag
-        in $g$; all u and B frames fail per-frame QC.  Hardware investigation needed.
-  \item \textbf{Seeing-dependent host term.}  Residual 0.3--0.75\,\% inter-Sinistro offsets
-        after colour correction may be host flux varying with seeing.
-  \item \textbf{Per-epoch AGN colour.}  Fixed AGN colour introduces $\lesssim4$\,mmag ZP
-        variation as the AGN brightens (bluer).
-  \item \textbf{MuSCAT 39\,px re-extraction.}  After re-extracting with the correct aperture,
-        the intercalibration offset $b$ should approach zero.
+  \item \textbf{Camera 1m006-fa08} has $\Delta S$ $+0.56$\,mag and $\mathrm{rms}_\mathrm{sc}$ 21\,mmag in g
+        (14\,mmag in V), the largest colour terms ($CK = -39$\,mmag\,mag$^{-1}$ in g), and no u or B frames
+        that pass per-frame QC. Hardware investigation needed.
+  \item \textbf{Camera 1m013-fa20} has $\mathrm{rms}_\mathrm{sc}$ 31 and 39\,mmag in i and z; worth checking
+        alongside fa08.
+  \item \textbf{Seeing-dependent host term.} Residual 0.3--0.75\,\% inter-Sinistro offsets after colour
+        correction may be host flux varying with seeing.
+  \item \textbf{Per-epoch AGN colour.} The fixed AGN colour introduces up to about 4\,mmag of ZP variation as
+        the AGN brightens (bluer).
+  \item \textbf{MuSCAT re-extraction.} After re-extracting MuSCAT3 with an aperture matching Sinistro
+        (10.5$''$), the intercalibration offset $b$ and the season step (Appendix~\ref{app:figs}) should
+        shrink.
   \item \textbf{Y band} has 10 frames and 68\,mmag ZP scatter; treat as unreliable.
-  \item \textbf{Colour-term universality.}  Currently measured from one field; running on
-        two or three more will determine whether $C_f$ is universal per filter and camera family.
+  \item \textbf{Colour-term universality.} Currently measured from one field; running on two or three
+        more will show whether $C$ is universal per filter and camera family.
+  \item \textbf{Colour-check record (resolved 18 Nov 2026).} The Mrk\,817 solutions used for the
+        figures carried a stale \texttt{meta.colour\_check} for u, B, g and V (two identical light curves,
+        gain 0, although the terms were on). A fresh full fit with \texttt{scope\_colour\_terms: auto}
+        repeated the check properly: on in u, B, g and V (gains $+9$, $+15$, $+26$ and $+23$\,\%), off
+        in r, i and z ($-9$, $-22$, $-4$\,\%). The AGN light curves and zero points are unchanged.
 \end{enumerate}
+
+\appendix
+
+%%============================================================
+\chapter{Additional figures}
+\label{app:figs}
+%%============================================================
+
+The figures below are in \texttt{docs/figures/pytics/} and were made by the scripts in
+\texttt{tools/pytics\_validation/} (\texttt{report\_figs.py}, \texttt{quality\_figs.py},
+\texttt{storm2\_figs.py}, \texttt{verify\_error\_model.py}, \texttt{muscat\_drift.py}). Each section
+says what the figure shows and how to read it, then what it tells us.
+
+\section{Epoch corrections}
+
+Figure~\ref{fig:epochs} shows the per-frame corrections $\Delta T_t$ that PyTICS fits in g. Read them as
+``how much fainter than usual the whole frame was'': clouds, extinction and exposure errors all move them.
+The bottom-left panel compares them with the per-frame zero points measured independently in the same
+frames; if both are right, each camera traces a line of slope one.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_04_epochs}
+  \caption{Epoch corrections in g, coloured by camera (MuSCAT3 black). \emph{Top left:} $\Delta T_t$
+    against time. \emph{Top right:} $\Delta T_t$ against airmass. \emph{Bottom left:} $-\Delta T_t$
+    against the per-frame GSPC zero point of the same frame. \emph{Bottom right:} histogram of
+    $\mathrm{rms}_t$ for all filters (values below 0.01\,mmag are shown at 0.01).}
+  \label{fig:epochs}
+\end{figure}
+
+$\Delta T_t$ spans about 0.9\,mag and has no tight
+airmass relation, because it absorbs transparency and exposure-to-exposure changes as well as extinction.
+Against the per-frame zero point every camera forms a line of slope one, offset by its $\Delta S_k$ (the
+MuSCAT3 line is 1.1\,mag to the right): the two calibrations measure the same frame-to-frame changes.
+The $\mathrm{rms}_t$ distribution is bimodal: one group of epochs needs no extra scatter (the peak at
+0; in every filter but u more than half of the epochs have $\mathrm{rms}_t<0.1$\,mmag), the other has
+1--10\,mmag, and a small tail exceeds the 50\,mmag \texttt{good} limit.
+
+\section{Comparison-star repeatability}
+
+Figure~\ref{fig:star-rms} measures how stable each comparison star is after calibration: its scatter over
+all frames against its brightness. Faint stars are limited by photon noise (the line); bright stars by
+calibration errors, so the bright end is where the two calibrations can be compared.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_05_star_repeatability}
+  \caption{Repeatability of the comparison stars: robust rms of each star over all frames against its
+    magnitude, calibrated with the per-frame GSPC zero point (open grey) and with PyTICS (filled, without
+    colour terms in this figure). The line is the median photometric error; the panel titles give the
+    median for the brightest 30\,\% of the stars.}
+  \label{fig:star-rms}
+\end{figure}
+
+Faint stars follow the photometric error in
+both calibrations. Bright stars reach a floor of 5--10\,mmag. PyTICS lowers it clearly in u (16.2 to
+10.5\,mmag) and z (14.4 to 12.9) and by 0.2--0.4\,mmag in g, V, r and i; in B it is 0.4\,mmag higher. The
+floor is set by camera-to-camera differences (flat fields, colour, aperture losses) rather than by the
+frame zero points. In z the faint stars scatter well above the photometric error.
+
+\section{Additive offsets of all cameras}
+
+Figure~\ref{fig:intercal-summary} extends the MuSCAT3 intercalibration of Fig.~\ref{fig:intercal} to every
+camera: the additive AGN flux offset $b_1$ of each camera against the others, in per cent of the flux
+(left). On the right, the offsets are compared with what the leftover colour slopes of
+Fig.~\ref{fig:colour-terms} would predict at the AGN colour: if the offsets were a colour effect they would
+lie on the 1:1 line.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_11_intercal_summary}
+  \caption{\emph{Left:} additive AGN offset $b_1$ (with $a\equiv1$) of every camera against the Sinistro
+    reference, in \% of the mean flux, per filter. \emph{Right:} measured $b_1/F$ against the offset
+    predicted from the residual star$\times$scope colour slope of Fig.~\ref{fig:colour-terms} at the AGN
+    colour; squares are MuSCAT3, the dotted line is 1:1.}
+  \label{fig:intercal-summary}
+\end{figure}
+
+The Sinistro cameras agree with each
+other to within $\pm2$\,\% (rms 0.7\,\%), while MuSCAT3 is 6--10\,\% low. The Sinistro offsets are barely
+correlated with the residual colour slopes (correlation coefficient 0.16), so after the $CK_k$ the remaining
+Sinistro offsets are not colour terms; the MuSCAT3 offsets lie far from the 1:1 line, as expected for
+host light.
+
+\section{Website plots}
+
+Figures~\ref{fig:webplot} and \ref{fig:webplot60} are the light-curve plots that the website shows for the
+target, drawn by the ensemble stage from the same good, intercalibrated epochs as Fig.~\ref{fig:merged}.
+They are included to show the published product. The full-archive plot (Fig.~\ref{fig:webplot}) is the
+one on the target page; the 60-day plot (Fig.~\ref{fig:webplot60}) shows the latest monitoring at a scale
+where single nights can be seen. The Y band appears in both but rests on only 10 frames and should not be
+used for science.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{pytics_13_webplot_merged}
+  \caption{The merged light curve in the website format (all data, flux in mJy, one panel per band
+    including Y), as written by the ensemble stage to \texttt{lco\_latest\_<obj>\_merged}.}
+  \label{fig:webplot}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{pytics_14_webplot_merged_last60d}
+  \caption{As Fig.~\ref{fig:webplot}, last 60 days of the archive (to 14 August 2026). The Y points
+    (bottom) come from 10 frames only.}
+  \label{fig:webplot60}
+\end{figure}
+
+\section{Epoch quality over time}
+
+Figure~\ref{fig:epoch-quality} follows the quality of the epochs through the archive: the extra scatter
+$\mathrm{rms}_t$ of the comparison stars in each frame (top), how many comparison stars each frame has
+(middle), and the fraction of epochs that pass the \texttt{good} cut each month (bottom). Points above the
+red lines in the top panel or below them in the middle panel are excluded from the light curve.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_18_epoch_quality}
+  \caption{Epoch quality over time, all filters. \emph{Top:} $\mathrm{rms}_t$ per epoch (log scale;
+    red: the 50\,mmag \texttt{good} limit). \emph{Middle:} number of comparison stars per epoch (red: the
+    minimum of 5). \emph{Bottom:} fraction of good epochs per 30-day bin.}
+  \label{fig:epoch-quality}
+\end{figure}
+
+The median $\mathrm{rms}_t$ is below 0.1\,mmag
+in all filters except u (2.2\,mmag); the 90th percentile is 6--15\,mmag. 96\,\% (u) to 99\,\% of the
+epochs are good, with dips in a few months, mostly in u. Sinistro epochs have about 97 comparison stars
+(u about 65); MuSCAT3 has only 6--12 (its field is smaller), and MuSCAT3 z sits close to the minimum
+of 5.
+
+\section{AGN STORM\,2}
+
+The AGN STORM\,2 campaign (2020--22) is the densest stretch of the archive, with several cameras often
+observing on the same night, which makes it the best place to check whether the cameras agree.
+Figure~\ref{fig:storm2} shows the whole campaign per band, one symbol per camera, so that a camera that
+sits off the others would stand out. Figure~\ref{fig:storm2-zoom} zooms on 40 days and puts the two
+calibrations side by side; the number in each panel, the scatter of the flux ratio between cameras on the
+same night, summarises the agreement over the whole campaign (lower is better).
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_19_storm2_lightcurves}
+  \caption{The AGN STORM\,2 campaign (MJD\,59150--59650): final light curves per band, coloured and
+    marked by camera; MuSCAT3 after (black) and before (open grey) the additive correction.}
+  \label{fig:storm2}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_20_storm2_zoom}
+  \caption{A 40-day window of AGN STORM\,2 chosen to have the most nights observed by two or more cameras.
+    \emph{Left:} per-frame zero-point calibration (QC-pass frames). \emph{Right:} PyTICS with the MuSCAT3
+    correction (good epochs). Each panel gives the robust same-night camera-to-camera $\sigma$ of the flux
+    ratio over the whole campaign.}
+  \label{fig:storm2-zoom}
+\end{figure}
+
+Over the densely sampled
+2020--22 campaign, the cameras interleave without large steps after calibration. The zoom compares the
+two calibrations directly. In g, r, i and z the same-night camera-to-camera $\sigma$ falls from 5.7--7.7\,\%
+to 0.7--0.8\,\% (z: 6.6 to 2.5\,\%), mostly because the per-frame curve has no MuSCAT3 host correction. In
+u, B and V (Sinistro only) the per-frame calibration is \emph{better}: 0.44, 0.63 and 0.43\,\% against
+0.50, 0.95 and 0.54\,\% for PyTICS. This is not yet understood and must be resolved before the error model
+is changed.
+
+\section{Pair test of the AGN errors}
+
+Figure~\ref{fig:pairs} tests the AGN errors with pairs of epochs that should agree: same camera and less
+than an hour apart (only noise can separate them), or different cameras within six hours (noise plus
+camera-to-camera calibration). Each difference is divided by its combined quoted error; the width
+$\sigma_z$ of the result should be 1. The bottom-right panel is the most telling: it shows $\sigma_z$ for
+epochs with small and with large quoted errors separately.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_21_pair_test}
+  \caption{Pair test of the AGN errors. \emph{Top left:} difference of AGN pairs less than 1\,h apart on the
+    same camera, divided by the combined random error; number of pairs in the legend. \emph{Top right:}
+    robust $\sigma$ of the normalised differences for same-camera pairs ($<1$\,h) and different-camera pairs
+    ($<6$\,h), with the random and the total error. \emph{Bottom left:} same-camera $\sigma_z$ against the time
+    between the epochs. \emph{Bottom right:} same-camera $\sigma_z$ against the quoted random error
+    (octiles).}
+  \label{fig:pairs}
+\end{figure}
+
+With the random error, same-camera pairs give
+$\sigma_z = 0.65$--1.03 overall, but $\sigma_z$ falls steeply with the quoted error: the best epochs
+(1--2\,mmag) scatter 1.2--1.6 times more than quoted, the worst 2--4 times less. The PyTICS random error
+therefore lacks a floor of 1--2\,mmag and gives too much weight to $\mathrm{rms}_t$. Different-camera pairs
+need the total error and reach $\sigma_z = 0.97$--1.11 in g, V and i but 1.16--1.84 in u, B, r and z, i.e.\
+camera offsets remain there. $\sigma_z$ rises beyond a few hours (bottom left) because the AGN varies.
+
+\section{Verification of the empirical error model}
+
+The empirical error model (Sect.~\ref{sec:agnlc}) is fitted on pairs of epochs, so it could simply learn
+the noise of the data it was fitted on. Figure~\ref{fig:errmodel} tests it on data it has not seen: the
+model is fitted on one half (even nights, or before MJD\,59900) and tested on the other, and the other way
+round. If it works, the solid lines in the top panels are flat at $\sigma_z=1$ for all quoted errors, and
+the fitted parameters in the bottom row agree between the halves.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_23_error_model_verification}
+  \caption{Verification of the opt-in empirical error model on held-out data (fit on even nights, test on
+    odd, and back; fit before MJD\,59900, test after, and back). \emph{Top left and centre:} same-camera
+    $\sigma_z$ on held-out nights in error sextiles, Sinistro and MuSCAT3; dashed PyTICS random error,
+    solid model. \emph{Top right:} held-out $\sigma_z$ per filter for the four splits and four pair types;
+    grey PyTICS, colour model. \emph{Bottom:} fitted $k$, $\beta$, $s_0$ and the camera term $s_\mathrm{cam}$
+    on the four training halves.}
+  \label{fig:errmodel}
+\end{figure}
+
+On held-out Sinistro nights the model flattens
+$\sigma_z$ across the error range (solid lines near 1, dashed lines falling from 1.2 to 0.3), with
+$k\approx0.8$--1.2, $\beta\approx0$--0.3 and $s_0\leq2.6$\,mmag, stable between the halves. For MuSCAT3
+the gain is smaller. The camera term $s_\mathrm{cam}$ is 4--7\,mmag in g, V, r and i, 7.5--12\,mmag in u and B
+and 13--17\,mmag in z. Different-camera pairs remain scattered ($\sigma_z$ 0.5--1.9) because the camera
+offsets change with time; that is a calibration problem rather than an error problem.
+
+\section{MuSCAT3 against Sinistro over time}
+
+Figures~\ref{fig:muscat-drift} and \ref{fig:muscat-season} check whether the single additive MuSCAT3
+correction holds over the years. Each point is a Sinistro epoch compared with the corrected MuSCAT3 flux
+of the nearest night, in per cent; if one offset were enough, the points and the black 30-day median would
+stay at zero in every season. The middle and right panels sort the same differences by seeing, to test
+whether the host light lost from the MuSCAT3 aperture depends on the seeing. Figure~\ref{fig:muscat-season}
+repeats the test with one offset per season.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_22_muscat_vs_sinistro}
+  \caption{MuSCAT3 against Sinistro over time in g, r, i and z: each good Sinistro epoch compared with the
+    corrected MuSCAT3 nightly flux interpolated to its time ($<1.5$\,d), in \% (one additive offset for all
+    seasons). Coloured by Sinistro camera; black line: 30-day median. \emph{Middle and right:} the same
+    differences against MuSCAT3 and Sinistro seeing.}
+  \label{fig:muscat-drift}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pytics_24_muscat_per_season}
+  \caption{As Fig.~\ref{fig:muscat-drift}, with one additive MuSCAT3 offset per observing season
+    (\texttt{intercal\_per\_season}).}
+  \label{fig:muscat-season}
+\end{figure}
+
+With one
+offset for all data, MuSCAT3 minus Sinistro changes between the 2021 and 2022 seasons: $-0.8$ to $+1.1$\,\%
+in z, $-0.4$ to $+0.6$\,\% in r, $-0.2$ to $+1.1$\,\% in i, and 0 in g (season medians). All Sinistro
+cameras see the same step, so it is MuSCAT3 or its host-light term that changes, and it does not follow
+seeing. With one offset per season the season medians drop to $\leq0.7$\,\% in size (mostly $\leq0.3$\,\%), but the drift
+within 2021 in z (about $-2$\,\% per 100\,d) remains. The option stays off until the MuSCAT3 re-extraction
+with a Sinistro-matched aperture shows whether the step is aperture-dependent host light.
 
 \begin{thebibliography}{9}
 \addcontentsline{toc}{chapter}{References}
