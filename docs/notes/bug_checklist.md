@@ -109,6 +109,10 @@ line in `future_improvements.md`.
 
   It prints one summary and exits non-zero when anything is stale or failed, so cron mail / alerting fires.
 
+- [x] **B24** (VM cron test, 19 Nov): no LCO token under cron (three lookups; token only in an exported variable).
+  Fixed: one lookup `ava.lco.token`, templates point at `<install root>/.secrets/lco_token`, `check_install` and
+  `make_crontab.py --check` test it as cron sees it.
+
 ## 4. QC items already opened by the QC session
 
 - [ ] **QC-0001** (QC): sparse fields fail `min_matched: 30` (PG 2304+043: 0 % pass); fields with few GSPC u

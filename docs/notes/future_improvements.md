@@ -1036,3 +1036,23 @@ needed 25 hand fixes. The changes, item by item:
   astroquery / sqlalchemy at the VM's versions. Also `environment.lock.yml` from `conda env export --no-builds` on
   the VM, so turgon can be rebuilt to match before the backfill. Waiting for the user's approval and the VM's
   full version list.
+
+## One LCO-token lookup; cron-environment check (19 Nov 2026)
+
+- **Bug (production VM, cron test):** `pipeline_test` failed under cron with "No LCO API token", while
+  `lcodb_daily_test` worked. Three lookups disagreed:
+  - downloads: `lco.token_file` (default `~/.lco_token`, absent on the VM) or `$LCO_API_TOKEN`;
+  - lcodb: its own `token_file` or `$LCO_TOKEN`;
+  - the checklist's `.bashrc`: exported `$LCO_TOKEN`, which cron does not have.
+- **Fix.**
+  - `ava.lco.token` is the single lookup: `$LCO_API_TOKEN` (documented), `$LCO_TOKEN` (accepted), `lco.token_file`
+    (relative to ava_root), lcodb's `token_file` (relative to its template folder), `~/.lco_token`.
+  - The error lists every place looked at.
+  - It is used by `cfg.lco_token`, downloads, lcodb, LCO usage and `check_install`.
+  - Both templates default to `<install root>/.secrets/lco_token` (checklist F1). The checklist no longer exports
+    the token.
+  - `check_install.py` checks it as cron sees it (environment ignored).
+  - `make_crontab.py --check` probes the crontab's environment under `env -i` before installing; `--run-now` runs
+    the test jobs now, as cron would.
+- Tests: `tests/test_lco_token.py`. The LCO-usage tests now stub the token through the environment, and never
+  print a token in a failure message.

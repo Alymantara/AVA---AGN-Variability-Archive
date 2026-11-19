@@ -306,10 +306,13 @@ All times UTC. Run everything as one unprivileged service user (e.g. `ava`), wit
 line goes through `scripts/cron_job.sh`, which logs to `<logs>/<job>.log` and appends one line per run (job,
 start, end, exit code) to `<logs>/cron_runs.tsv`. `scripts/daily_check.py` reads that record.
 
-**1. Test (safe):** every job runs once, a few minutes apart, with nothing downloaded or deleted:
+**1. Test (safe):** every job runs once, a few minutes apart, with nothing downloaded or deleted. `--check` first
+runs a probe under `env -i` and the crontab's variables, exactly as cron will. It checks the LCO token from its
+file, both configs, SExtractor, banzai-floyds, the writable log folder and `PREFECT_HOME`, and the pipeline imports.
+Nothing is installed if it fails. `--run-now` instead runs every test job immediately, the same way, then the check.
 
 ```bash
-python scripts/make_crontab.py --test --install
+python scripts/make_crontab.py --test --check --install
 ```
 
 | Test job | What it runs |
@@ -345,7 +348,10 @@ the command with `--cleanup-live`), every 6 h `lco_usage --live-snapshot`, and 0
   with `echo test | mail -s "AVA test" <address>`.
 - The crontab carries the jobs' whole environment: the Python, `AVA_CONFIG` / `LCODB_CONFIG`, `PREFECT_HOME` and
   the Prefect settings (`ava.utils.prefect_env`: analytics off, they locked Prefect's database), and `TMPDIR`.
-  Cron jobs read the LCO token from `token_file` (`tools/make_config.py init --token-file`).
+  Cron jobs read the LCO token from its file: one lookup for the whole package (`ava.lco.token`): `$LCO_API_TOKEN`,
+  then `lco.token_file`, then lcodb's `token_file`, then `~/.lco_token`. Both templates' `token_file` default to
+  `<install root>/.secrets/lco_token`. Do not rely on an exported variable: cron has none (19 Nov: the pipeline
+  failed under cron with the token only in `$LCO_TOKEN`). `check_install.py` checks the token as cron sees it.
 - The `pipeline` line replaces the Prefect deployment of section 7.3; use one or the other.
 - `--install` replaces only the block between the AVA markers in the user's crontab, and saves the previous
   crontab to `<logs>/crontab.before.<time>`. `--remove` takes the block out again.

@@ -107,8 +107,12 @@ are lost. Never paste a `<placeholder>` literally; replace it first.
   export PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS=90
   export PREFECT_SERVER_ANALYTICS_ENABLED=false
   export DO_NOT_TRACK=1
-  export LCO_TOKEN="$(cat $AVA/.secrets/lco_token 2>/dev/null)"
   ```
+  The token is **not** exported. Every job, in a shell or under cron, reads it from `$AVA/.secrets/lco_token` (F1),
+  the file both config templates name (`token_file`). One lookup for the whole package (`ava.lco.token`):
+  `$LCO_API_TOKEN` (the one documented variable; `$LCO_TOKEN` is still accepted), then `lco.token_file`, then lcodb's
+  `token_file`, then `~/.lco_token`. **Lesson (19 Nov):** with the token only in `$LCO_TOKEN` from `.bashrc`, the
+  pipeline worked by hand but failed under cron ("No LCO API token"), because cron has no environment.
   Then `mkdir -p $AVA/tmp $AVA/AVA/data/prefect`, and check that a login shell reads `~/.bashrc` (`sudo -iu ava`
   starts one): `grep bashrc ~/.profile` prints a line. The Prefect settings are also applied by the code
   (`ava.utils.prefect_env`, 19 Nov), so a missing line here no longer locks Prefect's database.
@@ -152,6 +156,7 @@ with `base: <template>`, and AVA and lcodb load the template first, so settings 
   ```bash
   cd $AVA/AVA && python tools/make_config.py init --token-file $AVA/.secrets/lco_token
   ```
+  (`--token-file` only if the token is not at the default `$AVA/.secrets/lco_token`.)
   It writes `data/config/ava_config.yaml` and `data/config/lcodb_config.yaml`:
   - the lcodb paths as absolute paths;
   - `web.data_dir` `data/web` and `pipeline.prefect.home` `data/prefect`;
@@ -165,7 +170,8 @@ with `base: <template>`, and AVA and lcodb load the template first, so settings 
   `schedule_cron`). **Move the live LCO-usage log off the tracked seed:** if `lco_usage.snapshots.file` pointed at
   `data/lco_usage/snapshots.csv` (the repository's seed), `git status` shows it modified and `git pull` fails:
   `mkdir -p data/live/lco_usage && cp data/lco_usage/snapshots.csv data/live/lco_usage/ && git checkout data/lco_usage/snapshots.csv`.
-- [ ] **E3. Settings to keep as they are** (template defaults): `photometry.reference.vizier_servers` = CDS,
+- [ ] **E3. Settings to keep as they are** (template defaults): `lco.token_file` and lcodb `token_file` =
+  `$AVA/.secrets/lco_token` (F1); `photometry.reference.vizier_servers` = CDS,
   **`gea.esac.esa.int`**, CfA; `photometry.reference.fallback: ""` (Gaia only, 18 Nov); `pipeline.n_cores: 1`;
   `download.mode` and `spectroscopy.download.mode` = `"dry_run"` until step L. lcodb `daily.include_regex` =
   `'^KEY2026'` (the key project runs for years). **Lesson:** CfA's copies of Gaia DR3 / GSPC can be incomplete,
@@ -221,7 +227,8 @@ Choose one route and record it.
 
 # H. Install check
 
-- [ ] **H1.** `ava-env && cd $AVA/AVA && python scripts/check_install.py --tests` → `READY: 0 FAIL`.
+- [ ] **H1.** `ava-env && cd $AVA/AVA && python scripts/check_install.py --tests` → `READY: 0 FAIL`. The token line
+  says "LCO API token (as cron sees it): from <file>": it ignores the environment variables, as cron will.
   Expected WARN only for folders not yet made. **Check the SExtractor line says "16 apertures per source"**
   (Lesson: `default.param` once said `*_APER(12)` against 16 diameters).
 - [ ] **H2. One real frame end to end** (≈ 15 archive requests):
@@ -304,9 +311,11 @@ Choose one route and record it.
 - [ ] **Q0. The machine runs in UTC:** `timedatectl` shows `UTC` (else `sudo timedatectl set-timezone UTC`).
   Debian's cron ignores `CRON_TZ`, so the schedule is in the machine's time zone.
 - [ ] **Q1. Test every job once** (deployment guide §7.0), from `ava-env` with the C3 variables set (they are copied
-  into the crontab; cron reads no `~/.bashrc`, and the token comes from `token_file`):
+  into the crontab; cron reads no `~/.bashrc`, and the token comes from `token_file`). First the probe, which runs
+  under `env -i` and the crontab's variables exactly as cron will (token file, configs, SExtractor, banzai-floyds,
+  writable folders, imports), and installs only if it passes:
   ```bash
-  python scripts/make_crontab.py --test --install
+  python scripts/make_crontab.py --test --check --install
   ```
   An hour later `tail -40 data/logs/daily_check_test.log` ends in `PASSED`; any failed job shows its log's end.
 - [ ] **Q2. Mail:** `MAILTO` needs a mail server. The first VM has `mail` but no `sendmail`: install one, or a
