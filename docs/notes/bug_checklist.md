@@ -87,7 +87,7 @@ line in `future_improvements.md`.
 
 ## 3d. Production operations: to do first (user, 19 Nov)
 
-- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: the weekly backup.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
+- [ ] **O01: ready-to-install cron / service files.** *(19 Nov: `scripts/make_crontab.py` (`--test` / `--production` / `--install`) and `scripts/cron_job.sh` done, not committed. Open: the weekly backup. Fresh-install round, 19 Nov: overrides config + make_config, Prefect env, dry cleanup, UTC.)* The scripts exist (`scripts/lcodb_daily.sh`, `scripts/deploy.py`
   for the Prefect flow, `scripts/cleanup.py --live`, `scripts/lco_usage.py --live-snapshot`), but the crontab is
   only written out in `deployment_guide.md` §7, with `/opt/ava` example paths. To do:
   - a `deploy/` folder with `crontab.example` and systemd units for the Prefect server and worker;

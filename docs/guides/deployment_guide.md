@@ -128,16 +128,21 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
 
 - Fork: `https://github.com/Alymantara/banzai-floyds` (based on LCO's banzai-floyds; depends on
   `lco-banzai` 1.36.2 from GitHub, `torch`, `astroscrappy`, `scikit-image`, `scikit-learn`, `alembic`, …).
-  Deploy a **fixed commit** (currently `9e34c07` on `rm-improvements`, 19 Nov 2026; was `3e8e796`); the version is
+  Deploy a **fixed commit** (currently `0271697` on `rm-improvements`, 19 Nov 2026: five more flux standards,
+  fringe templates that survive repeat runs, rejection of misidentified arc lines; was `3e8e796`). **Never
+  `origin/main`:** it lacks `offline.py`, the shipped sky flats and ~8,100 lines of the fork. Clone, then
+  `git checkout 0271697`. The version is
   recorded in every product. Install notes: the fork's `docs/INSTALL_RM.md`.
 - Python 3.12, own environment (e.g. `/opt/ava/env-banzai`). The fork has a `Dockerfile` that can be
   used instead.
   On Linux: install CPU-only PyTorch first (`pip install torch --index-url https://download.pytorch.org/whl/cpu`),
   then `pip install -e ".[test]"`, from a clean shell (`env -i`, no `PYTHONPATH`).
 - Data: the sky-flat order solutions of both FLOYDS sites ship with the fork since `11f8ce4` (`banzai_floyds/data/orders/skyflats/`,
-  registered by `setup-db`); point `spectroscopy.reduction.skyflats_dir` at that folder.
-- AVA calls it as an external process; configure `spectroscopy.reduction.python`, `.package`,
-  `.skyflats_dir` and `paths.floyds_pipeline` (currently `/Users/juan/...` paths — **must change**).
+  registered by `setup-db`); `spectroscopy.reduction.skyflats_dir` points at that folder.
+- AVA calls it as an external process. The config template's defaults are the production layout, relative to
+  the checkout: `paths.floyds_pipeline` and `spectroscopy.reduction.package` = `../banzai-floyds`, `.python` =
+  `../miniforge3/envs/banzai/bin/python`, `.skyflats_dir` = the shipped sky flats. A machine with another
+  layout sets them in its `data/config/ava_config.yaml` (`tools/make_config.py init --set ...`).
 - **Flux standards (19 Nov 2026).** The fork has reference spectra for 12 standards
   (`banzai_floyds/data/standards/`). Set lcodb `standards.reference_dir` to that folder on each host. lcodb then
   matches science spectra only to those standards, within `standards.usable_radius_arcsec` (300″). A missing
@@ -313,9 +318,11 @@ python scripts/make_crontab.py --test --install
 | `pipeline_test` | `run_pipeline.py --target <first active target>` with the nightly steps; `--download-mode dry_run --spec-mode dry_run` (search only); no publish (`--with-publish` adds it). |
 | `cleanup_test` | `cleanup.py` in dry run. |
 | `lco_usage_test` | `lco_usage.py` without the live snapshot, without publishing. |
-| `daily_check_test` | `daily_check.py` for the four test jobs, 45 min after the first (`--check-after`). |
+| `daily_check_test` | `daily_check.py` for the four test jobs, 60 min after the first (`--check-after`). |
 
-The command prints when the jobs will run. Afterwards, read `<logs>/daily_check_test.log`: it ends in `PASSED`
+The pipeline test starts 15 min after the archive crawl (`--pipeline-after`; the crawl takes ~11 min and the two
+never share the lcodb databases); the check runs an hour after the first job (`--check-after`). The command prints
+when the jobs will run. Afterwards, read `<logs>/daily_check_test.log`: it ends in `PASSED`
 or `FAILED`, and for a failed job it shows the end of that job's log. Each job's full output is in
 `<logs>/<job>_test.log`. The test lines have a fixed day and month, so they do not repeat, but replace them
 anyway.
@@ -327,10 +334,18 @@ python scripts/make_crontab.py --production --mailto <address> --install
 ```
 
 This sets: 01:00 `lcodb_daily`, 02:00 `pipeline` (`run_pipeline.py` with `pipeline.prefect.nightly_steps`, all
-targets), 05:00 `cleanup --live`, every 6 h `lco_usage --live-snapshot`, and 07:00 `daily_check`.
+targets), 05:00 `cleanup` (**dry run** until `--cleanup-live`: read the first nights' `cleanup.log`, then re-run
+the command with `--cleanup-live`), every 6 h `lco_usage --live-snapshot`, and 07:00 `daily_check`.
 - `daily_check` exits non-zero when a job did not run in time or failed, or when the archive tables are older
   than 30 h, so cron mails its output to `MAILTO`.
-- The times are UTC (`CRON_TZ=UTC`, honoured by cronie; otherwise run the machine in UTC).
+- **Run the machine in UTC** (`timedatectl`; `sudo timedatectl set-timezone UTC`): cron reads the times in the
+  machine's zone and Debian's cron ignores `CRON_TZ`, so none is written; `make_crontab.py` warns otherwise.
+- **Mail needs a mail server.** `MAILTO` only works if the machine can send mail. `mail` alone is not enough; the
+  first VM had no `sendmail`. Install one, or a relay to the department's server (e.g. `msmtp-mta`), and test it
+  with `echo test | mail -s "AVA test" <address>`.
+- The crontab carries the jobs' whole environment: the Python, `AVA_CONFIG` / `LCODB_CONFIG`, `PREFECT_HOME` and
+  the Prefect settings (`ava.utils.prefect_env`: analytics off, they locked Prefect's database), and `TMPDIR`.
+  Cron jobs read the LCO token from `token_file` (`tools/make_config.py init --token-file`).
 - The `pipeline` line replaces the Prefect deployment of section 7.3; use one or the other.
 - `--install` replaces only the block between the AVA markers in the user's crontab, and saves the previous
   crontab to `<logs>/crontab.before.<time>`. `--remove` takes the block out again.
@@ -401,6 +416,10 @@ then nearest time. `tools/headers_backfill.sh` is no longer needed.
   - Because images are deleted after processing (job 4), the file being absent does not mean the frame
     is new: both the daily download and the backfill (`scripts/download.py`) also **skip frames that already
     have a SExtractor catalogue** (reported as "already processed").
+- **First spectra download on a fresh install:** `select: "new"` starts from the last successful download in
+  `download_state`, which is empty on a new machine (the transferred databases have it cleared), so the first run
+  finds no night. Name the nights (`run_pipeline.py -D --spec-nights YYYYMMDD,...`) or set `select: "oldest"`
+  for the backfill; from then on "new" continues from there.
 - **Spectroscopy** (`ava/pipeline/tasks/spec_download.py`): planned **offline from `spectra.sqlite`**
   (hence job 1 must run first): the new nights of each target (after the last successful run minus
   `overlap_days`), with each night's science spectra, arc and lamp flat, **and the night's flux standard

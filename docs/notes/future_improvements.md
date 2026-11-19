@@ -998,3 +998,41 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
     photometric F_var, the Hβ products and `line_variability` are not refreshed by the nightly run.
   - The weekly backup (job 5).
 - Tests: `tests/test_cron_tools.py`.
+
+## Fresh install on the production VM: what moved into the repository (19 Nov 2026)
+
+The first VM install (`l-pipeline`: 2 vCPU, 7.8 GB, `/data` 1 TB, install root `/data/ava`, service user `ava`)
+needed 25 hand fixes. The changes, item by item:
+- **Config (A1–A8), `6baad1e`.**
+  - A machine's `data/config/*.yaml` holds only its overrides (`base:` → template), so template keys reach every
+    machine with `git pull` (A8). The first VM's full copy still had the old `nightly_steps` and `schedule_cron`.
+  - The template defaults are the production layout (A1, A2).
+  - `tools/make_config.py init / show / diff / check` writes the overrides and checks for another machine's
+    paths (A3, E4).
+  - GSPC only (A4); `source-extractor`, with `sex` tried too (A5); `n_cores: 1` (A7).
+  - The token path is set via `--token-file`; both loaders already fall back to `token_file` (A6).
+  - The AVA config honours `LCODB_CONFIG` (C03).
+- **Found while doing it: the VM's live LCO-usage log was the git-tracked seed** (`data/lco_usage/snapshots.csv`
+  inside the checkout). Every snapshot appended to a tracked file, and `git pull` would fail. `make_config.py`
+  now puts the live log at `data/live/lco_usage/snapshots.csv`; the checklist (E2) says how to move it.
+- **Prefect and cron (C10, D11–D16), `b19df08`.**
+  - Prefect analytics off before import (they locked its SQLite: "database is locked" on every run).
+  - The crontab carries `PREFECT_HOME`, the Prefect settings and `TMPDIR`.
+  - No `CRON_TZ` (Debian ignores it), with a warning off UTC.
+  - Production cleanup is a dry run until `--cleanup-live`.
+  - The test pipeline starts 15 min after the crawl.
+  - `lcodb_daily.sh` tees its log.
+- **Documentation (D12, D14, E17, E18, F19–F25).** Deployment guide §4.3 and §7 and the production checklist cover:
+  - UTC and the mail server;
+  - the fork pin `0271697`, never `origin/main`;
+  - the first spectra download;
+  - the cutover: the transferred databases have `spec_qc`, `local_files`, `spec_lines` and `download_state`
+    cleared, and the VM rebuilds them;
+  - the service user, packages, `.bashrc` and paste safety;
+  - the admin copy with `sha256sum` and the integrity check;
+  - one-target and one-night first runs with the VM's timings.
+- **Pins (B9): proposed, not applied.** `environment.yml` to the VM's set: Python 3.12, numpy 2.5.5, pandas 3.1.1,
+  astropy 8.0.3, scipy 1.18.1, pyarrow 26.0.1, Prefect 3.9.3, plus numba / matplotlib / lmfit / astroalign /
+  astroquery / sqlalchemy at the VM's versions. Also `environment.lock.yml` from `conda env export --no-builds` on
+  the VM, so turgon can be rebuilt to match before the backfill. Waiting for the user's approval and the VM's
+  full version list.
