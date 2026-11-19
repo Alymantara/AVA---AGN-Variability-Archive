@@ -666,10 +666,12 @@ def assign_star_ids(
     cat["is_agn"] = False
     hit = cat.index[cat["gaia_source_id"] == agn_gid] if agn_gid != NO_GAIA_ID else []
     if len(hit) == 0:
-        # A catalogue row at the nucleus without that Gaia id (APASS, unmatched)?
+        # A catalogue row at the nucleus WITHOUT a Gaia id (APASS, unmatched)?  Rows with another Gaia id are other
+        # stars and are never relabelled as the AGN (B14: a GSPC star within 2" took the AGN's id and the real
+        # neighbour was lost).
         d = SkyCoord(cat["ra"].values, cat["dec"].values, unit="deg").separation(
             SkyCoord(agn_ra, agn_dec, unit="deg")).arcsec
-        near = np.flatnonzero(d <= 2.0)
+        near = np.flatnonzero((d <= 2.0) & cat["gaia_source_id"].isna().to_numpy())
         if len(near):
             hit = [cat.index[near[np.argmin(d[near])]]]
             cat.loc[hit[0], "gaia_source_id"] = agn_gid

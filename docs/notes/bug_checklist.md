@@ -39,7 +39,7 @@ line in `future_improvements.md`.
 - [x] **B12** (main, ensemble; fixed 19 Nov with B4ₚ, same commit as B02): a failed g or i absolute ZP makes the ZP of every filter NaN.
   `photometry/ensemble.py:845`.
 - [x] **B13** (main, lcodb; fixed 19 Nov, B10/B13 commit): `sync --proposal ID` skips an inactive proposal that was already crawled. `lcodb/ingest.py:215`.
-- [ ] **B14** (main, photometry): a GSPC star within 2″ can be relabelled as the AGN. `photometry/reference.py`
+- [x] **B14** (main, photometry; fixed 19 Nov; never happened in the 39 test catalogues): a GSPC star within 2″ can be relabelled as the AGN. `photometry/reference.py`
   (`assign_star_ids`).
 - [x] **B15** (main, photometry; fixed 19 Nov, B15 commit; R/I/U now not calibrated at all): R/I frames with an APASS-fallback catalogue raise `KeyError 'lco_R'`.
   `photometry/calibration.py:41`.

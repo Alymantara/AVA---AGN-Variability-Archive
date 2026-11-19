@@ -923,3 +923,20 @@ Found by downloading and reducing PG 0804+761 (z = 0.102) and PG 0923+201 (z = 0
 - Rows from before this change are still there: in the Mac test archive, 62 R, 60 I and 407 U frames in
   `frame_qc`, plus their measurements. They are not used by PyTICS, which reads only `ensemble.filters`.
 - Test: `tests/test_no_ref_band.py` (`KeyError` on the previous commit).
+
+## B14: a GSPC star near the nucleus could be relabelled as the AGN (19 Nov 2026)
+
+- **Bug.** In `assign_star_ids`, when the AGN's Gaia source was not in the reference catalogue, any catalogue row
+  within 2" of the nucleus took the AGN's Gaia id and was marked as the AGN. That branch was meant for APASS rows,
+  which have no Gaia id, but with GSPC it could take a real neighbour: its position and magnitudes became the AGN's,
+  and the neighbour was lost.
+- **It never happened in practice.** All 39 test-archive catalogues were checked against Gaia DR3 (VizieR, CfA
+  mirror): every AGN row carries the id of the Gaia source at the nucleus. In 13 the AGN is not in GSPC, but none
+  has another catalogue star within 2"; the nearest is 4.5" (Mrk 110). Only NGC 7469 (host fragments at 1.3–2.2")
+  and Mrk 876 (2.0") have a Gaia neighbour that close, and neither neighbour is in GSPC.
+- **Fix.** Only a row without a Gaia id can be taken as the nucleus.
+- **Also seen.** The AGN rows of these test-archive catalogues are 0.04–1.6" from their own Gaia position (MR
+  2251-178 and 1H 2106-099 about 1.6", above the 1.5" AGN match radius). The catalogues predate the QC-0002
+  position fix (`0d3024f`); check those two after the planned catalogue rebuild.
+- Test: `tests/test_agn_relabel.py`.
+
