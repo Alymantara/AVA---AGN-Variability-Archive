@@ -20,6 +20,7 @@ Production layout written by ``init`` (relative to the checkout, ``paths.ava_roo
     data/lcodb/            lcodb db_dir (written as an absolute path)
     data/logs/             paths.logs (template default)
     data/web/              web.data_dir
+    data/prefect/          pipeline.prefect.home (Prefect's database; cron jobs and interactive runs share it)
     data/live/lco_usage/snapshots.csv
                            lco_usage.snapshots.file: the LIVE log, outside git. The repository's
                            data/lco_usage/snapshots.csv is the tracked seed; appending to it would make `git pull` fail.
@@ -49,6 +50,7 @@ FOREIGN = ("/Users/", "/data2/", "/data3/")
 
 PRODUCTION = {
     "ava": {"web": {"data_dir": "data/web"},
+            "pipeline": {"prefect": {"home": "data/prefect"}},
             "lco_usage": {"snapshots": {"file": "data/live/lco_usage/snapshots.csv"}}},
     "lcodb": {},
 }

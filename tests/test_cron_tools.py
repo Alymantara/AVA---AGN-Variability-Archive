@@ -37,3 +37,30 @@ def test_crontab_flags_and_block_replacement():
     assert make_crontab.nightly_flags(["extract", "publish"], publish=False) == ["-e"]
     old = ["MAILTO=x", make_crontab.BEGIN, "0 1 * * * old", make_crontab.END, "5 5 * * * other job"]
     assert make_crontab.without_ava_block(old) == ["MAILTO=x", "5 5 * * * other job"]
+
+
+def test_prefect_env_defaults_and_home(monkeypatch, tmp_path):
+    """C10: analytics off (they locked Prefect's SQLite at start-up), start-up timeout, PREFECT_HOME from config."""
+    from ava.utils import prefect_env
+
+    for k in (*prefect_env.DEFAULTS, "PREFECT_HOME"):
+        monkeypatch.delenv(k, raising=False)
+
+    class C:
+        _raw = {"pipeline": {"prefect": {"home": "data/prefect"}}}
+
+        def _resolve(self, p):
+            return tmp_path / p
+    env = prefect_env.apply(C())
+    assert env["PREFECT_SERVER_ANALYTICS_ENABLED"] == "false" and env["DO_NOT_TRACK"] == "1"
+    assert env["PREFECT_HOME"] == str(tmp_path / "data/prefect")
+    monkeypatch.setenv("PREFECT_SERVER_ANALYTICS_ENABLED", "true")
+    assert prefect_env.apply(C())["PREFECT_SERVER_ANALYTICS_ENABLED"] == "true"          # the machine's own wins
+
+
+def test_production_cleanup_is_dry_until_asked():
+    from types import SimpleNamespace
+    cfg = SimpleNamespace(pipeline=SimpleNamespace(prefect=SimpleNamespace(nightly_steps=["extract"])))
+    dry = "\n".join(make_crontab.production(cfg, Path("/tmp/logs"), None))
+    live = "\n".join(make_crontab.production(cfg, Path("/tmp/logs"), None, cleanup_live=True))
+    assert "scripts/cleanup.py\n" in dry + "\n" and "cleanup.py --live" in live and "CRON_TZ" not in dry

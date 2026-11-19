@@ -30,6 +30,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ava.config import cfg  # noqa: E402
 
+from ava.utils import prefect_env  # noqa: E402
+
+prefect_env.apply(cfg)        # before Prefect is imported (analytics off, start-up timeout, PREFECT_HOME)
+
 _PREFECT = cfg.pipeline.prefect
 
 

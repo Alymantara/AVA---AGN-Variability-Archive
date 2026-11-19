@@ -606,6 +606,10 @@ pipeline:
     work_pool: "ava-process"
     schedule_cron: "0 2 * * *"    # daily 02:00 UTC, after `lcodb daily` (01:00); same as scripts/make_crontab.py --production
     schedule_timezone: "UTC"
+    # Prefect's home (its database, logs), relative to ava_root. Blank: $PREFECT_HOME, else ~/.prefect.
+    # tools/make_config.py init sets data/prefect (production). ava.utils.prefect_env also switches the server's
+    # analytics off (they locked its SQLite database at start-up) and gives the temporary server 90 s to start.
+    home: ""
     # Steps of the scheduled run (scripts/deploy.py; flags override). Known: init, download_data, extract,
     # calibrate_data, pytics, plot, merge_data, save, spec_init, spec_download_data, spec_reduce_data,
     # spec_products_data, publish.

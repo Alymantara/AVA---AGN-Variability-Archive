@@ -14,6 +14,10 @@ Step order per target (each step optional, controlled by CLI flags):
 Prefect is an optional dependency: ``pip install -e .[pipeline]``.
 """
 
-from ava.pipeline.flows import ava_pipeline, ava_target_flow, load_targets
+from ava.utils import prefect_env as _prefect_env
+
+_prefect_env.apply()          # before Prefect is imported: analytics off, start-up timeout, PREFECT_HOME
+
+from ava.pipeline.flows import ava_pipeline, ava_target_flow, load_targets  # noqa: E402
 
 __all__ = ["ava_pipeline", "ava_target_flow", "load_targets"]
