@@ -40,6 +40,9 @@ function asset(string $path): string
 function ava_page_start(string $active, string $title, string $description = ''): void
 {
     $full = $active === 'home' ? AVA_SITE_NAME : $title . ' · AVA';
+    if (AVA_STAGING !== '') {
+        $full = '[STAGING] ' . $full;
+    }
     $description = $description ?: 'AVA — the AGN Variability Archive: long-baseline reverberation mapping of active galactic nuclei with the Las Cumbres Observatory global telescope network.';
     ?>
 <!doctype html>
@@ -49,6 +52,9 @@ function ava_page_start(string $active, string $title, string $description = '')
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= h($full) ?></title>
   <meta name="description" content="<?= h($description) ?>">
+<?php if (AVA_STAGING !== ''): ?>
+  <meta name="robots" content="noindex, nofollow">
+<?php endif; ?>
   <meta name="theme-color" content="#0A1628">
   <script>
     // Colour mode before first paint: saved choice, else dark (the AVA default).
@@ -77,6 +83,9 @@ function ava_page_start(string $active, string $title, string $description = '')
         <span class="ava-wordmark__ava">AVA</span>
         <span class="ava-wordmark__sub">AGN Variability Archive</span>
       </a>
+<?php if (AVA_STAGING !== ''): ?>
+      <span class="ava-staging-badge" title="Staging copy — <?= h(AVA_STAGING) ?>">Staging</span>
+<?php endif; ?>
       <div class="ava-header-end">
         <button class="ava-theme-toggle" type="button" id="avaTheme" aria-label="Switch to light mode" title="Switch to light mode">
           <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>

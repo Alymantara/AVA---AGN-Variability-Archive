@@ -98,8 +98,22 @@ site stays consistent while an upload runs. If files on the server were changed 
 Hosts' firewalls block an IP for a while (the site and FTP both time out from that machine, while it still opens
 on a phone over mobile data) after too many connections or stalled sessions. The script pauses 0.5 s between files
 (`--pause` to change it); if a block happens, wait for it to lift (typically 5–60 min) or unblock the IP in the
-hosting panel, then rerun. The first full upload to alymantara.com used plain FTP
-(`"protocol": "ftp"`, about 6 min for 125 MB); updates use FTPS.
+hosting panel, then rerun. FTPS on alymantara.com is finicky (stalled sessions, and
+"451 Error during read from data connection" on some files), so uploads there use plain FTP
+(`"protocol": "ftp"`; about 6 min for the full 125 MB) until the site work is finished. A failed file is simply
+resent on the next run. After an upload, changed PHP pages may take up to a minute to show (the host caches
+compiled PHP).
+
+# Staging badge
+
+By default the export writes a `STAGING` file into the bundle (commit and export time). `includes/config.php`
+detects it, and every page then shows a copper **STAGING** badge next to the AVA wordmark (tooltip: commit and
+export time), prefixes the page title with `[STAGING]` and asks search engines not to index it. The main site has no
+such file and is unchanged. For a copy without the badge: `AVA_BUNDLE_STAGING=0 tools/export_web_bundle.sh`.
+
+A staging bundle also leaves out the large 1-d FLOYDS spectra (`data/downloads/*/*_FLOYDS_1d.zip`, served only by
+the main site on the VM): the target pages list them as "on the main AVA site only" and the Data page says so.
+Which downloads are main-site-only is set by `AVA_STAGING_MAIN_ONLY` in `web/includes/plots.php`.
 
 Hosts with SSH can use `rsync -av --delete ~/ava_web_bundle/ USER@HOST:public_html/ava/` instead (only into a
 folder that holds nothing but the AVA copy).

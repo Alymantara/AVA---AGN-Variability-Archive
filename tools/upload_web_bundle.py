@@ -100,11 +100,15 @@ def credentials(cfg: dict) -> tuple[str, str]:
 
 
 class _FTPS(ftplib.FTP_TLS):
-    """FTP_TLS whose uploads do not wait for the server's TLS close_notify on the data channel.
+    """FTP_TLS whose uploads do not hang on the TLS shutdown of the data channel.
 
-    Many shared-host FTPS servers never answer it, so ftplib's conn.unwrap() hangs until the timeout although the
-    file has arrived. Completeness is checked instead by the transfer reply and by Remote.put (SIZE after rename).
+    The client must send its TLS close_notify (some servers, e.g. alymantara.com, reject the file with "451 Error
+    during read from data connection" without it), but some servers never answer it, so ftplib's conn.unwrap()
+    can hang for the full timeout. Here the shutdown is attempted with a short timeout and a missing answer is
+    ignored. Completeness is checked by the transfer reply and by Remote.put (SIZE after rename).
     """
+
+    UNWRAP_TIMEOUT = 10
 
     def storbinary(self, cmd, fp, blocksize=65536, callback=None, rest=None):
         self.voidcmd("TYPE I")
@@ -116,6 +120,12 @@ class _FTPS(ftplib.FTP_TLS):
                 conn.sendall(buf)
                 if callback:
                     callback(buf)
+            if hasattr(conn, "unwrap"):
+                conn.settimeout(self.UNWRAP_TIMEOUT)
+                try:
+                    conn.unwrap()             # sends close_notify; waits (briefly) for the server's reply
+                except OSError:               # timeout / server closed without answering: the data were sent
+                    pass
         return self.voidresp()
 
 

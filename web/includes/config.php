@@ -35,6 +35,11 @@ define('AVA_SITE_NAME', 'AVA — AGN Variability Archive');
 define('AVA_PI', 'J.V. Hernández Santisteban');
 define('AVA_COPYRIGHT_START', 2020);
 
+// Staging copies only: tools/export_web_bundle.sh writes a STAGING file (one line: commit and export time) into
+// the bundle. When it is present the header shows a STAGING badge and pages ask not to be indexed. The main site
+// has no such file, so nothing changes there.
+define('AVA_STAGING', is_file(AVA_ROOT . '/STAGING') ? (trim((string) file_get_contents(AVA_ROOT . '/STAGING')) ?: 'staging') : '');
+
 // What the site shows and counts as an AVA AGN target (includes/db.php: ava_target_filter_sql):
 //  - not listed here (catalogue entries that are not AVA targets, by data_id);
 //  - not of a non-AGN type (agn.AGN_type, e.g. the X-ray binary IGR J17062-6143);

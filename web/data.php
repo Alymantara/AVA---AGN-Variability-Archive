@@ -11,7 +11,7 @@ $filters = ava_filters_published();
 const AVA_FILTER_NAMES = ['u' => 'SDSS u′', 'B' => 'Bessell B', 'g' => 'SDSS g′', 'V' => 'Bessell V',
     'r' => 'SDSS r′', 'i' => 'SDSS i′', 'z' => 'Pan-STARRS zₛ', 'Y' => 'Pan-STARRS Y'];
 
-ava_page_start('data', 'Data', 'AVA observing summary, download policy, file formats, LCO filter curves, how to cite and contact.');
+ava_page_start('data', 'Data', 'AVA observing summary, download policy, file formats, LCO filter curves and contact.');
 ?>
 <div class="container-xxl ava-page-head">
   <h1>Data</h1>
@@ -22,7 +22,6 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
     <a href="#access">Download policy</a>
     <a href="#format">File formats</a>
     <a href="#filters">LCO filters</a>
-    <a href="#cite">How to cite</a>
     <a href="#contact">Contact</a>
   </nav>
 </div>
@@ -93,7 +92,7 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
           (Vieliute et al. 2025, <a href="https://doi.org/10.1093/rasti/rzaf021">RASTI, rzaf021</a>), so no further
           intercalibration is needed. Only epochs that pass quality control are included: frames with poor seeing,
           too few matched stars, a scattered or unusual zero point, a flagged AGN detection or an AGN close to saturation are left out. Please
-          <a href="#cite">cite PyTICS</a> together with AVA. Accuracy and filter-system details:
+          <a href="about.php#cite">cite PyTICS</a> together with AVA. Accuracy and filter-system details:
           <a href="calibration.php">Photometric calibration</a>. The file starts with a few lines beginning with
           <code>#</code> that describe it (read it with, e.g., <code>pandas.read_csv(file, comment="#")</code>).</p>
         <table class="table ava-info">
@@ -123,7 +122,11 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
         <p>Spectra are delivered as one bundle per AGN containing:</p>
         <ul>
           <li><strong>Reduced 1-d spectra</strong> — every FLOYDS spectrum as a FITS file, blue and red arms.
-            <span class="ava-tbd">Format to be finalised.</span></li>
+            <span class="ava-tbd">Format to be finalised.</span>
+            <?php if (AVA_STAGING !== ''): ?>
+              <br><span class="ava-tbd">Not available on this staging copy: the 1-d spectra are large and are served only
+                from the main AVA site.</span>
+            <?php endif; ?></li>
           <li><strong>PrepSpec input</strong> — one three-column text file (wavelength in Å, F<sub>λ</sub>, error) per
             spectrum and arm, plus <code>&lt;target&gt;_blue.hjd</code> and <code>&lt;target&gt;_red.hjd</code> listing each
             file and its mid-exposure MJD. The red arm starts at 5300 Å, where it no longer overlaps the blue.</li>
@@ -154,7 +157,7 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
     <p class="text-secondary mb-4" style="max-width:80ch">Transmission of each LCO filter including the
       <strong>Sinistro CCD response</strong> (the only instrument component — no telescope mirrors or other optics) and
       the <strong>atmosphere at airmass = 1</strong>, hence the telluric O<sub>2</sub> bands in r and i. These are the curves used for the absolute calibration of the merged light curves
-      (<a href="#cite">PyTICS; Vieliute et al. 2025</a>). Each file has two columns: wavelength (Å) and transmission.</p>
+      (<a href="about.php#cite">PyTICS; Vieliute et al. 2025</a>). Each file has two columns: wavelength (Å) and transmission.</p>
     <p class="mb-4" style="max-width:80ch"><a class="fw-semibold" href="calibration.php">How the photometry is calibrated, and why
       AGN magnitudes depend on the filter system →</a></p>
     <div class="ava-chart-wrap mt-0"><?= ava_transmission_svg($filters) ?></div>
@@ -185,26 +188,15 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
 </section>
 <?php endif; ?>
 
-<section class="ava-section" id="cite">
+<section class="ava-section" id="contact">
   <div class="container-xxl">
-    <div class="row g-5">
-      <div class="col-lg-6 ava-prose">
-        <p class="ava-eyebrow">How to cite</p>
-        <h2>Acknowledging AVA</h2>
-        <p>If your work uses AVA data, please cite:</p>
-        <?php ava_citation_block(); ?>
-        <p class="mt-3 small text-secondary">Also on the <a href="about.php#cite">About page</a>; see
-          <a href="science.php">Science</a> for results from the Key Projects.</p>
-      </div>
-
-      <div class="col-lg-6" id="contact">
-        <p class="ava-eyebrow">Contact</p>
-        <h2>Request data or ask a question</h2>
-        <p>To request access to AVA data products, or for any question about the archive, please email
-          <?= h(AVA_PI) ?> at <?= ava_mailto(AVA_CONTACT_EMAIL, 'AVA data request') ?>.</p>
-        <p class="small text-secondary">Key Project members: please say which programme you belong to and which
-          targets and products you need.</p>
-      </div>
+    <div class="ava-prose">
+      <p class="ava-eyebrow">Contact</p>
+      <h2>Request data or ask a question</h2>
+      <p>To request access to AVA data products, or for any question about the archive, please email
+        <?= h(AVA_PI) ?> at <?= ava_mailto(AVA_CONTACT_EMAIL, 'AVA data request') ?>.</p>
+      <p class="small text-secondary">Key Project members: please say which programme you belong to and which
+        targets and products you need. If you use AVA data, please <a href="about.php#cite">cite AVA</a>.</p>
     </div>
   </div>
 </section>

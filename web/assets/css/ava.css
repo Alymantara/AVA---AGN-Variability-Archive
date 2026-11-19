@@ -106,6 +106,12 @@ a:hover { color: var(--ava-strong); }
 .ava-wordmark { display: flex; align-items: baseline; gap: .6rem; text-decoration: none; }
 .ava-wordmark__ava { font-weight: 800; font-size: 1.75rem; letter-spacing: .02em; color: var(--ava-gold-text); line-height: 1; }
 .ava-wordmark__sub { font-weight: 400; font-size: .85rem; color: var(--ava-muted); }
+/* Staging copies only (includes/config.php: AVA_STAGING); the main site never renders this. */
+.ava-staging-badge {
+  margin-right: auto; padding: .2rem .55rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--ava-copper) 80%, black); color: #fff;
+  font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.2;
+}
 .ava-header .nav-link { white-space: nowrap; font-weight: 600; color: var(--ava-muted); padding-inline: .9rem !important; border-radius: .5rem; }
 .ava-header .nav-link:hover { color: var(--ava-strong); background: color-mix(in srgb, var(--ava-sky) 22%, transparent); }
 .ava-header .nav-link.active { color: var(--ava-strong); box-shadow: inset 0 -2px 0 var(--ava-gold); border-radius: 0; }
@@ -454,6 +460,30 @@ html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 .ava-dropdown .dropdown-header { font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .ava-dropdown .dropdown-item { display: flex; justify-content: space-between; gap: 1rem; text-decoration: none; }
 .ava-dl-size { color: var(--ava-muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+
+/* Data releases on the target page (includes/releases.php): grouped rows like the Download menu. */
+.ava-release { max-width: 40rem; margin-bottom: .75rem; }
+.ava-release__title { font-weight: 600; color: var(--ava-strong); margin: 0; }
+.ava-release__meta, .ava-release__desc { color: var(--ava-muted); font-size: .85rem; margin: .1rem 0 0; }
+.ava-release__files { list-style: none; padding: 0; margin: .6rem 0 0; border: 1px solid var(--ava-line); border-radius: var(--ava-radius); overflow: hidden; }
+.ava-release__group { padding: .45rem .9rem .25rem; font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ava-muted); background: var(--ava-surface); }
+.ava-release__file { display: flex; align-items: center; gap: .75rem; padding: .45rem .9rem; border-top: 1px solid var(--ava-line); }
+.ava-release__group + .ava-release__file { border-top: 0; }
+.ava-release__label { flex: 1; min-width: 0; }
+.ava-release__btn { --bs-btn-padding-x: .5rem; --bs-btn-padding-y: .3rem; --bs-btn-color: var(--ava-gold-text); --bs-btn-border-color: color-mix(in srgb, var(--ava-gold) 55%, transparent);
+  --bs-btn-hover-bg: var(--ava-gold); --bs-btn-hover-border-color: var(--ava-gold); --bs-btn-hover-color: var(--ava-abyss); line-height: 1; }
+
+/* Target page: a little larger text throughout (section heads stay above the body text). */
+.ava-target { font-size: 1.0625rem; }
+.ava-target .ava-h { font-size: 1.3rem; }
+.ava-target .ava-info { font-size: 1rem; }
+.ava-target .ava-info thead th { font-size: .8rem; }
+.ava-target .ava-info .mjd, .ava-target .ava-info .ref { font-size: .85rem; }
+.ava-target .ava-info td.num { white-space: nowrap; }        /* "6.17 ± 0.17 × 10⁻¹³" stays on one line; the table scrolls */
+@media (max-width: 575.98px) { .ava-target .ava-info { font-size: .9rem; } }
+.ava-target .ava-links { font-size: 1rem; }
+.ava-target .ava-release__title { font-size: 1.05rem; }
+.ava-target .ava-release__meta, .ava-target .ava-release__desc, .ava-target .ava-dl-size { font-size: .9rem; }
 
 /* ---------- Page intro (full width, body size) & collapsible sections ---- */
 .ava-intro { color: var(--ava-muted); font-size: .98rem; line-height: 1.6; max-width: none; margin-bottom: 0; }

@@ -1,6 +1,6 @@
 <?php
 /**
- * How to cite AVA — shared by about.php#cite (the main one) and data.php#cite so they never disagree.
+ * How to cite AVA — shown on about.php#cite (the one place the site gives it; other pages link there).
  */
 
 declare(strict_types=1);

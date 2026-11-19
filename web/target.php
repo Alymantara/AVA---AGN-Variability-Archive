@@ -221,7 +221,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
             Download
           </button>
           <ul class="dropdown-menu ava-dropdown">
-            <?php foreach ($dl as [$g, $label, $url, $bytes]): ?>
+            <?php foreach ($dl as [$g, $label, $url, $bytes, $note]): ?>
               <?php if ($g !== $group): $group = $g; ?>
                 <li><h6 class="dropdown-header"><?= h($g) ?></h6></li>
               <?php endif; ?>
@@ -229,7 +229,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
                 <?php if ($url): ?>
                   <a class="dropdown-item" href="<?= h($url) ?>" download><?= h($label) ?> <span class="ava-dl-size"><?= fmt_bytes($bytes) ?></span></a>
                 <?php else: ?>
-                  <span class="dropdown-item disabled" aria-disabled="true"><?= h($label) ?> <span class="ava-dl-size">not available</span></span>
+                  <span class="dropdown-item disabled" aria-disabled="true"><?= h($label) ?> <span class="ava-dl-size"><?= h($note) ?></span></span>
                 <?php endif; ?>
               </li>
             <?php endforeach; ?>
@@ -349,13 +349,12 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       <h2 class="ava-h">H&beta; variability</h2>
       <div class="table-responsive">
       <table class="table ava-info">
-        <thead><tr><th></th><th class="num">Mean</th><th class="num"><abbr title="Fractional variability: rms variation in excess of the measurement errors, as a fraction of the mean flux">F<sub>var</sub></abbr></th><th class="num"><abbr title="Ratio of the highest to the lowest nightly flux (not corrected for errors)">F<sub>max</sub>/F<sub>min</sub></abbr></th><th class="num">Median S/N</th></tr></thead>
+        <thead><tr><th></th><th class="num">Mean</th><th class="num"><abbr title="Fractional variability: rms variation in excess of the measurement errors, as a fraction of the mean flux">F<sub>var</sub></abbr></th><th class="num">Median S/N</th></tr></thead>
         <tbody>
           <?php foreach ($rows as $q => [$label, $unit]): if (!isset($lineVar[$q])) { continue; } $r = $lineVar[$q]; ?>
           <tr><th><?= $label ?><span class="mjd"><?= $unit ?></span></th>
             <td class="num"><?= sci($r['mean'], $r['mean_err']) ?></td>
             <td class="num"><?= pct($r['fvar'], $r['fvar_err']) ?></td>
-            <td class="num"><?= fmt_num($r['rmax'], 2) ?></td>
             <td class="num"><?= fmt_num($r['snr_median'], 0) ?></td></tr>
           <?php endforeach; ?>
         </tbody>
@@ -367,8 +366,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         median H&beta; FWHM <?= fmt_int(round((float) $any['fwhm_kms_median'])) ?> km s⁻¹<?php endif; ?>;
         <?= (int) $any['oiii_calibrated'] ? '[O III]-calibrated' : 'not [O III]-calibrated' ?>;
         fit <code><?= h($any['method']) ?></code>; updated <?= h(substr((string) $any['updated_utc'], 0, 10)) ?>.
-        F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean (Vaughan et al. 2003);
-        F<sub>max</sub>/F<sub>min</sub>: highest / lowest nightly flux (not corrected for errors).
+        F<sub>var</sub>: rms variation in excess of the errors, as a fraction of the mean (Vaughan et al. 2003).
       </p></details>
       <?php endif; ?>
 
@@ -453,7 +451,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_pos($t["avg_$f"] ?? null) ? fmt_num($t["avg_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
         <?php if ($bandVar): ?>
         <tr><th>F<sub>var</sub> (merged)</th><?php foreach ($breakdownCols as $f): $r = $bandVar[$f] ?? null; ?>
-          <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs, F_max/F_min ' . fmt_num($r['rmax'], 2) . '"' : '' ?>><?=
+          <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs"' : '' ?>><?=
             $r && is_numeric($r['fvar']) ? number_format(100 * (float) $r['fvar'], 1) . '<span class="mjd">± '
               . ((float) $r['fvar_err'] < 0.0005 ? '&lt;0.1' : number_format(100 * (float) $r['fvar_err'], 1)) . ' %</span>' : '—' ?></td>
         <?php endforeach; ?></tr>

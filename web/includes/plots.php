@@ -81,16 +81,23 @@ function ava_downloads_enabled(): bool
     return $on;
 }
 
-/** [key => [group, label, url|null, bytes|null]] for one target; url null = not available yet. */
+/**
+ * Downloads that staging copies (AVA_STAGING) do not carry: they are large and served only by the main site.
+ * tools/export_web_bundle.sh leaves the matching files out of a staging bundle.
+ */
+const AVA_STAGING_MAIN_ONLY = ['spec'];
+
+/** [key => [group, label, url|null, bytes|null, note]] for one target; url null = not available (note says why). */
 function ava_downloads(string $dataId): array
 {
     $out = [];
     foreach (AVA_DOWNLOADS as $k => [$group, $label, $pat]) {
         $name = sprintf($pat, $dataId);
         $f = AVA_DATA_DIR . '/downloads/' . $dataId . '/' . $name;
-        $ok = $dataId !== '' && !str_contains($dataId, '/') && is_file($f);
+        $mainOnly = AVA_STAGING !== '' && in_array($k, AVA_STAGING_MAIN_ONLY, true);
+        $ok = !$mainOnly && $dataId !== '' && !str_contains($dataId, '/') && is_file($f);
         $out[$k] = [$group, $label, $ok ? AVA_DATA_URL . '/downloads/' . rawurlencode($dataId) . '/' . rawurlencode($name) : null,
-            $ok ? filesize($f) : null];
+            $ok ? filesize($f) : null, $mainOnly ? 'on the main AVA site only' : 'not available'];
     }
     return $out;
 }
