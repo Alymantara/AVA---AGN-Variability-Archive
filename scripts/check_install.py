@@ -128,11 +128,12 @@ def main(run_tests: bool) -> int:
 
     # 5. SExtractor
     sc = cfg.photometry.sextractor
-    exe = shutil.which(sc.binary)
+    from ava.pipeline.tasks.sextract import sextractor_binary   # the configured one, else source-extractor / sex
+
+    exe = sextractor_binary(sc.binary)
     if exe is None:
-        alt = [b for b in ("source-extractor", "sex") if shutil.which(b)]
         report("FAIL", f"SExtractor binary {sc.binary!r} (photometry.sextractor.binary)",
-               f"not on PATH; found {alt} — set photometry.sextractor.binary" if alt else "not installed")
+               "not installed (neither source-extractor nor sex on PATH)")
     else:
         try:
             out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=30)

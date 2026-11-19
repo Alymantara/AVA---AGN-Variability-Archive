@@ -55,6 +55,7 @@ def _pkg_root() -> Path:
 
 
 def _find_config() -> Path:
+    """AVA_CONFIG, else this machine's file data/config/ava_config.yaml (tools/make_config.py), else the template."""
     env = os.environ.get("AVA_CONFIG")
     if env:
         p = Path(env).expanduser().resolve()
@@ -63,6 +64,9 @@ def _find_config() -> Path:
                 f"AVA_CONFIG points to a missing file: {p}"
             )
         return p
+    local = _pkg_root() / "data" / "config" / "ava_config.yaml"
+    if local.exists():
+        return local
     default = _pkg_root() / "config" / "ava_config.yaml"
     if default.exists():
         return default
@@ -72,8 +76,11 @@ def _find_config() -> Path:
 
 
 def _load_yaml(path: Path) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f) or {}
+    """The config at ``path``; a file with ``base:`` holds overrides on top of that template
+    (ava.utils.layered_config)."""
+    from ava.utils.layered_config import load_layered
+
+    return load_layered(path)[0]
 
 
 class _NS:
@@ -247,8 +254,14 @@ class AVAConfig:
     @property
     def lcodb_config_path(self) -> Path:
         """Path to the lcodb config.yaml."""
+        env = os.environ.get("LCODB_CONFIG")       # the same variable lcodb itself reads (C03)
+        if env:
+            return Path(env).expanduser().resolve()
         raw = self._raw.get("paths", {}).get("lcodb_config")
-        return self._resolve(raw or "config/lcodb_config.yaml")   # default: the repository's own
+        if raw:
+            return self._resolve(raw)
+        local = self.root / "data" / "config" / "lcodb_config.yaml"     # this machine's (tools/make_config.py)
+        return local if local.exists() else self._resolve("config/lcodb_config.yaml")
 
     @property
     def log_dir(self) -> Path:

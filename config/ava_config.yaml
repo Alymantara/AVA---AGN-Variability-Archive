@@ -40,8 +40,9 @@ paths:
   # raw_data), the Swift table and the templates below are relative to it unless absolute.
   # Absolute, or relative to ava_root. The website's copy is separate (web.data_dir) and may
   # live elsewhere.
-  # For now: data/test_archive, the dry-run execution stage.
-  archive_root: "data/test_archive"
+  # Default: data/archive under the checkout (production layout). The Mac test archive is data/test_archive:
+  # set it in that machine's data/config/ava_config.yaml (tools/make_config.py).
+  archive_root: "data/archive"
 
   # ---- Spectroscopy data (FLOYDS) -------------------------
   # Sub-structure expected:
@@ -77,11 +78,12 @@ paths:
 
   # ---- AVA code / archive ---------------------------------
   # Path to the banzai-floyds working copy (for spectroscopy pipeline).
-  floyds_pipeline: "/Users/juan/astro/floyds/banzai-floyds"
+  # Default: next to the checkout (<install root>/banzai-floyds; production layout, deployment guide 4.3).
+  floyds_pipeline: "../banzai-floyds"
 
-  # Path to the lcodb config.yaml that points at the archive DBs.
-  # Leave blank to auto-derive as <floyds_pipeline>/../lco_archive_db/config.yaml
-  lcodb_config: "config/lcodb_config.yaml"
+  # Path to the lcodb config.yaml that points at the archive DBs. Blank (default): $LCODB_CONFIG, else this
+  # machine's data/config/lcodb_config.yaml (tools/make_config.py), else config/lcodb_config.yaml.
+  lcodb_config: ""
 
   # AVA SQLite database (AGN master table).
   database: "data/ava.db"
@@ -89,8 +91,8 @@ paths:
   # AVA master CSV (read by lcodb link to match LCO names to AVA sources).
   ava_csv: "data/ava/ava.csv"
 
-  # Log directory (relative to ava_root).
-  logs: "logs"
+  # Log directory (relative to ava_root): the cron jobs' logs and run record (scripts/cron_job.sh), git-ignored.
+  logs: "data/logs"
 
   # Sandbox archive for testing the pipeline from scratch
   # (built by scripts/make_test_archive.py; never production data).
@@ -189,7 +191,8 @@ photometry:
     #                 (all-sky; matches SDSS to 0.01-0.02 mag).  Default.
     # "apass_model" = APASS + atmosphere-model synthetic photometry (legacy).
     method: "gspc"
-    fallback: "apass_model"     # used if GSPC fails or is too sparse; "" = none
+    fallback: ""                # used if GSPC fails or is too sparse; "" = none (decided 18 Nov 2026: Gaia GSPC only;
+                                # "apass_model" was the legacy fallback)
     min_stars: 20               # GSPC quality stars needed in each of g, r, i
     # GSPC quality cuts
     max_ruwe: 1.4
@@ -239,7 +242,7 @@ photometry:
 
   # SExtractor (run_pipeline.py -e; production machine only).
   sextractor:
-    binary: "sex"                              # or "source-extractor"
+    binary: "source-extractor"                 # Debian/Ubuntu name; "sex" elsewhere (the other name is tried too)
     config_dir: "data/reference/sextractor"    # default.sex/.param/.conv/.nnw (12-aperture series)
     max_frames_per_run: 2000
     # Aperture series: PHOT_APERTURES in <config_dir>/default.sex, APPEND-ONLY —
@@ -414,9 +417,11 @@ spectroscopy:
     verify_existing: false  # md5-check files already on disk
   # ---- reduction (ava.pipeline.tasks.spec_reduce: the improved banzai-floyds fork, run externally) ----
   reduction:
-    python: "/Users/juan/astro/floyds/env-banzai/bin/python"   # environment with the fork installed (py3.12 + torch)
-    package: "/Users/juan/astro/floyds/banzai-floyds"          # the fork's checkout (version recorded per product)
-    skyflats_dir: "/Users/juan/astro/floyds/data/skyflats"     # sky flats of both sites (order trace); registered once
+    # Relative to ava_root; the defaults are the production layout (<install root>/banzai-floyds, miniforge's
+    # `banzai` environment next to the checkout). Other machines set them in data/config/ava_config.yaml.
+    python: "../miniforge3/envs/banzai/bin/python"   # environment with the fork installed (py3.12 + torch)
+    package: "../banzai-floyds"                       # the fork's checkout (version recorded per product)
+    skyflats_dir: "../banzai-floyds/banzai_floyds/data/orders/skyflats"   # the sky flats shipped with the fork
     work_dir: "banzai"      # relative to spectra_root: calibration DB, shared calibrations, logs, staging
     workers: 4
     window_days: 60         # fringe phase-master window
@@ -577,7 +582,8 @@ intercalibration:
 # ============================================================
 pipeline:
   # Number of parallel worker processes for batch runs.
-  n_cores: 4            # targets processed at the same time (Prefect thread pool)
+  n_cores: 1            # targets processed at the same time (Prefect thread pool). 1 on the production VM (2 vCPU,
+                        # 7.8 GB): a target can take several GB (PyTICS, banzai-floyds), 4 ran out of memory.
 
   # If true, re-reduce frames that already have an entry in lco_latest.pkl.
   overwrite: false

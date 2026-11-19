@@ -28,7 +28,11 @@ from ava.config import cfg
 def reduction_settings() -> dict:
     r = cfg._raw.get("spectroscopy", {}).get("reduction", {}) or {}
     work = Path(r.get("work_dir", "banzai"))
-    return dict(python=r.get("python"), package=r.get("package"), skyflats_dir=r.get("skyflats_dir"),
+    def path(key):        # relative to ava_root (the template's defaults are the production layout)
+        v = r.get(key)
+        return str(cfg._resolve(v)) if v else v
+
+    return dict(python=path("python"), package=path("package"), skyflats_dir=path("skyflats_dir"),
                 work=work if work.is_absolute() else cfg.spec_root / work, workers=int(r.get("workers", 4)),
                 window_days=float(r.get("window_days", 60)), keep_2d=bool(r.get("keep_2d", True)),
                 cleanup=dict(r.get("cleanup") or {}))

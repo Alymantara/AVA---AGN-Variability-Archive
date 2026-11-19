@@ -14,6 +14,11 @@ class Config:
     path: Path
     token: str = None
     _cache: dict = field(default_factory=dict)
+    rel_dir: Path = None      # relative paths are taken from here: the template's folder for an overrides file
+
+    @property
+    def _base_dir(self):
+        return self.rel_dir or self.path.parent
 
     def __getitem__(self, key):
         return self.raw[key]
@@ -25,7 +30,7 @@ class Config:
     def db_dir(self):
         d = Path(os.path.expanduser(self.raw.get('db_dir', './db')))
         if not d.is_absolute():
-            d = self.path.parent / d
+            d = self._base_dir / d
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -34,16 +39,24 @@ class Config:
         if not p:
             return None
         q = Path(os.path.expanduser(p))
-        return q if q.is_absolute() else (self.path.parent / q).resolve()
+        return q if q.is_absolute() else (self._base_dir / q).resolve()
 
     def db_path(self, kind):
         return self.db_dir / self.raw[f'{kind}_db']
 
 
+LOCAL_CONFIG = DEFAULT_CONFIG.parent.parent / 'data' / 'config' / 'lcodb_config.yaml'   # tools/make_config.py
+
+
 def load_config(path=None):
-    path = Path(path or os.environ.get('LCODB_CONFIG', DEFAULT_CONFIG)).resolve()
-    with open(path) as f:
-        raw = yaml.safe_load(f)
+    """``path``, else LCODB_CONFIG, else this machine's data/config/lcodb_config.yaml, else the template. A file with
+    ``base:`` holds overrides on top of that template (ava.utils.layered_config); its relative paths, like the
+    template's, are then relative to the template's folder."""
+    from ava.utils.layered_config import load_layered
+
+    path = Path(path or os.environ.get('LCODB_CONFIG') or (LOCAL_CONFIG if LOCAL_CONFIG.exists() else DEFAULT_CONFIG))
+    path = path.resolve()
+    raw, base = load_layered(path)
     token = os.environ.get('LCO_TOKEN') or os.environ.get('LCO_API_TOKEN')   # same variables as ava.config
     if not token and raw.get('token_file'):
         tf = Path(os.path.expanduser(raw['token_file']))
@@ -52,4 +65,4 @@ def load_config(path=None):
     if raw.get('archive_url') or raw.get('portal_url'):
         from . import api
         api.set_urls(raw.get('archive_url'), raw.get('portal_url'))
-    return Config(raw=raw, path=path, token=token)
+    return Config(raw=raw, path=path, token=token, rel_dir=base.parent if base is not None else None)

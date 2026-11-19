@@ -60,6 +60,19 @@ def newest_first_key(name: str) -> tuple:
     return date, num, name
 
 
+#: SExtractor's executable names: Debian/Ubuntu package `source-extractor`; `sex` from source / conda-forge
+SEXTRACTOR_NAMES = ("source-extractor", "sex")
+
+
+def sextractor_binary(configured: str | None) -> str | None:
+    """The configured SExtractor (a path or a name on PATH), else whichever of its usual names is installed."""
+    for name in ([configured] if configured else []) + [n for n in SEXTRACTOR_NAMES if n != configured]:
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
 def frames_to_extract(target: str) -> tuple[list[Path], int, int]:
     """(frames without a catalogue, newest first; n frames; n catalogues)."""
     raw, catdir = cfg.phot_raw(target), cfg.sextractor_dir(target)
@@ -142,10 +155,10 @@ def sextract(target: str, dry_run: bool = False) -> dict:
     logger.info("%s: %d frames on disk, %d catalogues, %d to extract (this run)", target, n_frames, n_cats, len(todo))
     if dry_run or not todo:
         return out
-    binary = shutil.which(sc.binary)
+    binary = sextractor_binary(sc.binary)
     if binary is None:
-        raise RuntimeError(f"SExtractor binary {sc.binary!r} not found on this machine "
-                           "(photometry.sextractor.binary); run this step on the production machine")
+        raise RuntimeError(f"SExtractor binary {sc.binary!r} not found on this machine (also tried "
+                           f"{' / '.join(SEXTRACTOR_NAMES)}; photometry.sextractor.binary)")
     confdir = cfg._resolve(sc.config_dir)
     failed = {}
     for f in todo:

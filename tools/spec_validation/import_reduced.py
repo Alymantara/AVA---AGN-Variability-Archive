@@ -26,7 +26,8 @@ entry = cfg.target_by_data_id(a.data_id)
 if entry is None:
     sys.exit(f"{a.data_id!r} is not a known data_id")
 db = lcodb_path("spec")
-version = a.version or R.pipeline_version(cfg._raw["spectroscopy"]["reduction"].get("package"))
+from ava.pipeline.tasks.spec_reduce import reduction_settings  # noqa: E402
+version = a.version or R.pipeline_version(reduction_settings()["package"])
 files = sorted(Path(a.processed_dir).glob("**/*-e91-1d.fits*"))
 raw = {f.name.split(".fits")[0].replace("-e91-1d", "-e00"): f for f in files}
 with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True)) as con:
