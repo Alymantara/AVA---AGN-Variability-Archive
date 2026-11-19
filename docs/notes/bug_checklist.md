@@ -18,7 +18,7 @@ line in `future_improvements.md`.
 
 ## 2. Medium
 
-- [ ] **B03** (main, spectroscopy): standards from another night are downloaded but never staged (39 % of spectra).
+- [x] **B03** (main, spectroscopy; fixed 19 Nov, see the B03 commit; earlier reductions not redone): standards from another night are downloaded but never staged (39 % of spectra).
   `spectroscopy/download.py:117`, `reduce.py:109`.
 - [ ] **B04** (QC): the `zp_offset` check uses the median ZP per camera *family*, not per camera, and drops all
   173 fa08 B frames. Needs a decision on fa08. `photometry/process.py:141`.

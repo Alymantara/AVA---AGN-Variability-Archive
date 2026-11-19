@@ -72,7 +72,13 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
     if R.ensure_calibration_db(s["python"], db, Path(s["skyflats_dir"]), processed, work / "logs" / "setup.log"):
         logger.info("created calibration DB %s (sites, standards, sky flats from %s)", db, s["skyflats_dir"])
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    staged = R.stage(nights, target_raw, std_raw, work / "input" / f"{target}_{run_id}")
+    # the standard chosen for each science spectrum may be from another night (B03): stage it too
+    std_files, std_missing = R.chosen_standards(lcodb_path("spec"), int(entry["ava_id"]), nights,
+                                                target_raw.parent, cfg.spec_root, target)
+    if std_missing:
+        logger.warning("%s: %d chosen standard frame(s) not on disk (run the spectra download): %s",
+                       target, len(std_missing), std_missing[:5])
+    staged = R.stage(nights, target_raw, std_raw, work / "input" / f"{target}_{run_id}", extra=std_files)
     logger.info("%s: %d night(s) %s, %d raw frames staged; banzai-floyds %s", target, len(nights), nights,
                 len(staged), version)
     n0 = len(log.read_text().splitlines()) if log.exists() else 0

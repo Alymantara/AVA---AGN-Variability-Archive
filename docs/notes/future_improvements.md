@@ -705,3 +705,23 @@ The `-R` stage (`spec-reduce`) ran banzai-floyds `rm-improvements@8897b99` on 3 
 - Tests: `test_agn_zero_points_one_failed_filter_does_not_spoil_the_others`,
   `test_error_model_ignores_filter_without_zero_point`, `test_fit_s_cam_caps_instead_of_raising`.
 
+## B03: standards from another night were never staged for banzai-floyds (19 Nov 2026)
+
+- **Bug.**
+  - `spectrum_standards` picks the standard for each science spectrum: same slit, then 2″, then nearest,
+    within 30 d. In the spectra DB that standard is on another night for 3601 of 9160 AGN science spectra
+    (39 %).
+  - The download files a standard (with its arc and flat) under its *own* night, `<spec_raw>/standards/<night>/`.
+    But `reduce.stage` only linked `standards/<science night>`, so the chosen standard was downloaded and then
+    never given to `banzai_floyds_offline chain`.
+  - The flux calibration then silently used whatever standard the calibration DB already held, or none.
+- **Fix (following legacy `ava_floyds_sort.py`, which copied the nearest standard into the night's folder).**
+  `reduce.chosen_standards` rebuilds the download plan for the nights being reduced (offline, from the spectra
+  DB) and returns the standard frames at their download paths. `spec_reduce` stages them with the nights' own
+  frames, and logs any that are not on disk.
+- **Still open.**
+  - Nights reduced before this fix may have been flux-calibrated with another standard. `spec_qc` does not
+    record which standard was used. Re-reducing them (`-R` with the nights) is a decision for later.
+  - C04: cleanup frees a standard only by its own night name, so it can delete a standard that an unreduced
+    night elsewhere still needs.
+- Tests: `tests/test_spec_stage_standards.py`.

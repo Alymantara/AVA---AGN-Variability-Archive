@@ -98,21 +98,39 @@ def ensure_calibration_db(python: str, db: Path, skyflats_dir: Path, processed: 
     return True
 
 
-def stage(nights: list[str], target_raw: Path, std_raw: Path, staging: Path) -> list[Path]:
-    """Symlink the nights' raw frames (target and standards) into one input folder."""
+def stage(nights: list[str], target_raw: Path, std_raw: Path, staging: Path, extra=()) -> list[Path]:
+    """Symlink the nights' raw frames (target and standards) into one input folder.
+
+    ``extra``: more raw files to stage. These are the standards chosen for these nights (with their arcs
+    and flats), which are filed under the standard's OWN night and so are often not in
+    ``std_raw/<science night>`` (legacy ``ava_floyds_sort.py`` copied the nearest standard into the night's
+    folder in the same way)."""
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
     out = []
-    for n in nights:
-        night = n.replace("-", "")
-        for d in (target_raw / night, std_raw / night):
-            for f in sorted(d.glob("*.fits*")):
-                if f.name.endswith(".part"):
-                    continue
-                (staging / f.name).symlink_to(f.resolve())
-                out.append(staging / f.name)
+    files = [f for n in nights for d in (target_raw / n.replace("-", ""), std_raw / n.replace("-", ""))
+             for f in sorted(d.glob("*.fits*"))] + [Path(f) for f in extra]
+    for f in files:
+        if f.name.endswith(".part") or not f.exists() or (staging / f.name).exists():
+            continue
+        (staging / f.name).symlink_to(f.resolve())
+        out.append(staging / f.name)
     return out
+
+
+def chosen_standards(spec_db: Path, ava_id: int, nights: list[str], spec_raw_root: Path, spec_root: Path,
+                     target: str) -> tuple[list[Path], list[str]]:
+    """Raw standards (with their arcs and flats) that the spectra DB picked for these nights' science
+    spectra (view ``spectrum_standards``, as the download used), as local paths: (on disk, missing names)."""
+    from ava.spectroscopy import download as SD
+
+    days = [n if "-" in n else f"{n[:4]}-{n[4:6]}-{n[6:8]}" for n in nights]
+    p = SD.plan(spec_db, ava_id, days, archive_products=False)
+    p = p[p.side == "standard"]
+    paths = [SD.destination(r, spec_raw_root=spec_raw_root, spec_root=spec_root, target=target)
+             for r in p.itertuples()]
+    return [q for q in paths if q.exists()], [q.name for q in paths if not q.exists()]
 
 
 def parse_chain_log(log: Path, since: int = 0) -> dict:
