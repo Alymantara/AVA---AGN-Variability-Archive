@@ -1,11 +1,12 @@
 // Click-to-sort for tables whose header cells carry data-sort="text|num".
+// In a two-row header, a cell in the second row gives its body column with data-col="<index>".
 document.querySelectorAll('table').forEach((table) => {
   const heads = [...table.querySelectorAll('thead th[data-sort]')];
   const body = table.tBodies[0];
   heads.forEach((th) => {
     th.tabIndex = 0;
     const run = () => {
-      const col = [...th.parentNode.children].indexOf(th);
+      const col = th.dataset.col !== undefined ? Number(th.dataset.col) : [...th.parentNode.children].indexOf(th);
       const dir = th.getAttribute('aria-sort') === 'ascending' ? -1 : 1;
       heads.forEach((h) => h.removeAttribute('aria-sort'));
       th.setAttribute('aria-sort', dir === 1 ? 'ascending' : 'descending');

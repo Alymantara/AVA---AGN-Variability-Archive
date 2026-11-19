@@ -139,9 +139,14 @@ def cmd_link(cfg, a):
                          c.get('radius_footprint_arcsec', 180.0), cfg.resolve(c.get('overrides_csv')))
     log.info('link: %d LCO targets, %d linked to AVA, %d flagged for review (see target_link.review)', n, nl, nr)
     if c.get('db'):   # observing flag agn.ava from the freshly linked frames
+        from datetime import date, timedelta
+
         from ava.database import activity
-        ch = activity.update_observing(cfg.resolve(c['db']), activity.last_frames(
-            (k, cfg.db_path(k)) for k in activity.SCIENCE_OBSTYPES), int(c.get('observing_days', 30)))
+        dbs = [(k, cfg.db_path(k)) for k in activity.SCIENCE_OBSTYPES]
+        windows = tuple(int(w) for w in c.get('cadence_windows', (30, 60)))
+        activity.update_recent_cadence(cfg.resolve(c['db']), activity.recent_nights(
+            dbs, (date.today() - timedelta(days=max(windows))).isoformat()), windows)
+        ch = activity.update_observing(cfg.resolve(c['db']), activity.last_frames(dbs), int(c.get('observing_days', 30)))
         log.info('observing flag: %d change(s)%s', len(ch), ''.join(f'\n  {d}: {o} -> {w} (last {l})' for d, o, w, l in ch))
     return nl, 0
 

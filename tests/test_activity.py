@@ -44,3 +44,46 @@ def test_update_observing(tmp_path):
     assert update_observing(db, last, today=TODAY) == []                     # idempotent
     with closing(sqlite3.connect(db)) as c:
         assert dict(c.execute("SELECT data_id, ava FROM agn")) == {"A": 2, "B": 0, "C": None, "D": 2}
+
+
+# --- recent cadence (observing_recent) -------------------------------------------------------------------------
+
+from ava.database.activity import cadence, recent_nights, update_recent_cadence  # noqa: E402
+
+
+def test_cadence_windows():
+    today = date(2026, 11, 19)                       # 30 d -> 2026-10-20, 60 d -> 2026-09-20
+    assert cadence(["2026-11-01", "2026-11-03", "2026-11-07"], today) == (3, 3.0, 30)
+    assert cadence(["2026-10-20", "2026-11-19"], today) == (2, 30.0, 30)            # both window edges inclusive
+    # one night in 30 d: fall back to 60 d
+    assert cadence(["2026-09-25", "2026-10-05", "2026-11-14"], today) == (3, 25.0, 60)
+    assert cadence(["2026-11-14"], today) == (1, None, 60)                           # a single visit
+    assert cadence(["2026-08-01"], today) == (0, None, 60)                           # nothing recent
+    assert cadence([], today) == (0, None, 60)
+
+
+def test_recent_nights_distinct_science(tmp_path):
+    ph, sp = tmp_path / "p.sqlite", tmp_path / "s.sqlite"
+    _frames(ph, [(1, "EXPOSE", "2026-11-10"), (1, "EXPOSE", "2026-11-10"), (1, "EXPOSE", "2026-11-12"),
+                 (1, "BIAS", "2026-11-13"), (1, "EXPOSE", "2026-08-01")])
+    _frames(sp, [(1, "SPECTRUM", "2026-11-11"), (2, "SPECTRUM", "2026-11-01")])
+    assert recent_nights([("photometry", ph), ("spectra", sp)], "2026-09-20") == {
+        1: {"photometry": ["2026-11-10", "2026-11-12"], "spectra": ["2026-11-11"]}, 2: {"spectra": ["2026-11-01"]}}
+
+
+def test_update_recent_cadence(tmp_path):
+    db = tmp_path / "ava.db"
+    with closing(sqlite3.connect(db)) as c:
+        c.execute("CREATE TABLE agn (id INTEGER PRIMARY KEY, data_id TEXT, ava INTEGER)")
+        c.executemany("INSERT INTO agn VALUES (?,?,?)", [(1, "A", 2), (2, "B", 2)])
+        c.commit()
+    nights = {1: {"photometry": ["2026-11-10", "2026-11-12"], "spectra": ["2026-11-11"]}, 9: {"photometry": ["2026-11-01"]}}
+    today = date(2026, 11, 19)
+    assert update_recent_cadence(db, nights, today=today, dry_run=True)[0][:9] == \
+        ("A", 2, 2.0, 30, "2026-11-12", 1, None, 60, "2026-11-11")                  # unknown ava_id 9 skipped
+    assert not sqlite3.connect(db).execute("SELECT name FROM sqlite_master WHERE name='observing_recent'").fetchone()
+    update_recent_cadence(db, nights, today=today)
+    update_recent_cadence(db, nights, today=today)                                     # rebuilt, not appended
+    with closing(sqlite3.connect(db)) as c:
+        assert c.execute("SELECT data_id, phot_nights, phot_cadence, spec_nights FROM observing_recent").fetchall() == \
+            [("A", 2, 2.0, 1)]

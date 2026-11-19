@@ -536,3 +536,35 @@ html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 .ava-rowtoggle:hover, .ava-rowtoggle:focus-visible { color: var(--ava-link); }
 .ava-rowtoggle:focus-visible { outline: 2px solid var(--ava-link); outline-offset: 2px; }
 .ava-subrow th { padding-left: 1.5rem; font-weight: 400; color: var(--ava-muted); }
+
+/* Target page: the photometric and spectroscopic data summaries share column widths, so they line up. */
+.ava-summary { min-width: 34rem; }
+.ava-summary th:nth-child(1) { width: 20%; }
+.ava-summary th:nth-child(2) { width: 16%; }
+.ava-summary th:nth-child(3), .ava-summary th:nth-child(4) { width: 24%; }
+.ava-summary th:nth-child(5) { width: 16%; }
+
+/* Two-row table header (targets list: "Cadence" over Photo / Spec): the whole header sticks as one block. */
+.ava-table thead.ava-thead-2 { position: sticky; top: 0; z-index: 2; }
+.ava-table thead.ava-thead-2 th { position: static; vertical-align: bottom; }
+.ava-table thead.ava-thead-2 tr:first-child th { border-bottom-width: 0; }
+.ava-table thead.ava-thead-2 tr:first-child th[rowspan] { border-bottom-width: 2px; }
+.ava-table thead .ava-th-group { text-align: center; border-bottom: 1px solid var(--ava-line) !important; padding-bottom: .25rem; }
+
+/* "Live" dot for Observing: a green dot whose ring slowly pulses (steady when the viewer prefers reduced motion).
+   Badges already draw a status dot (.ava-badge::before); the Observing one only gains the pulse. */
+.st-observing::before {
+  content: ""; display: inline-block; width: .5em; height: .5em; margin-right: .45em; vertical-align: .08em;
+  border-radius: 50%; background: var(--ava-aurora);
+}
+.st-observing::before, .ava-badge--active::before { animation: ava-live 2s ease-out infinite; }
+@keyframes ava-live {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ava-aurora) 65%, transparent); }
+  70%  { box-shadow: 0 0 0 .5em color-mix(in srgb, var(--ava-aurora) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .st-observing::before, .ava-badge--active::before { animation: none; } }
+
+/* Targets table: the shared "Current" heading over Status / Photo / Spec; cadence columns sized to their content. */
+.ava-table thead .ava-th-note { font-weight: 400; color: var(--ava-muted); }
+.ava-classic .ava-cad { width: 1%; white-space: nowrap; padding-left: .5rem; padding-right: .5rem; }

@@ -14,14 +14,49 @@ function classic_state(array $t): array
     return match ((int) ($t['ava'] ?? -1)) {
         2 => ['observing', 'Observing'],
         1 => ['archived', 'Archived'],
-        0 => ['pending', 'to be processed'],
+        0 => ['pending', 'TBP'],                      // to be processed (explained in the Notes and the tooltip)
         default => ['tba', 'tba'],
     };
 }
 
-// Classic table: observing status first (Observing, Archived, to be processed, tba), then name.
+// Recent cadence (observing_recent): mean spacing of the observing nights in the last 30 d, or 60 d when there
+// were fewer than 2 nights in 30 d. Null on a database without the table: the all-time cadence is shown instead.
+$recent = ava_recent_cadence();
+$recentWin = 30;
+$recentMax = 60;
+if ($recent) {
+    $ws = array_filter(array_merge(array_map(fn($r) => (int) $r['phot_window'], $recent),
+        array_map(fn($r) => (int) $r['spec_window'], $recent)));
+    $recentWin = $ws ? min($ws) : 30;
+    $recentMax = $ws ? max($ws) : 60;
+}
+
+/** One cadence cell: "1.08", "6.0 · 60 d" (longer window), "1 visit", or "—"; tooltip with nights and last night. */
+function recent_cell(?array $r, string $k, int $dp): string
+{
+    $n = $r ? (int) $r["{$k}_nights"] : 0;
+    $cad = $r[$k . '_cadence'] ?? null;
+    $w = $r ? (int) $r["{$k}_window"] : 0;
+    $tip = $r && $n ? "$n night" . ($n > 1 ? 's' : '') . " in the last $w d; last " . $r["{$k}_last"] : '';
+    if (is_numeric($cad)) {
+        $txt = number_format((float) $cad, $dp);                     // the window used is in the tooltip
+        $v = (float) $cad;
+    } elseif ($n === 1) {
+        $txt = '<span class="text-secondary">1 visit</span>';
+        $v = 9000;
+    } else {
+        $txt = '—';
+        $v = 9999;
+    }
+    return '<td class="num ava-cad" data-v="' . $v . '"' . ($tip ? ' title="' . h($tip) . '"' : '') . '>' . $txt . '</td>';
+}
+
+// Classic table: observing status first (Observing, Archived, to be processed, tba), then g mag (the column
+// shown, from agn.Vmag; brightest first, no magnitude last), then name.
 $classic = $targets;
+$gmag = fn(array $t): float => is_numeric($t['Vmag'] ?? null) && (float) $t['Vmag'] > 0 ? (float) $t['Vmag'] : INF;
 usort($classic, fn($a, $b) => ((int) ($b['ava'] ?? -1) <=> (int) ($a['ava'] ?? -1))
+    ?: ($gmag($a) <=> $gmag($b))
     ?: strnatcasecmp((string) $a['name'], (string) $b['name']));
 
 ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumbres Observatory network.');
@@ -90,8 +125,13 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
       <summary>Notes</summary>
         <span class="st-observing">Observing</span> = data collected in the last 30 days ·
         <span class="st-archived">Archived</span> = all available data processed and archived ·
-        <span class="st-pending">to be processed</span> = observed but <strong>not</strong> archived.
-        Click a column header to sort.<br>
+        <span class="st-pending">TBP</span> (to be processed) = observed in the past, no longer observing, and its data <strong>not</strong> yet processed by the AVA pipeline.
+        Ordered by status, then g<sub>mag</sub> (brightest first); click a column header to sort.<br>
+        <?php if ($recent !== null): ?>
+        <strong>Current</strong>: status, and cadence = mean spacing (days) of the LCO imaging / FLOYDS nights in the last
+        <?= $recentWin ?> days, or over the last <?= $recentMax ?> days when there were fewer than two nights in that time (the tooltip says which); <em>1 visit</em> = a
+        single night. The full-history cadence is on each target's page.<br>
+        <?php endif; ?>
         <strong>IBRM</strong> = intensive broadband reverberation mapping: ≥<?= AVA_IBRM_MIN_BANDS ?> LCO filters with
         ≥<?= AVA_IBRM_MIN_FRAMES ?> frames each and ≥<?= AVA_IBRM_MIN_VISITS ?> visits (or still observing) ·
         <strong>Few-band</strong> = regular monitoring in fewer filters (mostly V-band support for spectroscopic RM) ·
@@ -99,20 +139,25 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
     </details>
     <div class="ava-table-wrap">
       <table class="table table-hover ava-table ava-classic" id="classic">
-        <thead>
+        <thead class="ava-thead-2">
           <tr>
-            <th data-sort="num" class="num">ID</th>
-            <th data-sort="text">Name</th>
-            <th data-sort="text">RA<br><small>(hms)</small></th>
-            <th data-sort="text">Dec<br><small>(dms)</small></th>
-            <th data-sort="num" class="num">g<sub>mag</sub></th>
-            <th data-sort="num" class="num">log L<sub>Bol</sub><br><small>(erg/s)</small></th>
-            <th data-sort="num" class="num">log M<sub>●</sub><br><small>(M<sub>☉</sub>)</small></th>
-            <th data-sort="num" class="num">z</th>
-            <th data-sort="text">LCO<br>filters</th>
-            <th data-sort="num" class="num">Photo<br>⟨Δt⟩/d</th>
-            <th data-sort="num" class="num">Spec<br>⟨Δt⟩/d</th>
-            <th data-sort="num">Status</th>
+            <th rowspan="2" data-sort="num" class="num">ID</th>
+            <th rowspan="2" data-sort="text">Name</th>
+            <th rowspan="2" data-sort="text">RA<br><small>(hms)</small></th>
+            <th rowspan="2" data-sort="text">Dec<br><small>(dms)</small></th>
+            <th rowspan="2" data-sort="num" class="num">g<sub>mag</sub></th>
+            <th rowspan="2" data-sort="num" class="num">log L<sub>Bol</sub><br><small>(erg/s)</small></th>
+            <th rowspan="2" data-sort="num" class="num">log M<sub>●</sub><br><small>(M<sub>☉</sub>)</small></th>
+            <th rowspan="2" data-sort="num" class="num">z</th>
+            <th rowspan="2" data-sort="text">LCO<br>filters</th>
+            <th colspan="3" class="ava-th-group"><?= $recent !== null
+                ? 'Current <small class="ava-th-note">(cadence in days)</small>'
+                : 'Status <small class="ava-th-note">(cadence in days, all data)</small>' ?></th>
+          </tr>
+          <tr>
+            <th data-sort="num" data-col="9">Status</th>
+            <th data-sort="num" data-col="10" class="num ava-cad">Photo</th>
+            <th data-sort="num" data-col="11" class="num ava-cad">Spec</th>
           </tr>
         </thead>
         <tbody>
@@ -131,9 +176,14 @@ ava_page_start('targets', 'Targets', 'All AGN monitored by AVA with the Las Cumb
               <td class="num"><?= fmt_num($t['logm'], 2) ?></td>
               <td class="num"><?= fmt_num($t['redshift'], 4) ?></td>
               <td class="filters"><?php foreach (array_keys(ava_target_filters($t)) as $f): ?><span style="color: var(<?= ava_filter_var($f) ?>)"><?= h($f) ?></span><?php endforeach; ?></td>
-              <td class="num"><?= $pcad > 0 ? number_format($pcad, 2) : '—' ?></td>
-              <td class="num"><?= $scad > 0 ? number_format($scad, 1) : '—' ?></td>
-              <td data-v="<?= (int) $t['ava'] ?>"><span class="st-<?= $sk ?>"><?= h($sl) ?></span></td>
+              <td data-v="<?= (int) $t['ava'] ?>"><span class="st-<?= $sk ?>"<?= $sk === 'pending' ? ' title="To be processed"' : '' ?>><?= h($sl) ?></span></td>
+              <?php if ($recent !== null): $rc = $recent[$t['data_id']] ?? null; ?>
+              <?= recent_cell($rc, 'phot', 1) ?>
+              <?= recent_cell($rc, 'spec', 1) ?>
+              <?php else: ?>
+              <td class="num ava-cad"><?= $pcad > 0 ? number_format($pcad, 1) : '—' ?></td>
+              <td class="num ava-cad"><?= $scad > 0 ? number_format($scad, 1) : '—' ?></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
         </tbody>

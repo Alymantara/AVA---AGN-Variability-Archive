@@ -69,6 +69,14 @@ function date_cell(?string $date): string
     return '<td>' . h($date) . '<span class="mjd">MJD ' . mjd($date) . '</span></td>';
 }
 
+/** Epochs, with the number of frames underneath in grey (data summary tables). */
+function epochs_cell(mixed $epochs, mixed $frames): string
+{
+    $e = is_pos($epochs) ? fmt_int($epochs) : '—';
+    $f = is_pos($frames) ? '<span class="mjd">' . fmt_int($frames) . ' frames</span>' : '';
+    return '<td class="num">' . $e . $f . '</td>';
+}
+
 /** Allow only simple typographic markup stored in the DB (e.g. logl_comment). */
 function db_markup(?string $s): string
 {
@@ -303,12 +311,12 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
 
       <h2 class="ava-h">Photometric data summary</h2>
       <div class="table-responsive">
-      <table class="table ava-info">
-        <thead><tr><th>Facility</th><th class="num">Cadence (d)</th><th>Start</th><th>End</th><th class="num">Frames</th></tr></thead>
+      <table class="table ava-info ava-summary">
+        <thead><tr><th>Facility</th><th class="num">Cadence (d)</th><th>Start</th><th>End</th><th class="num">Epochs</th></tr></thead>
         <tbody>
           <?php if (is_pos($lcoCad) || is_pos($v('db_lco_images'))): ?>
           <tr><th>LCO</th><td class="num"><?= fmt_num($lcoCad, 2) ?></td><?= date_cell($lcoStart) ?><?= date_cell($lcoEnd) ?>
-              <td class="num"><?= fmt_int($v('db_lco_images')) ?></td></tr>
+              <?= epochs_cell($v('db_lco_visits'), $v('db_lco_images')) ?></tr>
           <?php endif; ?>
           <?php if (is_pos($t['swift_cadence'])): ?>
           <tr><th>Swift</th><td class="num"><?= fmt_num($t['swift_cadence'], 2) ?></td><?= date_cell($t['swift_start']) ?><?= date_cell($t['swift_end']) ?>
@@ -319,7 +327,7 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
               <td class="num">—</td></tr>
           <?php endif; ?>
           <?php if (is_pos($t['hst_tot'])): ?>
-          <tr><th>HST</th><td class="num">—</td><td>—</td><td>—</td><td class="num"><?= fmt_int($t['hst_tot']) ?></td></tr>
+          <tr><th>HST</th><td class="num">—</td><td>—</td><td>—</td><?= epochs_cell(null, $t['hst_tot']) ?></tr>
           <?php endif; ?>
         </tbody>
       </table>
@@ -332,10 +340,10 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       <?php if (is_pos($fEpochs)): ?>
       <h2 class="ava-h">Spectroscopic data summary</h2>
       <div class="table-responsive">
-      <table class="table ava-info">
-        <thead><tr><th>Facility</th><th class="num">Cadence (d)</th><th class="num">Epochs</th><th>Start</th><th>End</th></tr></thead>
-        <tbody><tr><th>LCO FLOYDS</th><td class="num"><?= fmt_num($fCad, 2) ?></td><td class="num"><?= fmt_int($fEpochs) ?></td>
-          <?= date_cell($fStart) ?><?= date_cell($fEnd) ?></tr></tbody>
+      <table class="table ava-info ava-summary">
+        <thead><tr><th>Facility</th><th class="num">Cadence (d)</th><th>Start</th><th>End</th><th class="num">Epochs</th></tr></thead>
+        <tbody><tr><th>LCO FLOYDS</th><td class="num"><?= fmt_num($fCad, 2) ?></td><?= date_cell($fStart) ?><?= date_cell($fEnd) ?>
+          <?= epochs_cell($fEpochs, $v('db_floyds_frames')) ?></tr></tbody>
       </table>
       </div>
       <?php if (is_pos($v('db_floyds_frames'))): ?>

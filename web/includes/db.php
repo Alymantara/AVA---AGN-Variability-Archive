@@ -150,7 +150,7 @@ function ava_processing(array $t): string
     return match ((int) ($t['ava'] ?? -1)) {
         2 => 'Observing — data in the last 30 days',
         1 => 'Processed and archived',
-        0 => 'Observed, not yet archived',
+        0 => 'Observed in the past; no longer observing and the data not yet processed by the AVA pipeline',
         default => 'Not scheduled',
     };
 }
@@ -197,6 +197,22 @@ function ava_norm(string $s): string
 }
 
 /** True if the (published) database has this table — newer pipeline tables may be missing. */
+/**
+ * Recent LCO cadence per target (table observing_recent, written by ava.database.activity): data_id => row, or
+ * null when the database predates the table (the target list then shows the all-time cadence instead).
+ */
+function ava_recent_cadence(): ?array
+{
+    if (!ava_has_table('observing_recent')) {
+        return null;
+    }
+    $out = [];
+    foreach (ava_db()->query('SELECT * FROM observing_recent') as $r) {
+        $out[$r['data_id']] = $r;
+    }
+    return $out;
+}
+
 function ava_has_table(string $name): bool
 {
     static $cache = [];
