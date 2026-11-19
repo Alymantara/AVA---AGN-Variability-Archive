@@ -25,6 +25,17 @@ define('AVA_DATA_DIR', rtrim(getenv('AVA_WEB_DATA') ?: AVA_ROOT . '/data', '/'))
 define('AVA_DATA_URL', getenv('AVA_WEB_DATA_URL') ?: 'data');   // public URL of AVA_DATA_DIR
 define('AVA_DB_PATH', AVA_DATA_DIR . '/ava.db');
 define('AVA_FILTER_DICT', AVA_DATA_DIR . '/filter_dict.txt');
+
+/**
+ * Public URL of a published data file (path relative to AVA_DATA_DIR), each segment encoded and cache-busted with
+ * ?v=<mtime>: files regenerated daily (light curves, zips) get a new URL, so browsers never serve a stale copy.
+ */
+function ava_data_url(string $rel): string
+{
+    $url = AVA_DATA_URL . '/' . implode('/', array_map('rawurlencode', explode('/', $rel)));
+    $f = AVA_DATA_DIR . '/' . $rel;
+    return is_file($f) ? $url . '?v=' . filemtime($f) : $url;
+}
 define('AVA_CONTACT_EMAIL', 'jvhs1@st-andrews.ac.uk');   // shown on the Data page for data requests
 
 // Key Projects shown on Live Updates (first semester => number of semesters).

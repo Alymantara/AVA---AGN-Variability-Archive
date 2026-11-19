@@ -175,14 +175,14 @@ ava_page_start('data', 'Data', 'AVA observing summary, download policy, file for
               <td class="num"><?= number_format($f['fwhm_A']) ?></td>
               <td class="num"><?= number_format($f['half_lo_A']) ?>–<?= number_format($f['half_hi_A']) ?></td>
               <td class="num"><?= number_format(100 * $f['peak']) ?> %</td>
-              <td><a href="<?= h(AVA_DATA_URL . '/filters/' . rawurlencode($f['file'])) ?>" download><?= h($f['file']) ?></a></td>
+              <td><a href="<?= h(ava_data_url('filters/' . $f['file'])) ?>" download><?= h($f['file']) ?></a></td>
             </tr>
           <?php endforeach; ?>
         </tbody>
       </table>
     </div>
     <?php if (is_file(AVA_DATA_DIR . '/filters/ava_lco_filters.zip')): ?>
-      <a class="btn btn-ava btn-ava-gold mt-3" href="<?= h(AVA_DATA_URL) ?>/filters/ava_lco_filters.zip" download>Download all curves (zip)</a>
+      <a class="btn btn-ava btn-ava-gold mt-3" href="<?= h(ava_data_url('filters/ava_lco_filters.zip')) ?>" download>Download all curves (zip)</a>
     <?php endif; ?>
   </div>
 </section>

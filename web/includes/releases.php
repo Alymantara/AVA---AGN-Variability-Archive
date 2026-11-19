@@ -44,8 +44,7 @@ function ava_agn_releases(string $dataId): array
 /** Public URL of one release file (each path segment encoded). */
 function ava_release_url(string $release, string $path): string
 {
-    $parts = array_map('rawurlencode', explode('/', $release . '/' . $path));
-    return AVA_DATA_URL . '/releases/' . implode('/', $parts);
+    return ava_data_url('releases/' . $release . '/' . $path);
 }
 
 function ava_bytes(?int $n): string

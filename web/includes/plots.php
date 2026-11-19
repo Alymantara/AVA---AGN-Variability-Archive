@@ -96,7 +96,7 @@ function ava_downloads(string $dataId): array
         $f = AVA_DATA_DIR . '/downloads/' . $dataId . '/' . $name;
         $mainOnly = AVA_STAGING !== '' && in_array($k, AVA_STAGING_MAIN_ONLY, true);
         $ok = !$mainOnly && $dataId !== '' && !str_contains($dataId, '/') && is_file($f);
-        $out[$k] = [$group, $label, $ok ? AVA_DATA_URL . '/downloads/' . rawurlencode($dataId) . '/' . rawurlencode($name) : null,
+        $out[$k] = [$group, $label, $ok ? ava_data_url("downloads/$dataId/$name") : null,
             $ok ? filesize($f) : null, $mainOnly ? 'on the main AVA site only' : 'not available'];
     }
     return $out;
