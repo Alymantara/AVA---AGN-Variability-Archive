@@ -3,7 +3,8 @@
 \caption{Summary of the quality metrics. Scatters are robust (1.4826 times the median absolute deviation) over the
 50 Fairall~9 spectra unless stated otherwise. Small-scale scatter: rms over the 50 spectra of the ratio of each
 (normalised) spectrum to the median spectrum after removing a 200\,\AA{} running median. Fringe metric: rms of the
-ratio of 25\,\AA{} to 200\,\AA{} running medians in the telluric-free windows 7750--8050 and 8450--8900\,\AA.}
+ratio of 25\,\AA{} to 200\,\AA{} running medians in the telluric-free windows 7750--8050 and 8450--8900\,\AA.
+Optimal and boxcar: the optimal and the fixed-aperture extraction of improved v1 (Appendix~\ref{sec:app_v1}).}
 \label{tab:summary}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.9cm}ccc@{}}
 \toprule
@@ -38,8 +39,8 @@ red 8500--9500\,\AA & \SSreOld & \SSreOpt & \SSreBox \\
 {[O\,{\sc iii}]\,5007 flux scatter, blue order} & \FOIIIbOld & \FOIIIbOpt & \FOIIIbBox \\
 {[O\,{\sc iii}]\,5007 flux scatter, red order} & \FOIIIrOld & \FOIIIrOpt & \FOIIIrBox \\
 red/blue [O\,{\sc iii}] flux ratio scatter & \FRBOld & \FRBOpt & \FRBBox \\
-EG\,21 shape vs CTIO, blue, rms (18 nights) & \CLbOld & \multicolumn{2}{c}{\CLbNew} \\
-EG\,21 shape vs CTIO, red, rms (18 nights) & \CLrOld & \multicolumn{2}{c}{\CLrNew} \\
+EG\,21 calibrated shape vs CTIO reference, blue, rms (18 nights) & \CLbOld & \multicolumn{2}{c}{\CLbNew} \\
+EG\,21 calibrated shape vs CTIO reference, red, rms (18 nights) & \CLrOld & \multicolumn{2}{c}{\CLrNew} \\
 EG\,21 red fringe-scale rms (median of 18) & \EGfrOld & \multicolumn{2}{c}{\EGfrNew} \\
 \bottomrule
 \end{tabular}

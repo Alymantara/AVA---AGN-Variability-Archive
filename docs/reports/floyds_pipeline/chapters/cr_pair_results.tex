@@ -1,10 +1,12 @@
 % Results of the same-visit check (input from cr_pair.tex)
 \subsection{Injection test with a partner}
 \label{sec:cr_pair_inject}
-The injection test of Section~\ref{sec:cr_inject} was repeated on eight frames that have a partner (four NGC\,4151 at
-OGG, four Fairall\,9 at COJ, two random seeds each, 20 hits per category per frame), injecting into one exposure only,
-as real cosmic rays are, and reducing it with the 1.1.0 detector, with LA Cosmic and the object model, and with the
-same-visit check added (Table~\ref{tab:cr_pair_inject}).
+We repeated the injection test of Section~\ref{sec:cr_inject} on eight frames that have a partner: four of NGC\,4151
+at OGG and four of Fairall\,9 at COJ. In each frame we placed two random sets of 20 artificial cosmic rays in each of three
+places: on the sky, on the trace, and on the line peaks or core. As real cosmic rays
+are, they were injected into one exposure of the visit only. Each frame was then reduced three ways: with the 1.1.0
+detector, with LA Cosmic and the object model, and with the object model followed by the same-visit check
+(Table~\ref{tab:cr_pair_inject}).
 
 \begin{table}[!htbp]
 \centering\small
@@ -18,27 +20,30 @@ Site & Detector & Sky & Trace & Line peak & Line peak & Pixels flagged \\
  & & & & or core & or core, $>10\sigma$ & without injection \\
  & & \multicolumn{4}{c}{(fraction of the hits detected)} & (pixels, 4 frames) \\
 \midrule
-OGG & 1.1.0 / final v3 & 0.89 & 0.59 & 0.14 & 0.27 & 1037\\
+OGG & 1.1.0 / improved v3 & 0.89 & 0.59 & 0.14 & 0.27 & 1037\\
     & object model & 0.89 & 0.76 & 0.50 & 0.89 & 1020\\
     & object model + same visit & 0.89 & 0.76 & 0.50 & 0.89 & 799\\
 \midrule
-COJ & 1.1.0 / final v3 & 0.90 & 0.94 & 0.68 & 0.94 & 1775\\
+COJ & 1.1.0 / improved v3 & 0.90 & 0.94 & 0.68 & 0.94 & 1775\\
     & object model & 0.90 & 0.94 & 0.79 & 1.00 & 1816\\
     & object model + same visit & 0.90 & 0.94 & 0.78 & 1.00 & 1634\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-With the strict rule for new groups the comparison finds the same hits as the object model alone: of the 953
-hits, none is found only with it, and 2 are found only without it, both faint hits on Fairall\,9 line peaks
-(3.7--5$\sigma$, 7--12 per cent of the line). The 8
-hits above 10$\sigma$ that both miss on the OGG peaks carry 4--38 per cent of the line under them. An earlier version
-of the check, with the loose rule for new groups, found 14 more hits on the sky and 6 more on the line peaks, but the
-same rule added hundreds of false pixels on the narrow lines of the real sample (Section~\ref{sec:cr_pair}); we chose
-the clean lines. What the comparison does is remove flags: 22 per cent fewer pixels at OGG and 10 per cent fewer at
-COJ in the frames without injected hits. It removes 9--19 LA Cosmic groups per frame that the partner shows to be real
-structure and adds 0--1; 35--51 groups per frame stay flagged because the partner cannot check them. These runs were
-made before the rule for pixels flagged in both exposures on the object; the rule acts only where the partner flagged
-the same pixel, and an injected hit is in one exposure only, so it does not change which hits are found.
+\textit{Result.} With the strict rule for new groups, the check finds the same artificial cosmic rays as the object
+model alone. Of the 953 hits, none is found only with the check, and 2 are found only without it; both are faint hits on
+Fairall\,9 line peaks (3.7--5$\sigma$, 7--12 per cent of the line). On the OGG line peaks, 8 hits above 10$\sigma$ are
+missed by both; they carry 4--38 per cent of the line under them. An earlier version of the check, with the loose rule
+for new groups, found 14 more hits on the sky and 6 more on the line peaks. But the same rule added hundreds of false
+pixels on the narrow lines of the real sample (Section~\ref{sec:cr_pair}, item (iv)), and we chose clean lines.
+
+What the check does is remove flags. In the frames without artificial cosmic rays it flags 22 per cent fewer pixels at
+OGG and 10 per cent fewer at COJ. Per frame, it removes 9--19 LA Cosmic groups that the partner shows to be real
+structure and adds 0--1; 35--51 groups per frame stay flagged because the partner cannot check them.
+
+These runs were made before the rule for pixels flagged in both exposures on the object was added. That rule acts only
+where the partner flagged the same pixel, and an artificial cosmic ray is in one exposure only, so the rule does not
+change which of them are found.
 
 \input{chapters/cr_pair_sample}

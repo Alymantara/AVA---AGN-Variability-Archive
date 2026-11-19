@@ -1,0 +1,95 @@
+% Conventions and terms used throughout the report (input from floyds_rm_report.tex, after the summary)
+\chapter*{Conventions used in this report}
+\phantomsection
+\addcontentsline{toc}{chapter}{Conventions used in this report}
+\label{sec:conventions}
+
+This page defines the names and terms that recur in the report. Each chapter still defines what is specific to it.
+
+\paragraph{The instrument and the data.} FLOYDS is a low-resolution cross-dispersed spectrograph on each of the two
+2-m Faulkes Telescopes of the Las Cumbres Observatory (LCO): Faulkes Telescope South at Siding Spring (site code
+\textbf{COJ}) and Faulkes Telescope North at Haleakal\=a (\textbf{OGG}). A FLOYDS spectrum has two \textbf{orders} on
+the detector: the \textbf{red order} (order~1, $\approx4500$--$10\,000$\,\AA, $\approx3.5$\,\AA\ per pixel) and the
+\textbf{blue order} (order~2, $\approx3200$--$5800$\,\AA, $\approx1.7$\,\AA\ per pixel). On the detector the
+dispersion runs along the rows ($x$) and the slit along the columns ($y$); the spatial scale is 0.337\,arcsec per pixel.
+The \textbf{slit} is 1.2, 1.6, 2 or 6\,arcsec wide; the AGN are observed with the 6\,arcsec slit, most standard stars
+with the 2\,arcsec slit. Wavelengths are observed (not rest-frame) unless stated, in \AA ngstr\"om; counts are in
+electrons (e$^-$).
+
+\paragraph{Observations.} A \textbf{frame} or \textbf{exposure} is one image read out from the detector. A
+\textbf{block} is one telescope request: an arc lamp exposure, a lamp flat and the science exposures, taken together.
+A \textbf{visit} is the science exposures of one block, usually two consecutive exposures of the same target; the other
+exposure of the same visit is called its \textbf{partner} (Chapter~\ref{sec:cosmics}). An \textbf{epoch} is one visit
+in a reverberation-mapping light curve; it never means a period of the instrument, which we call an
+\textbf{instrument configuration} (between two changes of the spectrograph, each with its own sky flats). \textbf{Calibration frames}: the \textbf{arc} (a lamp with emission lines, for
+the wavelength scale), the \textbf{lamp flat} (a continuum lamp, which shows the fringes of the red order), and the
+\textbf{sky flat} (twilight sky, used once per instrument configuration to trace where the two orders fall on the
+detector).
+
+\paragraph{The reductions compared.} \banzai{} is the LCO pipeline for FLOYDS. Throughout, the reductions are named as
+in Table~\ref{tab:versions_names}, and every figure uses the same name and colour for each:
+\textcolor[HTML]{8a8a85}{\textbf{\banzai{}~1.0.1 (archive)}} for the products in the LCO archive,
+\textcolor[HTML]{2a6fb0}{\textbf{\banzai{}~1.1.0}} for the current release run from the raw frames,
+\textcolor[HTML]{d9822b}{\textbf{improved v1}} for our first corrections applied to the archive products, and
+\textcolor[HTML]{8e44ad}{\textbf{improved v3}} for the final version of this work (drawn thicker in the figures).
+Improved v2, an intermediate run, appears in a few comparisons only. ``\banzai{}~1.1.0 (stock)'' is 1.1.0 run with
+its default settings plus the object wavelength zero point of this work; ``1.1.0 as released'' (in the executive summary and the cosmic-ray chapter)
+is the same run without it. \textbf{LA Cosmic} is the cosmic-ray detector of \banzai{} \citep{vanDokkum2001}. In the cosmic-ray chapter
+three detectors are compared, always in the same colours: \textcolor[HTML]{2a6fb0}{\textbf{the 1.1.0 detector}}
+(LA Cosmic as in 1.1.0 and improved v3), \textcolor[HTML]{8e44ad}{\textbf{the object model}} (LA Cosmic given a
+smooth model of the object) and \textcolor[HTML]{1b7f79}{\textbf{the same-visit check}} (the object model followed
+by a comparison with the other exposure of the visit).
+
+\paragraph{Products.} The pipeline writes, for each science exposure, a two-dimensional product (\texttt{-2d}: the
+calibrated image with its error, mask and order map) and a one-dimensional product (\texttt{-1d}: the extracted
+spectrum of each order, with its error and mask). File names follow the LCO pattern
+\texttt{site telescope-camera-date-frame number-type}, e.g. \texttt{coj2m002-en12-20261026-0013-e91-1d.fits.fz}, where
+\texttt{e00} is the raw frame and \texttt{e91} the processed one (\texttt{a} for arcs, \texttt{w} for lamp flats,
+\texttt{f} for sky flats). The \texttt{-2d} product also carries a \textbf{pixel table} (\texttt{BINNED2D}): one row
+per pixel with its wavelength, its position along the slit and its weight in the extraction (Section~\ref{sec:data}). A \textbf{mask} marks pixels or bins that should not
+be used; a non-zero value means ``do not use''. Header keywords starting \texttt{L1} are written by the pipeline;
+those starting \texttt{L1Q} are the quality keywords of Section~\ref{sec:qc}, and those starting \texttt{L1CR}
+record the cosmic-ray check (Section~\ref{sec:cr_pair}).
+
+\paragraph{Statistics.} $\sigma$ is the uncertainty of a pixel or bin as propagated by the pipeline, except where it is called the
+width of the spatial profile (the Gaussian $\sigma$ of the object along the slit; FWHM $=2.355\sigma$). The
+\textbf{robust scatter} (or robust rms) of a set of values is $1.4826$ times their median absolute deviation from the
+median: it equals the standard deviation for Gaussian noise and is not driven by a few outliers. A \textbf{pull} is a
+difference divided by its expected error, e.g. $(f_1-f_2)/\sqrt{\sigma_1^2+\sigma_2^2}$ for the same quantity measured
+in two exposures; if the errors are right its rms is 1. ``$n\sigma$'' means $n$ times the uncertainty. Per-cent
+values are relative to the flux at that wavelength unless stated.
+
+\paragraph{Terms used for the fringe and flux corrections.} \textbf{Fringes} are the interference pattern of the CCD
+in the red order beyond $\approx6500$\,\AA, a ripple of up to 10--20 per cent with a period of tens of \AA ngstr\"oms.
+To measure them we use a \textbf{high-pass} of the spectrum: its running median over 12\,\AA\ divided by its running
+median over 150\,\AA, minus 1, which keeps structure on fringe scales and removes the continuum. The \textbf{clean
+windows} are wavelength ranges free of telluric (atmospheric) absorption bands and of strong lines where that
+residual is measured. The \textbf{harmonic fringe model} describes the fringes as a sum of sine waves whose phase is
+taken from the lamp flats (a \textbf{phase master} is the median of the lamp flats of 1--2 months for one slit). A
+\textbf{sensitivity} converts counts into flux; the \textbf{ensemble} sensitivity is the median of those of the nine
+standards nearest in time, after each is scaled by a constant (\textbf{grey}) factor that absorbs clouds and slit
+losses.
+
+\paragraph{Measures of quality.} The \textbf{fringe metric} is the rms of the ratio of the 25\,\AA{} to the
+200\,\AA{} running median of a red-order spectrum in the telluric-free windows 7750--8050 and 8450--8900\,\AA. The
+\textbf{small-scale scatter} is the rms, over many spectra of one target, of the ratio of each (normalised) spectrum
+to their median spectrum, after a 200\,\AA{} running median is removed. The \textbf{residual from a power law} is
+the rms of one red-order spectrum about a power law fitted to it in the clean windows. The
+\textbf{frame-specific part} of a high-pass is what remains after the median high-pass of all spectra of the target is
+subtracted: real narrow lines, common to every spectrum, cancel, and the frame-to-frame fringe and telluric residuals
+remain. All are in per cent.
+
+\paragraph{Extraction and calibration terms.} \textbf{Optimal extraction} weights each pixel by the spatial profile
+of the object \citep{Horne1986}; a \textbf{fixed-aperture} (boxcar) extraction sums the pixels within a fixed width.
+The \textbf{order trace} is where an order lies on the detector (from the sky flats); the \textbf{object trace} is
+where the spectrum of the object lies within it. The \textbf{object wavelength zero point} is a shift of the wavelength
+scale measured on the telluric absorption bands in the object's own light; it corrects for where the object sits in a
+wide slit, which the arc cannot know. The \textbf{residual fringe template} is the small fringe residual that the
+fringe model leaves in the standard stars, measured once per slit width and removed from every spectrum.
+
+\paragraph{Cosmic-ray terms.} A \textbf{group} is a set of flagged pixels that touch each other. The \textbf{trace
+core} is the part of the slit within one FWHM of the object's trace; \textbf{on the object} means within two FWHM. A
+\textbf{warm pixel} is a detector pixel with excess dark current, so it is bright in every frame at the same place.
+LCO groups the exposures taken for one request into a \textbf{molecule} (header keyword \texttt{MOLUID}); the two
+exposures of a visit share it.
+

@@ -22,8 +22,8 @@ On Linux any Python 3.10--3.12 virtual environment works.
 \texttt{lco-banzai} compiles C extensions, and compiler settings exported by the login profile (here from an Intel
 conda / oneAPI installation) made the build fail (\texttt{This is not the Intel oneAPI compiler};
 \texttt{unsupported tapi file type ... for architecture x86\_64}). Installing, and running, from a clean environment
-with the system compiler avoids it. A wrapper script \texttt{benv} next to the checkout does this (in zsh the command
-cannot be kept in a variable, which zsh does not split into words):
+with the system compiler avoids it. A wrapper script \texttt{benv} next to the checkout does this (a script rather than a shell variable, because zsh
+does not split a variable into words):
 \begin{verbatim}
 #!/bin/sh
 exec env -i HOME="$HOME" \
@@ -52,13 +52,13 @@ DB=sqlite:///$PWD/floyds.db
 \texttt{setup-db} creates the calibration database (both FLOYDS sites, order locations, line-spread parameters, flux
 standards). \texttt{skyflats} processes the sky flats listed in \texttt{data/orders/skyflats.dat}, which fix the shape
 of the orders. \texttt{chain} classifies the raw frames from their headers and runs, in order: arcs, lamp flats, the
-fringe phase masters (one per slit width and $\approx60$-d window), the standards, the residual fringe templates, the
+fringe phase masters (one per slit width and $\approx60$-day window), the standards, the residual fringe templates, the
 standards again and the science frames (Section~\ref{sec:visit_timing} for the time per visit). The spectra are in
-\texttt{processed/<site>/<camera>/<date>/processed/*-1d.fits.fz}; use the rows with \texttt{mask == 0} (bit 2 marks
+\texttt{processed/<site>/<camera>/<date>/processed/*-1d.fits.fz}; use only the wavelength bins (table rows) with \texttt{mask == 0} (bit 2 marks
 the O$_2$ A band in science spectra). Keep more than 10\,GB of disk free: \banzai{} memory-maps its arrays in the
 temporary directory and a processed 2-d frame is $\approx50$\,MB before it is made lean
-(Section~\ref{sec:sites_disk}). Sky flats can be the raw frames or the processed \texttt{-f91} files from the archive
+(Section~\ref{sec:sites_disk}). Sky flats can be the raw frames or the processed sky flats (file type \texttt{f91}) from the archive
 (for OGG only the 2019 March 29 set is listed). Both sites have an object-trace template and priors; for a new
-instrument or after an intervention, rebuild them from the standards with \texttt{work/scripts/build\_trace\_template.py}
+instrument or after an intervention on the instrument, rebuild them from the standards with \texttt{work/scripts/build\_trace\_template.py}
 (without a template the pipeline falls back to the 1.1.0 polynomial). Flux standards must be in
 \texttt{data/standards} to be used as standards; others are reduced as science.

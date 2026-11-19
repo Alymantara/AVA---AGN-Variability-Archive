@@ -5,8 +5,8 @@ products of \banzai{}~1.0.1. Those products had already been divided by a shifte
 be undone, the destroyed pixels masked, and the sky and the extraction redone before the fringe model could be applied.
 This appendix documents that procedure (improved v1, Table~\ref{tab:versions_names}). It is not part of the pipeline
 run from raw (improved v2 and v3), which never divides by a flat and uses \banzai's own sky model and extraction; it
-remains useful for reprocessing archive products for which the raw frames are not available
-(\texttt{banzai\_floyds.diagnostics.reextract}, Chapter~\ref{sec:software}).
+remains useful for reprocessing archive products for which the raw frames are not available (the tool is the module
+\texttt{banzai\_floyds.diagnostics.reextract}, Chapter~\ref{sec:software}).
 
 \section{Undoing the division and the master pattern}
 \label{sec:fringe_master}
@@ -16,10 +16,11 @@ R(x,y)=\begin{cases} I(x,y)\,\Phi(x,y) & 0.5<\Phi<2\\ I(x,y) & |\Phi|<10^{-3}\ \
 \text{masked} & \text{otherwise,}\end{cases}
 \label{eq:undo}
 \end{equation}
-with $I$ the \texttt{SCI} image, and likewise for the uncertainty. Each frame's map is the lamp pattern
-$\Pi$ shifted along the slit, $\Phi_f(x,y)=\Pi(x,y-o_f)$, so $\Pi$ is recovered by shifting $\Phi_f$ by $-o_f$
-(linear interpolation; pixels with interpolation weight $<0.99$ discarded). The 61 maps with $|o_f|<40$ give
-patterns that agree with their median $\bar\Pi$ with $r=0.998$--1.000. The fringe component is
+with $I$ the archive image (\texttt{SCI}) and $\Phi$ the map it was divided by, and likewise for the
+uncertainty. The map of frame $f$ is the lamp pattern $\Pi$ shifted along the slit by $o_f$ rows,
+$\Phi_f(x,y)=\Pi(x,y-o_f)$, so $\Pi$ is recovered by shifting $\Phi_f$ by $-o_f$ (linear interpolation; pixels with
+interpolation weight $<0.99$ discarded). The 61 maps with $|o_f|<40$ give patterns that agree with their median
+$\bar\Pi$ (correlation coefficient $r=0.998$--1.000). The fringe component is
 \begin{equation}
 \delta(x,y) = w(\lambda)\left[\frac{\bar\Pi(x,y)}{\mathcal{M}_{41}[\bar\Pi](x,y)}-1\right],\qquad
 w(\lambda)=\min\!\left[\max\!\left(\frac{\lambda-6500}{300},0\right),1\right],
@@ -67,8 +68,8 @@ frames, in four regions (6800--7500, 7500--8300, 8300--9100, 9100--9800\,\AA), a
 centres (Table~\ref{tab:amplaw}). Regions where the median is negative or its scatter exceeds half its value
 (6800--7500\,\AA, where $\delta$ is still tapered in and most pixels are telluric) take the value of the nearest
 reliable region. This uses no target information. The amplitude exceeds unity because the stored lamp map has a
-diluted fringe contrast, and it differs between the 2 and 6\,arcsec slits, plausibly because slit-filling light reaches
-each pixel over a wider wavelength range in a wide slit. This model is kept as an option
+diluted fringe contrast. It differs between the 2 and 6\,arcsec slits, plausibly because slit-filling light reaches
+each pixel over a wider wavelength range in a wide slit. This model is kept as an option of the archive tool
 (\texttt{method='amplitude'}); Section~\ref{sec:fringe_harmonic} explains why it leaves $\approx5$ per cent
 residuals and describes the default model.
 
@@ -100,12 +101,13 @@ S_\beta(y_{\rm o})=\sum_{k=0}^{2}b_{\beta k}\,y_{\rm o}^k,
 fitted by weighted least squares to the unmasked pixels with $|y_{\rm p}|>m\,\sigma_{\rm p}$ and
 $|y_{\rm o}|<y_{\rm max}-6$, with iterative $3\sigma$ clipping. The mask half-width is $m=4$ unless that leaves fewer
 than 25 per cent of the slit's pixels, in which case $m$ is reduced to the corresponding quantile of
-$|y_{\rm p}|/\sigma_{\rm p}$ (but not below 2); the degree is reduced while fewer than $4(K+1)$ sky pixels remain, and set
+$|y_{\rm p}|/\sigma_{\rm p}$ (but not below 2); the degree $K$ (at most 2) is reduced while fewer than $4(K+1)$ sky pixels remain, and set
 to zero when all sky pixels lie on one side of the object. When the mask has been reduced, the sky pixels contain the
 object's wings, so the sky polynomial and the object are fitted jointly to all slit pixels,
 $R_i=\sum_k b_{\beta k}y_{{\rm o},i}^k+F'_\beta P_i$, with iterative clipping; only the sky part is kept. In synthetic
-tests with $\sigma_{\rm p}=9$\,pixels in a 60-row slit this removes an 11 per cent flux bias. Its covariance
-$C_\beta=(V^{\rm T}WV)^{-1}$ ($V$ the Vandermonde matrix, $W$ the inverse variances) is propagated into the
+tests with $\sigma_{\rm p}=9$\,pixels in a 60-row slit this joint fit removes an 11 per cent flux bias. The covariance
+of the sky fit,
+$C_\beta=(V^{\rm T}WV)^{-1}$ ($V$ the Vandermonde matrix, $W$ the inverse variances), is propagated into the
 extraction errors. This replaces the 2-d spline sky of \banzai{} \citep{Kelson2003}, which cannot follow the
 discontinuities introduced by the fringe map.
 
@@ -121,7 +123,7 @@ V_i = r^2+\max(F_\beta P_i+S_{\beta,i},0),
 \end{equation}
 iterated with $V$ from the model (not the data); at each iteration the single pixel with the largest
 $(d_i-F_\beta P_i)^2/V_i$ is rejected if this exceeds 25 (cosmic rays), up to $\max(2,\,0.1N_\beta)$ pixels per bin
-(more ``outliers'' indicate a profile mismatch, not cosmic rays). The read noise is $r=3.5\,e^-$. Its variance is
+(more ``outliers'' indicate a profile mismatch, not cosmic rays). The read noise is $r=3.5\,e^-$. The variance of $F_\beta$ is
 \begin{equation}
 \sigma^2_{F_\beta}=\frac{\sum_i a_i^2V_i+\mathbf{g}^{\rm T}C_\beta\,\mathbf{g}}{\left(\sum_i a_iP_i\right)^2},\qquad
 \mathbf{g}=\sum_i a_i\,\mathbf{v}_i,
@@ -149,12 +151,12 @@ drops from \FrOld{} to \FrNewOpt{} per cent and the fringing in the median spect
 per cent (Fig.~\ref{fig:series}); on the EG\,21 spectra from \EGfrOld{} to \EGfrNew{} per cent. This metric
 smooths over 25\,\AA{} and includes real spectral structure and telluric residuals in its windows; the unsmoothed
 comparison of Table~\ref{tab:fringevariants} isolates the fringe correction: the harmonic model halves the residual
-of the amplitude law and comes within a factor $\approx2$ of the photon-noise floor (Fig.~\ref{fig:harmonic}). Because RM fits every
-spectrum separately, Fig.~\ref{fig:individual} shows all spectra individually, divided by a power law: in the archive
-products every spectrum carries 10--20 per cent fringes; after the correction the residual in the clean windows is
-\IndivNewF{} per cent for Fairall~9 and \IndivNewE{} per cent for EG\,21 (\banzai: \IndivOldF{} and \IndivOldE), and no
-periodic pattern is left in single spectra; the faintest spectra (signal-to-noise ratio 11--16 per pixel, 3--4\,arcsec
-seeing) are photon-noise limited. The individual spectra also expose a feature that is \emph{not} a fringe residual:
+of the amplitude model above and comes within a factor $\approx2$ of the photon-noise floor (Fig.~\ref{fig:harmonic}). Because RM fits every
+spectrum separately, Fig.~\ref{fig:individual} shows all spectra individually, divided by a power law. In the archive
+products every spectrum carries 10--20 per cent fringes. After the correction the residual in the clean windows is
+\IndivNewF{} per cent for Fairall~9 and \IndivNewE{} per cent for EG\,21 (\banzai{}~1.0.1: \IndivOldF{} and
+\IndivOldE), and no periodic pattern is left in single spectra. The faintest spectra (signal-to-noise ratio 11--16 per
+pixel, 3--4\,arcsec seeing) are limited by photon noise. The individual spectra also expose a feature that is \emph{not} a fringe residual:
 a step of $\approx30$ per cent at $\approx9285$\,\AA{}, preceded by a bump in the gap between water bands at
 9240--9285\,\AA, present in every version including the first one. Redward of 8900\,\AA{} there is no telluric-free
 continuum: both the continuum used to measure the telluric transmission and the sensitivity correction are extrapolated
@@ -176,13 +178,12 @@ the line-spread function of the 6\,arcsec spectra, which the seeing sets.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_individual.pdf}
-\caption{Individual flux-calibrated red-order spectra (one row per spectrum, in time order) divided by a power law
-fitted at 7000--9800\,\AA{} outside the telluric bands (marked by vertical lines). Left: the 50 Fairall~9 spectra;
-right: the 18 EG\,21 spectra. Top: \banzai{}~1.0.1; middle: initial model of the correction (lamp pattern times
-amplitude law); bottom: this work (harmonic model, two passes). The number in each title is the median over spectra of
-the rms in 7750--8050 and 8450--8900\,\AA. Remaining vertical structure is common to all spectra (broad lines of
-Fairall~9, telluric residuals); horizontal bands beyond 9300\,\AA{} are night-to-night changes of the water-vapour
-absorption.}
+\caption{Every flux-calibrated red-order spectrum (one row each, in time order) divided by a power law fitted at
+7000--9800\,\AA{} outside the telluric bands (grey bars above each panel): \banzai{}~1.0.1 (top) and improved v1
+(harmonic model, two passes; bottom); the 50 Fairall~9 spectra left, the 18 EG\,21 spectra right. The rms is the
+median over spectra in 7750--8050 and 8450--8900\,\AA. Remaining vertical structure is common to all spectra (broad
+lines of Fairall~9, telluric residuals). Cut at 9300\,\AA, beyond which night-to-night changes of the water-vapour
+absorption dominate.}
 \label{fig:individual}
 \end{figure}
 
@@ -190,8 +191,10 @@ absorption.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_fringe1d.pdf}
-\caption{Extracted red order (counts, normalised) of a Fairall~9 frame and an EG\,21 frame: archive (grey), fringe
-division undone without new correction (yellow), this work (orange). The zooms are free of telluric bands.}
+\caption{Extracted red order (counts divided by their median) of a Fairall~9 frame and an EG\,21 frame:
+\banzai{}~1.0.1 (grey), the same with its fringe division undone and no new correction (dashed), and improved v1
+(orange). Left: 6500--9800\,\AA{} (H$\alpha$ of Fairall~9 clipped); middle and right: zooms on the shaded ranges,
+which are free of telluric bands.}
 \label{fig:fringe1d}
 \end{figure}
 
@@ -199,9 +202,9 @@ division undone without new correction (yellow), this work (orange). The zooms a
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_residuals.pdf}
-\caption{Red order at $\approx7600$--9300\,\AA. Top: new sky model. Middle and bottom: normalised residuals (data $-$
-sky $-$ profile $\times$ extracted flux)$/\sigma$ of the archive products and of this work, for a dark and a bright-moon
-frame.}
+\caption{Red order at $\approx7600$--9300\,\AA{} on the detector, for a dark and a bright-moon frame. Top: the new
+sky model. Middle and bottom: normalised residuals (data $-$ sky $-$ profile $\times$ extracted flux)$/\sigma$ of
+\banzai{}~1.0.1 and of improved v1.}
 \label{fig:residuals}
 \end{figure}
 

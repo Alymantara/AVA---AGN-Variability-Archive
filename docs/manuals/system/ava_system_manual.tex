@@ -270,25 +270,32 @@ lcodb --help
 Obtain your personal API token from
 \url{https://observe.lco.global} $\to$ Profile $\to$ API~token.
 
-\begin{lstlisting}[style=shell]
-echo 'YOUR_TOKEN_HERE' > ~/.lco_token
-chmod 600 ~/.lco_token
-\end{lstlisting}
+Save it, with an editor, in the file the configuration names (\texttt{lco.token\_file}; on a server
+\path{<install root>/.secrets/lco_token}, on a desktop \path{~/.lco_token}), then \texttt{chmod 600} it.
+The whole package reads the token through one lookup (\texttt{ava.lco.token}): \texttt{\$LCO\_API\_TOKEN},
+then \texttt{\$LCO\_TOKEN}, then \texttt{lco.token\_file}, then the lcodb \texttt{token\_file}, then
+\path{~/.lco_token}.  Cron jobs start with no environment, so on a server the \emph{file} is what counts;
+\texttt{scripts/check\_install.py} checks the token as cron sees it.
 
 \begin{warnbox}
-Never put the token directly in a config file or commit it to git.
+Never put the token itself in a config file, a script or a command line, and never commit it to git.
 \end{warnbox}
 
 \subsection{Step 5 --- Create and configure your local config file}
 
+The repository templates (\texttt{config/ava\_config.yaml}, \texttt{config/lcodb\_config.yaml}) hold the
+production defaults.  Each machine keeps only its \emph{overrides} in \texttt{data/config/} (git-ignored),
+which start with \texttt{base: <template>}; new template keys then arrive with \texttt{git pull}:
 \begin{lstlisting}[style=shell]
 cd $BASE/AVA
-cp config/ava_config.yaml config/ava_config.local.yaml
+python tools/make_config.py init      # writes data/config/{ava,lcodb}_config.yaml
+python tools/make_config.py show      # the merged config in use
+python tools/make_config.py check     # paths that belong to another machine?
 \end{lstlisting}
 
-Open \texttt{config/ava\_config.local.yaml} in an editor and update the
-\texttt{paths} section to match the new machine.  The keys that \emph{must}
-be set are listed in Table~\ref{tab:paths}.
+Change any key with \texttt{init --set key=value} or by editing the override file.  The path keys most
+often changed are listed in Table~\ref{tab:paths}; the full list is in
+\texttt{docs/guides/deployment\_guide.md}, \S5.1.
 
 \begin{table}[h!]
 \centering
@@ -315,21 +322,15 @@ paths.ava\_csv           & AVA master CSV               & \path{data/ava/ava.csv
 \label{tab:paths}
 \end{table}
 
-Point AVA at the local config:
-\begin{lstlisting}[style=shell]
-# Option A: environment variable (add to ~/.bashrc or ~/.zshrc)
-export AVA_CONFIG="$BASE/AVA/config/ava_config.local.yaml"
-
-# Option B: symlink the local copy over the default
-ln -sf ava_config.local.yaml config/ava_config.yaml
-\end{lstlisting}
+AVA and lcodb find \texttt{data/config/} on their own.  \texttt{AVA\_CONFIG} and \texttt{LCODB\_CONFIG}
+still take precedence when set (for example to point at a test configuration).
 
 Verify that the config loads and all paths resolve:
 \begin{lstlisting}[style=python]
 from ava.config import cfg
 print(cfg)
 # AVAConfig(
-#   config  = /home/.../config/ava_config.local.yaml
+#   config  = /home/.../data/config/ava_config.yaml
 #   root    = /home/.../AVA
 #   phot    = <archive_root>/photometry
 #   spec    = <archive_root>/spectroscopy
@@ -341,13 +342,15 @@ print(cfg)
 
 This step builds the \texttt{lcodb} archive databases by crawling the LCO
 archive API.  It is a one-time operation that takes between a few minutes
-(spectra) and several hours (photometry headers) depending on the data volume.
+(spectra) and a few hours (photometry) depending on the data volume.  The daily update
+afterwards syncs only the \emph{active} proposals; a full \texttt{lcodb sync} is needed only to rebuild.
 
 \begin{lstlisting}[style=shell]
 # Crawl all KEY proposals (metadata only; no FITS files downloaded)
 lcodb sync
 
-# Download FITS headers for all spectra (~10^4 frames, minutes)
+# Slit widths of the spectra (the only header value kept; the full headers
+# are not stored -- lcodb purge-headers removes old ones, dry run unless --live)
 lcodb headers --db spectra
 
 # Compute airmass for frames without it in the header
@@ -383,15 +386,19 @@ python -m ava.database.migrate \
 
 \subsection{Step 8 --- Schedule the daily update}
 
-The daily update fetches new frames from the LCO archive and updates the
-databases.  Add the following to \texttt{crontab -e}:
-
+The schedule (archive tables 01:00, download 02:00, pipeline, cleanup 05:00, LCO usage every 6\,h; all
+UTC, so run the machine in UTC) is written by \texttt{scripts/make\_crontab.py}.  Every job goes through
+\texttt{scripts/cron\_job.sh}, which logs to \texttt{<paths.logs>} and records each run in
+\texttt{cron\_runs.tsv}; \texttt{scripts/daily\_check.py} reports whether the jobs ran and succeeded.
+Test first, then install the production schedule:
 \begin{lstlisting}[style=shell]
-# Run every day at 09:30 UTC
-30 9 * * * /path/to/AVA/scripts/lcodb_daily.sh
+python scripts/make_crontab.py --test --check --install   # test jobs a few minutes from now
+python scripts/daily_check.py --since <start> --jobs ...  # the command make_crontab prints
+python scripts/make_crontab.py --production --check --install
 \end{lstlisting}
-
-Or on macOS using \texttt{launchd}, create a plist pointing to the same script.
+\texttt{--check} first runs a probe in the environment cron gives (token file, configs, SExtractor,
+banzai-floyds, writable folders) and installs nothing if it fails.  The cleanup job is a dry run unless
+\texttt{--cleanup-live} is given.  Details: \texttt{docs/guides/deployment\_guide.md}, \S7.
 
 \subsection{Step 9 --- Verify the installation}
 

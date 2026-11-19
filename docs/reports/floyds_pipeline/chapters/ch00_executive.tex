@@ -2,26 +2,30 @@
 \addcontentsline{toc}{chapter}{Executive summary}
 \label{sec:exec}
 
-\textit{What this report is.} We examined every step of the LCO FLOYDS pipeline \banzai{} that matters for
-reverberation mapping (RM): the archive products of version 1.0.1 and the current release 1.1.0, using a Fairall~9
-campaign at Siding Spring (COJ) and an NGC\,4151 campaign at Haleakal\=a (OGG). For each step we show what the pipeline
+\textit{What this report is.} We examined every step of \banzai{}, the LCO pipeline for the FLOYDS spectrographs,
+that matters for reverberation mapping (RM). We tested the archive products (\banzai{} version 1.0.1) and the current
+release (1.1.0) on a Fairall~9 campaign at Siding Spring (COJ) and an NGC\,4151 campaign at Haleakal\=a (OGG). For each step we show what the pipeline
 does, where and why it fails, what we changed, and what the change achieves. All corrections are target-independent
 (no knowledge of the science target is used) and are built into \banzai{} (branch \texttt{rm-improvements} of
 \url{https://github.com/Alymantara/banzai-floyds}); a whole data set is reduced from the raw frames with one command
 (Appendix~\ref{sec:app_install}).
 
-\textit{Status.} \textbf{Improved v3 is our final version for now.} It reduces both FLOYDS sites from raw without
-failures (833 frames) and was verified step by step at both (Chapter~\ref{sec:sites}). Table~\ref{tab:exec_numbers}
+\textit{Status.} \textbf{Improved v3 is our final version for now.} It reduces all 833 raw frames of the two
+campaigns without failures, and we verified it step by step at both sites (Chapter~\ref{sec:sites}). Table~\ref{tab:exec_numbers}
 gives the headline numbers and Table~\ref{tab:exec_issues} lists every problem we found, what v3 does about it and where
-in the report it is explained. A search for the worst reductions of v3 then found problems in two steps we had not
-examined, the cosmic-ray detector and the sky model under the object (issues 27--31, Chapter~\ref{sec:cosmics}); the
-changes are in the code and verified on a sample, but the products have not been re-reduced with them yet. Every
-product now carries quality keywords and flags (Section~\ref{sec:qc}). The reductions compared are defined in Table~\ref{tab:versions_names}.
+in the report it is explained. We then inspected the worst
+v3 reductions and found problems in two steps we had not examined: the cosmic-ray detector and the sky model under the
+object (issues 27--31, Chapter~\ref{sec:cosmics}). The fixes are in the code and verified on a sample, but the
+products have not yet been re-reduced with them. Every product now carries header keywords that record the quality of
+its reduction, and a flag bitmask (Section~\ref{sec:qc}). The reductions compared are defined in
+Table~\ref{tab:versions_names}, and the terms used throughout (orders, visits, pulls, fringe measures) in the
+Conventions (p.~\pageref{sec:conventions}).
 
 \begin{table}[!htbp]
 \centering
-\caption{Headline numbers. Fairall~9 at COJ and NGC\,4151 at OGG, 6\,arcsec slit. Scatters are robust rms between
-exposures. ``1.1.0 as released'' is \banzai{}~1.1.0 from raw without the object zero point of this work.}
+\caption{Headline numbers. Fairall~9 at COJ and NGC\,4151 at OGG, 6\,arcsec slit. Scatters are robust rms (see
+Conventions) over all exposures. ``1.1.0 as released'' is \banzai{}~1.1.0 run from raw without the object wavelength
+zero point of this work (elsewhere in the report the 1.1.0 run includes it; Table~\ref{tab:versions_names}).}
 \label{tab:exec_numbers}
 \small
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.6cm}cccc@{}}
@@ -29,24 +33,25 @@ exposures. ``1.1.0 as released'' is \banzai{}~1.1.0 from raw without the object 
 Quantity (unit) & \banzai{}~1.0.1 & \banzai{}~1.1.0 & \multicolumn{2}{c}{improved v3 (final)} \\
  & (archive) & as released & COJ & OGG \\
 \midrule
-{[O\,{\sc iii}]} position scatter, red / blue order (\AA) & 6.4 / 2.8 & 6.6 / 3.1 & 0.69 / 0.45 & 0.94 / 0.53 \\
-{[O\,{\sc iii}]} red $-$ blue order (\AA) & $-5.9\pm3.0$ & $+0.4\pm3.1$ & $+0.30\pm0.79$ & $+1.39\pm0.88$ \\
-Red-order fringing (per cent) & 13.7 & 8.1 & 1.9 & 2.5$^{a}$ \\
-Water band 8130--8360\,\AA{} residual (per cent) & 16.1 & 8.0 & 3.2 & 2.7 \\
+{[O\,{\sc iii}]} wavelength scatter, red / blue order (\AA) & 6.4 / 2.8 & 6.6 / 3.1 & 0.69 / 0.45 & 0.94 / 0.53 \\
+{[O\,{\sc iii}]} wavelength, red $-$ blue order (\AA) & $-5.9\pm3.0$ & $+0.4\pm3.1$ & $+0.30\pm0.79$ & $+1.39\pm0.88$ \\
+Red-order fringe residual, rms (per cent) & 13.7 & 8.1 & 1.9 & 2.5$^{a}$ \\
+Residual in the water band 8130--8360\,\AA, rms (per cent) & 16.1 & 8.0 & 3.2 & 2.7 \\
 Red/blue [O\,{\sc iii}] flux ratio scatter (per cent) & 29.2 & 8.9 & 6.9 & 6.2 \\
-Uncertainties: pull rms, red order (no unit; 1 = correct) & 1.7--2.2$^{b}$ & up to 1.6 & 0.94--1.06 & 0.98--1.27 \\
+Uncertainties: rms of the pull, red order (1 = correct errors) & 1.7--2.2$^{b}$ & up to 1.6 & 0.94--1.06 & 0.98--1.27 \\
 Absolute flux level (factor) & $\times2.2$ too bright & correct & correct & correct$^{c}$ \\
 \bottomrule
 \end{tabular}
 \par\smallskip\raggedright\footnotesize
-$^{a}$Includes NGC\,4151's own lines in the windows; the exposure-to-exposure part equals COJ (0.66--0.69 per cent).
-$^{b}$Beyond 7700\,\AA. $^{c}$Across a factor-1.8 throughput change, bridged by two added standards
-(Section~\ref{sec:sites_flux}). All levels are biased high by the slit losses of the 2\,arcsec standards, which the RM
-scaling to [O\,{\sc iii}] removes.
+$^{a}$Includes NGC\,4151's own lines, which fall in the measurement windows. The difference between the two
+exposures of a visit, which removes all structure common to both, is the same as at COJ (0.66--0.69 per cent).
+$^{b}$Beyond 7700\,\AA. $^{c}$Also across a factor-1.8 change in telescope throughput, thanks to two added standards
+(Section~\ref{sec:sites_flux}). All absolute levels are biased high by the slit losses of the 2\,arcsec standards; the
+usual RM scaling of each spectrum to the [O\,{\sc iii}] flux removes this bias.
 \end{table}
 
-\textit{The issues.} In Table~\ref{tab:exec_issues}, ``1.0.1'' marks problems of the archive products, ``1.1.0''
-problems that remain in the current release. Status: \textit{solved} (fixed in v3 and verified), \textit{mitigated}
+\textit{The issues.} In Table~\ref{tab:exec_issues}, ``1.0.1'' marks problems of the archive products and ``1.1.0''
+problems that remain in the current release. Issues are grouped by pipeline step, so their numbers are not in order. Status: \textit{solved} (fixed in v3 and verified), \textit{mitigated}
 (reduced or flagged, not removed), \textit{open} (not addressed in the software), \textit{operations} (needs a change in
 how data are taken). The open items and recommendations for LCO are collected in Chapter~\ref{sec:recommendations}.
 
@@ -78,49 +83,55 @@ slit shifts its spectrum by $\approx10$\,\AA{} per arcsec, which arcs and sky li
 scatters by 3--7\,\AA{} between exposures, up to $\pm17$\,\AA{} for NGC\,4151. & Zero point measured from the telluric
 bands in the object's own light, transferred to the blue order: scatter 0.5--0.9\,\AA. & \S\ref{sec:wl_zp},
 \S\ref{sec:sites_zp} & solved \\
-4 & The absolute wavelength zero point is that of the telluric template, uncertain by $\approx\pm2$--4\,\AA. & A
-constant; consistency between exposures and orders is not affected. & \S\ref{sec:wl_zp} & open (harmless for RM) \\
+4 & The absolute wavelength zero point is that of the telluric template, uncertain by $\approx\pm2$--4\,\AA. & Nothing:
+it is a constant offset and does not affect the agreement between exposures or between orders. & \S\ref{sec:wl_zp} & open (harmless for RM) \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{Order and object traces}}\\
 5 & The object trace is a polynomial (1.0.1, 1.1.0): at the faint red end it is off by 0.8--1.4\,px (1--2 per cent
-flux loss), and much worse for targets 30--60 times fainter than Fairall~9. & Physical model (refraction along the slit
-+ instrumental shape per site + penalised correction): 0.1--0.3\,px down to 60 times fainter; templates for COJ and OGG.
+flux loss), and much worse for targets 30--60 times fainter than Fairall~9. & Physical model (atmospheric refraction along the
+slit + an instrumental shape for each site + a small smooth correction fitted to the residuals): 0.1--0.3\,px down to 60 times fainter; templates for COJ and OGG.
 & \S\ref{sec:traces_object}, \S\ref{sec:traces_model}, \S\ref{sec:sites_trace} & solved \\
-6 & The order position of each frame is fitted on the science light, which fails for faint targets. Correct to
-0.14\,px for the targets here. & Unchanged (1.1.0 shift). The same-block lamp flat measures it at a signal-to-noise
-ratio of thousands. & \S\ref{sec:traces_orders} & open (faint targets) \\
-7 & Order shapes come only from sky flats in a hard-coded list; for OGG the newest are from 2019. & Archive-processed
-sky flats accepted; the 2019 OGG set works for 2024--25 data. & \S\ref{sec:traces_orders}, \S\ref{sec:sites_data} &
+6 & The position of the orders on the detector in each frame is fitted on the light of the science target, which
+fails for faint targets. For the targets here it agrees with the lamp flat to 0.14\,px. & Unchanged (the 1.1.0 fit).
+The lamp flat of the same block would measure it at a signal-to-noise ratio of thousands. & \S\ref{sec:traces_orders} & open (faint targets) \\
+7 & The shapes of the orders on the detector come only from the sky flats in a list fixed in the code; for OGG the
+newest are from 2019. & Sky flats already processed by the LCO archive can also be used; the 2019 OGG set works for
+2024--25 data. & \S\ref{sec:traces_orders}, \S\ref{sec:sites_data} &
 mitigated \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{Fringing and extraction}}\\
 8 & 1.0.1 divides every frame by a whole eight-month-old lamp flat, including its slit illumination: flux biased by up
 to $\pm10$ per cent, wavelength and frame dependent. & No 2-d division by a lamp flat. & \S\ref{sec:fringe_banzai} &
 solved \\
-9 & 1.0.1 shifts that flat along the slit by up to hundreds of pixels (fringe aliases); its invalid edge destroys data
-in 13 of 50 frames (spikes, striped sky). & As 8; the destroyed pixels are never created. & \S\ref{sec:fringe_banzai},
+9 & 1.0.1 shifts that flat along the slit by up to hundreds of pixels (the fit locks on to wrong
+matches of the repeating fringe pattern); the invalid edge of the shifted flat destroys data in 13 of 50 frames
+(spikes, striped sky). & As 8; the destroyed pixels are never created. & \S\ref{sec:fringe_banzai},
 \S\ref{sec:traces_object} & solved \\
 10 & A lamp flat gives the phase of the fringes but not their amplitude or shape (the slit-filling lamp smooths them
 differently from a point source), so scaling a lamp pattern leaves spiky residuals. & A two-harmonic fringe model with
 the lamp phase, fitted to each extracted spectrum. & \S\ref{sec:fringe_harmonic} & solved \\
-11 & 1.1.0 still leaves 8 per cent fringing (Fairall~9). & 1.9 per cent (EG\,21: 1.5). & \S\ref{sec:raw_compare} &
+11 & 1.1.0 still leaves 8 per cent rms of fringing (Fairall~9). & 1.9 per cent (EG\,21: 1.5). & \S\ref{sec:raw_compare} &
 solved \\
 12 & Residual fringes at 6500--7500\,\AA: the phase of a single 6\,arcsec lamp flat is noisy there and slow structure
-in the lamp pattern dominates it. & Phase master (median of the lamp flats of 1--2 months), high-passed phase, model
-from 6200\,\AA, nodes every 200\,\AA. & \S\ref{sec:fringe_pipeline}, \S\ref{sec:fringe_joint} & solved \\
-13 & Fringes inside the telluric bands were only interpolated, leaving a 4 per cent residual in the standards'
-transmission and so in every science spectrum; a static 0.7 per cent residual locked to the detector remained. &
-Fringes fitted jointly with a telluric template; residual template per slit from the standards. &
+in the lamp pattern dominates it. & Phase from a phase master (median of the lamp flats of 1--2
+months) after a high-pass filter; the model starts at 6200\,\AA{} and its amplitude and phase may change every
+200\,\AA. & \S\ref{sec:fringe_pipeline}, \S\ref{sec:fringe_joint} & solved \\
+13 & Fringes inside the telluric bands were not fitted but interpolated across. This left a 4 per cent residual in
+the transmission measured on the standards, and so in every science spectrum. A 0.7 per cent residual that is fixed on
+the detector also remained. & Fringes fitted jointly with a telluric template; a template of the fixed residual is
+measured on the standards for each slit and removed. &
 \S\ref{sec:fringe_joint} & solved \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{Telluric correction}}\\
 14 & 1.1.0 divides almost the whole red order by the standard's observed/expected ratio, so the standard's noise and
-residuals (1--3 per cent) appear in every science spectrum; a single standard's transmission is noisy. & Transmission
-applied only inside the absorption bands (1-per-cent-depth limits), median of the nine nearest standards. &
+residuals (1--3 per cent) appear in every science spectrum. The transmission of a single standard is noisy. &
+Transmission applied only inside the absorption bands (between the points where the absorption is 1 per cent deep),
+median of the nine nearest standards. &
 \S\ref{sec:flux_tell} & solved \\
-15 & The saturated O$_2$ A band leaves $\pm20$ per cent residuals in 6\,arcsec spectra: the 2\,arcsec standards resolve
-it differently. Sky lines cannot give the object's resolution. & Flagged in science spectra (mask bit 2,
-7580--7700\,\AA); broadening tests gave no real gain. & \S\ref{sec:flux_tell} & mitigated \\
+15 & The saturated O$_2$ A band leaves $\pm20$ per cent residuals in 6\,arcsec spectra, because the 2\,arcsec standards
+resolve it differently. The sky lines fill the slit, so they cannot give the resolution of the object's spectrum. &
+Flagged in science spectra (bit 2 of the mask, 7580--7700\,\AA); smoothing the standards' transmission to match gave
+no real gain. & \S\ref{sec:flux_tell} & mitigated \\
 16 & The water absorption changes from night to night ($\approx3.5$ per cent in the band level); a median of standards
 does not follow it. & -- & \S\ref{sec:raw_compare}, \S\ref{sec:recommendations} & open \\
 17 & Beyond 8900\,\AA{} there is no telluric-free continuum: the transmission and the sensitivity are extrapolated
@@ -131,60 +142,67 @@ there (a step of $\approx30$ per cent near 9285\,\AA{} in every version). & Wate
 18 & 1.0.1 does not scale by the exposure time: 600\,s science calibrated with 300\,s standards is 2.2 times too bright
 in the archive. & Fixed in 1.1.0; v3 agrees with 1.1.0 to 4 per cent. & \S\ref{sec:flux_banzai} & solved (1.1.0) \\
 19 & Standards are chosen by block or proposal, not slit width, and a single standard transfers its clouds (grey levels
-of nine consecutive standards span a factor 2) and noise to the science; 1.0.1 sensitivities learn the fringes and have
-spikes. & Median of the grey-normalised sensitivities of the nine nearest standards, grey level from the clearest
-half; red/blue [O\,{\sc iii}] scatter 29.2 (1.0.1), 8.9 (1.1.0) $\rightarrow$ 6.9 per cent. &
+of nine consecutive standards span a factor 2) and noise to the science. The 1.0.1 sensitivity functions contain the
+fringes and spikes. & Median of the sensitivities of the nine nearest standards, each first scaled by its grey factor; overall level
+from the clearest half; red/blue [O\,{\sc iii}] scatter 29.2 (1.0.1), 8.9 (1.1.0) $\rightarrow$ 6.9 per cent. &
 \S\ref{sec:flux_banzai}, \S\ref{sec:flux_ensemble} & solved \\
 20 & Nightly standards missing from the catalogue (EG\,21 at COJ; Feige\,67 and GD\,153 at OGG) are reduced as science and
 never calibrate anything. & Feige\,67 and GD\,153 added (references from ESO; Feige\,67 extended beyond 9200\,\AA). EG\,21
 has only a 50\,\AA{} reference. & \S\ref{sec:flux_model}, \S\ref{sec:sites_flux} & solved for OGG; open for EG\,21 \\
-21 & The OGG telescope throughput rose by a factor 1.8 between 2025 April 7 and May 2, and all catalogue standards are
-from after it: earlier frames were calibrated 1.8 times too faint ([O\,{\sc iii}] scatter 26 per cent). & With the added
+21 & The OGG telescope throughput rose by a factor 1.8 between 2025 April 7 and May 2 (re-aluminisation of the
+primary mirror), most in the blue (48 per cent more at 3400\,\AA{} than at 5800\,\AA), and all catalogue standards are
+from after it: earlier frames were calibrated 1.8 times too faint ([O\,{\sc iii}] scatter 26 per cent) and up to
+30 per cent off in shape. & With the added
 standards the two periods agree to 7 per cent ([O\,{\sc iii}] scatter 9.4 per cent). An ensemble must not combine
-standards across such a change. & \S\ref{sec:sites_flux} & solved here; open in general; operations \\
+standards across such a change. & \S\ref{sec:sites_flux}, \S\ref{sec:shape_stability} & solved here; open in general; operations \\
 22 & The standards are 2\,arcsec, the RM science 6\,arcsec: absolute levels are biased high by the standards' slit
 losses. & Grey level from the clearest standards (lowest bias). RM scaling to [O\,{\sc iii}] removes it. &
 \S\ref{sec:flux_banzai} & open (harmless for RM) \\
 \midrule
-\multicolumn{5}{@{}l}{\textit{Cosmic rays and the sky model} (found after the final v3 run; Chapter~\ref{sec:cosmics})}\\
-27 & LA Cosmic (1.1.0; 1.0.1 has no cosmic-ray detection) takes the core of a bright star in good seeing for cosmic
-rays: up to 46 per cent of the core of BD$+28^\circ4211$ at OGG, and its spectrum scatters 2.9 times its errors.
-& LA Cosmic is given a model of the object (7-pixel median along the dispersion) besides the sky; core flags 46 to
-0.1 per cent. & \S\ref{sec:cr_stars}, \S\ref{sec:cr_model} & fixed in code; re-reduction pending \\
+\multicolumn{5}{@{}l}{\textit{Cosmic rays and the sky model} (found after the improved v3 run; Chapter~\ref{sec:cosmics})}\\
+27 & The cosmic-ray detector of 1.1.0, LA Cosmic (1.0.1 has none), takes the core of a bright star in good seeing
+for cosmic rays: up to 46 per cent of the core of BD$+28^\circ4211$ at OGG, whose spectrum then scatters by 2.9 times
+its errors. & LA Cosmic is given a model of the object (7-pixel median along the dispersion) besides the sky; the
+flagged share of the core drops from 46 to 0.1 per cent. & \S\ref{sec:cr_stars}, \S\ref{sec:cr_model} & fixed in code; re-reduction pending \\
 28 & LA Cosmic clips bright narrow lines that are resolved along the slit, and the extraction scales up what is left:
 H$\alpha$ of NGC\,4151 flagged in 7 of 60 frames, 2.64 and 1.18 times too bright in two. [O\,{\sc iii}]\,5007 never
-flagged. Can affect any bright emission-line object in good seeing. & Object model (flags on H$\alpha$ 179 to 15 and
-119 to 0 pixels; fluxes within 2 per cent); bins that lose more than half their profile weight to flags are masked
-(extraction guard) and counted in the header. & \S\ref{sec:cr_lines}, \S\ref{sec:cr_guard} & mitigated in code;
+flagged. Can affect any bright emission-line object in good seeing. & Object model (flagged pixels on H$\alpha$ drop from
+179 to 15 and from 119 to 0 in those two frames; fluxes within 2 per cent). Wavelength bins that lose more than half of
+their profile weight to flags are masked instead of scaled up, and counted in the header. & \S\ref{sec:cr_lines}, \S\ref{sec:cr_guard} & mitigated in code;
 re-reduction pending \\
-29 & Beside a wide object under the Moon in poor seeing, the sky spline gets a knot per pixel and follows the noise:
-the extracted flux scatters 3--4 times its errors (six Fairall~9 frames) and LA Cosmic flags the object
-($\approx240$ false detections per frame). Also in 1.1.0. & Sky lines must stand out from the first-pass noise
-(5$\sigma$); scatter 3.0--3.3 to 1.1--1.2 times the errors. & \S\ref{sec:cr_sky} & fixed in code; re-reduction
+29 & When the object is wide (poor seeing) and the sky bright (Moon), the spline that models the sky gets a knot at
+every pixel beside the object and follows the noise. The extracted flux then scatters by 3--4 times its errors (six
+Fairall~9 frames), and LA Cosmic flags the object ($\approx240$ false detections per frame). Also in 1.1.0. & A sky
+line is only treated as such if it stands out by 5$\sigma$ from the noise of a first-pass sky fit; the scatter drops
+from 3.0--3.3 to 1.1--1.2 times the errors. & \S\ref{sec:cr_sky} & fixed in code; re-reduction
 pending \\
 30 & LA Cosmic (1.1.0) misses real cosmic rays on bright cores and line peaks (66 per cent found above 10$\sigma$; none
-of 8 on the core of BD$+28^\circ4211$) and spreads its detections into bright regions. & The object model: 97 per cent
-found (injection test); in exchange 1--5 more small false detections per frame on bright traces. The two exposures of
-each visit are now compared after LA Cosmic: flags the other exposure shows to be real structure are removed (about a
-fifth fewer flags; H$\alpha$ peak 15 to 0 pixels), with no change in the agreement of their fluxes. Standards are single
-exposures and keep the object model. & \S\ref{sec:cr_verify}, \S\ref{sec:cr_pair} & fixed in code; re-reduction
+of 8 on the core of BD$+28^\circ4211$) and spreads its detections into bright regions. & With the object model, 97 per cent of
+artificial cosmic rays added to the frames are found, at the cost of 1--5 more small false detections per frame on
+bright traces. After LA Cosmic, the two exposures of each visit are now compared, and a flag is removed when the
+partner exposure shows the same structure, which is therefore real (10--22 per cent fewer flagged pixels; on the H$\alpha$ peak
+15 to 0 pixels), with no change in the agreement of their fluxes. Standards are single exposures and use the object
+model only. & \S\ref{sec:cr_verify}, \S\ref{sec:cr_pair} & fixed in code; re-reduction
 pending \\
-31 & A warm pixel of the OGG camera at $(1465,409)$ is not in the bad-pixel mask (flagged as a cosmic ray in every
+31 & A warm pixel of the OGG camera at $(x,y)=(1465,409)$ is not in the bad-pixel mask (flagged as a cosmic ray in every
 frame, on the wing of [O\,{\sc iii}]\,4959 of NGC\,4151). & -- & \S\ref{sec:cr_lines} & open \\
-32 & Nothing in the products records how good a reduction is. & Quality keywords and a flag bitmask in every product
+32 & Nothing in the products records how good a reduction is. & Quality keywords (\texttt{L1Q}) and a flag bitmask
+in every product
 (added to all 317 products of the final reductions), and a command that tabulates them. & \S\ref{sec:qc} & solved \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{Uncertainties and products}}\\
-23 & Uncertainties: 1.0.1 underestimates the red-order errors by 1.7--2.2 (fringe residuals are not in them), 1.1.0 by
-up to 1.6. & Correct per pixel at both sites (pull 0.9--1.1; 1.3 at OGG where the signal is high). Integrated
-quantities need $\approx20$--30 per cent more (residuals not in the error array). & \S\ref{sec:raw_errors},
+23 & Uncertainties: 1.0.1 underestimates the red-order errors by a factor 1.7--2.2 (the fringe residuals are not in
+them), 1.1.0 by up to 1.6. & Correct per pixel at both sites (rms of the pull 0.9--1.1; 1.3 at OGG where the signal is
+high). Quantities integrated over many pixels need errors $\approx20$--30 per cent larger, because the fringe and
+telluric residuals are not in the error array. & \S\ref{sec:raw_errors},
 \S\ref{sec:sites_verify} & solved per pixel; documented \\
-24 & The combined spectrum mixes the two orders, which are not aligned, over 4540--5760\,\AA. & Use the per-order
-extraction (\texttt{EXTRACTED} table). & \S\ref{sec:recommendations} & open \\
-25 & A processed 2-d frame is 47\,MB (43\,MB uncompressed pixel table): a decade of data would not fit. & Lean 2-d products
-after a run ($\approx2$\,GB per site-season). & \S\ref{sec:sites_disk} & mitigated \\
-26 & Installation fails on Apple-silicon laptops with an Intel Python or Intel compiler settings. & Native arm64
-environment and a clean-environment wrapper. & App.~\ref{sec:app_install} & solved \\
+24 & The combined spectrum of the \texttt{-1d} product mixes the two orders, which are not aligned, over
+4540--5760\,\AA. & Use the separate spectrum of each order (\texttt{EXTRACTED} table of the \texttt{-1d} product). & \S\ref{sec:recommendations} & open \\
+25 & A processed 2-d frame is 47\,MB, of which 43\,MB is an uncompressed table of all pixels: a decade of data
+would not fit on disk. & After a run, the diagnostic images and the pixel table are removed from the 2-d products
+($\approx2$\,GB per site and season of $\approx400$ frames). & \S\ref{sec:sites_disk} & mitigated \\
+26 & Installation fails on Apple-silicon laptops with an Intel Python or Intel compiler settings. & A native arm64 Python
+environment, and a wrapper script that runs the pipeline without the user's compiler settings. & App.~\ref{sec:app_install} & solved \\
 \end{longtable}
 }
 

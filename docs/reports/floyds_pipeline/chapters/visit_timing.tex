@@ -1,16 +1,19 @@
 \section{Processing time per visit}
 \label{sec:visit_timing}
-A visit is one block of the campaign: an arc, a lamp flat and the exposures of the target (2 for Fairall~9).
-Table~\ref{tab:visit_timing} breaks the processing time of each frame type into the pipeline stages, measured
-from the time stamps of the \banzai{} log for the final configuration (one worker; four ran in parallel on an
-8-core laptop with 8\,GB of memory). Figure~\ref{fig:visit_timing} adds them up per visit.
+Here the time per visit includes all the frames of its block: an arc, a lamp flat and the exposures of the target
+(2 for Fairall~9). Table~\ref{tab:visit_timing} splits the processing time of each frame type into the pipeline
+stages, for the final configuration (improved v3). We measured it from the time stamps of the \banzai{} log. The
+times are per worker (one frame at a time); four workers ran in parallel on an 8-core laptop with 8\,GB of memory.
+Figure~\ref{fig:visit_timing} adds the times up per visit.
 
 \begin{table}[!htbp]
 \centering
 \caption{Median processing time per frame (s, one worker) by pipeline stage, final configuration. ``Arc'' is
-the 2-d wavelength solution; ``orders'' the order loading and tweak; ``fringe'' the lamp-pattern loading and the
-harmonic fit (joint with the telluric template); ``flux + telluric'' the sensitivity, the ensemble flux
-calibration and the telluric correction; ``other'' reading, writing and database access.}
+the 2-d wavelength solution; ``orders'' loading the order traces and fitting their shift along the slit;
+``fringe'' loading the lamp-flat fringe pattern and the harmonic fringe fit (joint with the telluric template);
+``trace'' the object trace; ``bkg+CR'' the background fit and cosmic-ray rejection; ``extract'' the extraction;
+``flux + telluric'' the sensitivity, the ensemble flux calibration and the telluric correction; ``other'' reading,
+writing and database access.}
 \label{tab:visit_timing}
 \small
 \begin{tabular}{lcccccccccc}
@@ -29,18 +32,48 @@ Science & 118 & 0.5 & 0.3 & 0.9 & 3.5 & 1.8 & 2.0 & 0.3 & 0.1 & 10 \\
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_visit_timing.pdf}
-\caption{Left: median processing time per frame by stage. Right: per visit, for a science visit (arc, lamp flat
-and 2 exposures) and a standard visit (arc, lamp flat and one exposure, processed twice: before and after the
-residual fringe template is measured).}
+\caption{Top: median processing time per frame, split by pipeline stage. Bottom: time per visit, split by frame
+type, for a science visit (arc, lamp flat and 2 exposures) and a standard visit (arc, lamp flat and one exposure,
+processed twice: before and after the residual fringe template is measured).}
 \label{fig:visit_timing}
 \end{figure}
 
-A science visit costs $\approx72$\,s of processing (48\,s arc, 4\,s lamp flat,
-2$\times$10\,s for the exposures) and a standard visit $\approx76$\,s. With four workers
-the throughput is $\approx18$\,s of wall-clock time per science visit, so the
-$\approx5000$ visits of a decade take $\approx25$\,h on this laptop, most of it in the arcs.
-Fitting the arc once per instrument epoch and checking each block only for a zero-point shift
-(Chapter~\ref{sec:wavelength}) would bring this to $\approx8$\,h. The steps that are not
-per frame are small: the fringe phase master of a slit and two-month window takes 3\,s,
-the residual fringe template 3\,s, and the ensemble flux and telluric calibrations
-read the nearest nine standards from the database for each frame (included in ``flux + telluric'').
+\textit{Why the arc takes longest.} We profiled the reduction of one COJ arc (2026 August 1) with the Python
+profiler: 54 of its 58\,s (the profiler adds some overhead) are spent in the wavelength calibration, and almost all of
+that in one activity. To measure how the arc lines are tilted on the detector and what shape they have (the
+line-spread function, LSF), \banzai{} fits every arc line separately in every detector row along the slit: a
+Gauss--Hermite profile (a Gaussian with skew and kurtosis terms) with a robust, non-linear least-squares fit. For this
+arc that is 1914 fits, one per line and row, which together evaluate the line model about 480\,000 times. First the
+isolated lines are fitted with a free shape (32\,s), then the blends of nearby lines with the shape fixed to the LSF of
+the isolated ones (22\,s). The lamp flat, standard and science frames take only 0.5--0.7\,s in this stage because they
+load the solution of their arc instead of measuring one. Two implementation details make the fits slower than they
+need to be. The fitter computes its derivatives numerically, by evaluating the model again for every parameter, which
+takes about half of the time. And the normalisation of the Hermite polynomials, a constant, is recomputed with a
+factorial function at each of the 1.5 million polynomial evaluations, which takes about a quarter. The row fits run in
+threads, but they gain little from them because the fitting code holds the Python interpreter lock. Neither is
+needed for the result, and we have now removed both: the normalisation is computed once, and the fitter is given the
+derivatives of the line model in closed form. We tested this on twelve arcs drawn at random (six per site, 2 and 6\,arcsec slits, 2025 March to 2026
+November), each reduced with the old and the new code from the same calibration database. Every arc takes 21--35 per
+cent less time (median 29 per cent; 350\,s in total became 248\,s), the 6\,arcsec arcs gaining most. The same lines
+are used and the scatter of the arc fit is unchanged (e.g.\ 0.138 and 0.136\,\AA). The wavelength solutions agree
+to within 0.04\,\AA{} everywhere except at the blue end of the red order of one arc, where the solution is
+extrapolated beyond the last line and moves by up to 0.19\,\AA, still within the scatter of the fit; the median
+difference is below 0.02\,\AA.
+The times in Table~\ref{tab:visit_timing} were measured before this change. Most of the remaining time is spent in
+the fitting routine itself (SciPy's trust-region least squares); fitting only every second or third row would cut it
+further, at the cost of fewer points for the tilt and the line shape.
+
+With the times of Table~\ref{tab:visit_timing}, a science visit cost $\approx72$\,s of processing (48\,s arc,
+4\,s lamp flat, 2$\times$10\,s for the exposures) and a standard visit $\approx76$\,s (48\,s arc, 4\,s lamp flat,
+2$\times$12\,s for the two passes of the exposure). With the faster arc fits the arc takes $\approx34$\,s (the
+median saving of 29 per cent applied to the 48\,s; the other frames are unchanged), so a science visit now costs
+$\approx58$\,s and a standard visit $\approx62$\,s. These are scaled estimates, not a new timing of whole visits.
+With four workers the throughput is $\approx15$\,s of wall-clock time per science visit (18\,s before), so the
+$\approx5000$ visits of a decade take $\approx20$\,h on this laptop (25\,h before), still more than half of it in
+the arcs.
+Fitting the full arc solution once per instrument configuration, and measuring only a zero-point shift of the
+wavelength scale in each block (Chapter~\ref{sec:wavelength}), would bring this to $\approx8$\,h. The steps that are
+not done for every frame take little time: the fringe phase master of one slit over a two-month window takes 3\,s,
+and the residual fringe template of a slit (Section~\ref{sec:fringe_joint}) 3\,s. The ensemble flux and telluric
+calibrations read the nine nearest standards from the database for each frame; this is included in the
+``flux + telluric'' column.

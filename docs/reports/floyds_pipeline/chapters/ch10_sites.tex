@@ -1,20 +1,24 @@
 \chapter{The final pipeline (improved v3) at both FLOYDS sites}
 \label{sec:sites}
 
-Improved v3 is our final version of the pipeline for now. This chapter lists what it contains, describes the three
-additions made after the first v3 run (arc lines in the arc fit, a trace template per site, two more flux
-standards), applies it to a second data set from the other FLOYDS (Faulkes Telescope North, Haleakal\=a; site code
-OGG), and verifies every step at both sites with the same measurements. Both data sets were reduced from raw with the
-final code in one pass each (\texttt{banzai\_floyds\_offline}; COJ: 412 frames, OGG: 421 frames, no failures).
+Improved v3 is our final version of the pipeline for now (sites and reduction names as in
+the Conventions, p.~\pageref{sec:conventions}). This chapter lists what it contains and describes the three additions made after the
+first v3 run: more lines in the arc fit, a trace template for each site, and two more flux standards, and measures how
+stable the shape of the flux calibration is on all the standards of both sites. It then applies
+v3 to a second data set, from the FLOYDS on Faulkes Telescope North (OGG), and verifies every step at both sites with
+the same measurements. Both data sets were reduced from the raw frames with the final code, in one pass each, using
+the offline driver \texttt{banzai\_floyds\_offline} (COJ: 412 frames, OGG: 421 frames, no failures).
 
 \section{What the final version contains}
 \label{sec:sites_final}
 \begin{itemize}
-\item \textit{Order trace}: order shape from the sky flats of \texttt{data/orders/skyflats.dat}; the per-frame shift as
-in \banzai{}~1.1.0. Sky flats already processed by the LCO archive (\texttt{-f91} files) are accepted as they are.
+\item \textit{Order trace} (where the two orders fall on the detector): the shape of each order is measured on the
+sky flats listed in the package file \texttt{data/orders/skyflats.dat}, and its shift in each frame is measured as in
+\banzai{}~1.1.0. Sky flats already processed by the LCO archive (\texttt{-f91} files) are accepted as they are.
 \item \textit{Arcs}: the \banzai{}~1.1.0 2-d arc fit with five more lines (Hg\,4916 in both orders, Ar\,6416, 6677,
 6753 and 6767 in the red; Section~\ref{sec:sites_arcs}).
-\item \textit{Object trace}: the physical model of eq.~(\ref{eq:tracehybrid}) with a template and priors for each site
+\item \textit{Object trace} (the position of the object along the slit as a function of wavelength): the model of
+eq.~(\ref{eq:tracehybrid}), based on atmospheric refraction, with an instrumental template and priors for each site
 (Section~\ref{sec:sites_trace}).
 \item \textit{Object wavelength zero point}: from the telluric bands in the object's own light, transferred to the
 blue order (Section~\ref{sec:wl_zp}).
@@ -25,19 +29,23 @@ the O$_2$ A band flagged in science spectra (Section~\ref{sec:flux_tell}).
 \item \textit{Flux}: ensemble of the nine nearest standards with the grey level from the clearest half
 (Section~\ref{sec:flux_ensemble}); Feige\,67 and GD\,153 added to the standards (Section~\ref{sec:sites_flux}).
 \end{itemize}
-Every frame records what was applied in its header (\texttt{L1TRCMOD}, \texttt{L1TRCADR}, \texttt{L1WZP1/2},
-\texttt{L1FRGMET}, \texttt{L1FRGJNT}, \texttt{L1FRGTPL}, \texttt{L1TELNST}, \texttt{L1TELFLG}, \texttt{L1FLXNST},
-\texttt{L1FLXGRY}). All 176 unit tests of the package pass.
+The header of every frame records what was applied: the trace model and its fitted refraction scale
+(\texttt{L1TRCMOD}, \texttt{L1TRCADR}), the wavelength zero point removed in each order (\texttt{L1WZP1/2}, in
+\AA), the fringe method, whether the joint telluric fit and the residual template were used (\texttt{L1FRGMET},
+\texttt{L1FRGJNT}, \texttt{L1FRGTPL}), the number of standards in the telluric transmission and the flagged
+wavelength ranges (\texttt{L1TELNST}, \texttt{L1TELFLG}), and the number of standards in the sensitivity and the spread
+of their grey factors (\texttt{L1FLXNST}, \texttt{L1FLXGRY}). All 176 unit tests of the package pass.
 
 \section{The OGG data set}
 \label{sec:sites_data}
 The OGG set (Table~\ref{tab:oggdata}) is an RM campaign on NGC\,4151 through the 6\,arcsec slit, with BD$+28^\circ4211$,
 GD\,153 and Feige\,67 through the 2\,arcsec slit, from 2024 November 20 to 2025 August 30. Every science and standard
-exposure has its arc and lamp flat. The only sky flats in \texttt{skyflats.dat} for OGG are from 2019 March 29; they
-were used as processed by the archive. NGC\,4151 ($z=0.003326$) is bright and has very strong narrow lines, so it
-tests the wavelength scale and the flux calibration well; its broad H$\alpha$ and [S\,{\sc ii}] vary and fall in two of
-the three 6500--7500\,\AA{} windows used for Fairall~9, so for NGC\,4151 only the line-free window 6960--7150\,\AA{} and
-the differences between the two exposures of a visit measure the fringe residual.
+exposure has its arc and lamp flat. The only OGG sky flats listed in \texttt{skyflats.dat} are from 2019 March 29;
+they were used as processed by the archive. NGC\,4151 ($z=0.003326$) is bright and has very strong narrow lines, so it
+tests the wavelength scale and the flux calibration well. Its broad H$\alpha$ and [S\,{\sc ii}] lines, however, vary and
+fall in two of the three 6500--7500\,\AA{} clean windows used for Fairall~9. For NGC\,4151 the fringe residual is
+therefore measured only in the line-free window 6960--7150\,\AA{} and from the differences between the two exposures
+of a visit.
 
 \begin{table}[!htbp]
 \centering
@@ -62,20 +70,20 @@ Sky flats (2019 Mar 29, archive-processed) & 1.2, 1.6, 2, 6\,arcsec & 4 & \\
 Chapter~\ref{sec:wavelength} found that Hg\,4916 and Ar\,6416, 6677 and 6753/6767 are detected in the arcs but not used,
 leaving H$\beta$--[O\,{\sc iii}] and H$\alpha$ to interpolation; in improved v1 they were used to correct the archive
 products afterwards (Section~\ref{sec:wl_refit}). In the final version they are part of the arc fit itself: they are
-in the list of used lines of \texttt{arc\_lines.py}, with strengths relative to Hg\,5461 measured on 158 arcs through
-the 2\,arcsec and narrower slits of both sites (Hg\,4916: 0.0029; Ar\,6416: 0.0038; 6677: 0.0054; 6753: 0.0037; 6767:
-0.0002). They are faint (0.2--0.5 per cent of Hg\,5461), so the arc fit treats them with a fixed line profile like
-the other faint and blended lines.
+in the list of used lines of the \banzai{} arc-line catalogue (\texttt{arc\_lines.py}). Their strengths relative to
+Hg\,5461 were measured on 158 arcs through the 2\,arcsec and narrower slits of both sites (Hg\,4916: 0.0029;
+Ar\,6416: 0.0038; 6677: 0.0054; 6753: 0.0037; 6767: 0.0002). They are faint (0.2--0.5 per cent of Hg\,5461), so the
+arc fit treats them with a fixed line profile, like the other faint and blended lines.
 
-The \banzai{}~1.1.0 arc fit is already much better than the 1.0.1 solution of the archive: measured with the group
-model of eq.~(\ref{eq:arcgroup}) on each arc's own wavelength map, the 1.1.0 solution is off at the unused lines by
-at most 0.6\,\AA{} (COJ; $-8$\,\AA{} in 1.0.1) and 0.2\,\AA{} (OGG). Adding the lines removes most of what is left
-where it matters for RM (Fig.~\ref{fig:arc_lines}): at COJ the red-order error at Hg\,4916 goes from $+0.59$ to
-$-0.06$\,\AA{} and the difference between the two orders there from 1.07 to 0.32\,\AA; the lines already used do not
-move ($<0.1$\,\AA). The added lines enter the fit in 41 (Hg\,4916) to 99 per cent (Ar\,6677) of the COJ arcs. At OGG
-they are fainter, enter the fit in at most 41 per cent of the arcs (Hg\,4916 in none), and change nothing, since the solution was already
-right there. On the science, the red--blue [O\,{\sc iii}] difference of Fairall~9 goes from $+0.61\pm0.79$ to
-$+0.30\pm0.79$\,\AA.
+The \banzai{}~1.1.0 arc fit is already much better than the 1.0.1 solution of the archive. We measured it with the
+group model of eq.~(\ref{eq:arcgroup}) on each arc's own wavelength map: the 1.1.0 solution is off at the unused lines
+by at most 0.6\,\AA{} at COJ ($-8$\,\AA{} in 1.0.1) and 0.2\,\AA{} at OGG. Adding the lines removes most of the
+remaining error where it matters for RM (Fig.~\ref{fig:arc_lines}). At COJ the red-order error at Hg\,4916 goes from
+$+0.59$ to $-0.06$\,\AA, and the difference between the two orders there from 1.07 to 0.32\,\AA. The lines already used
+do not move ($<0.1$\,\AA). The added lines enter the fit in 41 per cent (Hg\,4916) to 99 per cent (Ar\,6677) of the
+COJ arcs. At OGG they are fainter: they enter the fit in at most 41 per cent of the arcs (Hg\,4916 in none), and they
+change nothing, since the solution there was already right. In the science spectra, the red--blue [O\,{\sc iii}]
+difference of Fairall~9 goes from $+0.61\pm0.79$ to $+0.30\pm0.79$\,\AA.
 
 \begin{figure}[!htbp]
 \centering
@@ -88,51 +96,62 @@ order left and red right: COJ before (grey) and after (blue) adding the lines to
 
 \section{A trace template for each site}
 \label{sec:sites_trace}
-The instrumental shape $S_o(\lambda)$ of the object-trace model (eq.~\ref{eq:tracemodel}) belongs to the instrument,
-so OGG needs its own. It was built, as for COJ, from the chunk centroids of all OGG standards (100 frames; script
-\texttt{build\_trace\_template.py}); it spans $-0.28$ to $+0.45$\,px (red) and $-0.17$ to $+0.21$\,px (blue), and the
-smoothed template follows the stacked median to 0.014 and 0.012\,px. The priors are $c_1-c_2=-0.18\pm0.18$\,px and
-$a=0.24\pm0.51$ (COJ: $-0.87\pm0.29$ and $0.58\pm0.14$). The fitted refraction scale varies much more from frame to
-frame at OGG (the standards range from $\approx-0.1$ to 0.3, NGC\,4151 has $0.89\pm0.21$), so its prior is broad and
-each frame's own centroids decide. Without a template the pipeline falls back to the 1.1.0 polynomial; with it, every
-OGG frame uses the physical model (\texttt{L1TRCMOD = 'adr'}).
+The object-trace model (eq.~\ref{eq:tracemodel}) contains an instrumental shape $S_o(\lambda)$ for each order, which
+belongs to the instrument, so OGG needs its own. It was built as for COJ (Section~\ref{sec:traces_model}): from the
+trace positions measured in wavelength chunks (chunk centroids) of all 100 OGG standard-star frames (script
+\texttt{build\_trace\_template.py}). It spans $-0.28$ to $+0.45$\,px in the red order and $-0.17$ to $+0.21$\,px in the
+blue, and the smoothed template follows the median of the stacked traces to 0.014 and 0.012\,px. The priors on the
+order offset $c_1-c_2$ and on the refraction scale $a$ are $c_1-c_2=-0.18\pm0.18$\,px and $a=0.24\pm0.51$ (COJ:
+$-0.87\pm0.29$ and $0.58\pm0.14$). The fitted refraction scale varies much more from frame to frame at OGG (the
+standards range from $\approx-0.1$ to 0.3, NGC\,4151 has $0.89\pm0.21$), so its prior is broad and each frame's own
+centroids decide. Without a template the pipeline falls back to the polynomial trace of \banzai{}~1.1.0; with it,
+every OGG frame uses the physical model (header \texttt{L1TRCMOD = 'adr'}).
 
 \section{Flux standards and a throughput step at OGG}
 \label{sec:sites_flux}
-In a first OGG reduction only BD$+28^\circ4211$ was a flux standard: GD\,153 and Feige\,67 are not in the \banzai{}
-catalogue. NGC\,4151's [O\,{\sc iii}] flux, which should be constant, then scattered by 26 per cent, because of a
-step: $6.8\times10^{-12}$ until 2025 March 28 and $1.2\times10^{-11}$\,erg\,s$^{-1}$\,cm$^{-2}$ from May 10, a factor of
-1.8 in both orders. The step is real light: the raw counts and the sum over the whole order in 2-d show the same
-factor, the extraction window holds 92--96 per cent of the light throughout, and the lamp flats and arcs (which do
-not use the telescope) stay constant to 10 per cent. It is therefore a change of the telescope throughput between
-2025 April 7 and May 2 (the last Feige\,67 and the first GD\,153 exposure): Feige\,67 in March--April comes out at
-about half its catalogue flux, GD\,153 in May at its catalogue flux. All BD$+28^\circ4211$ standards are from after the
+In a first OGG reduction only BD$+28^\circ4211$ was a flux standard, because GD\,153 and Feige\,67 are not in the
+\banzai{} catalogue of standards. The [O\,{\sc iii}] flux of NGC\,4151, which should be constant, then scattered by
+26 per cent because of a step: it was $6.8\times10^{-12}$\,erg\,s$^{-1}$\,cm$^{-2}$ until 2025 March 28 and
+$1.2\times10^{-11}$\,erg\,s$^{-1}$\,cm$^{-2}$ from May 10, a factor of 1.8 in both orders. The step is in the light
+collected, not in the reduction. The raw counts and the sum over the whole order in the 2-d frame show the same factor;
+the extraction window holds 92--96 per cent of the light throughout; and the lamp flats and arcs, whose light does
+not pass through the telescope, stay constant to 10 per cent. It is the re-aluminisation of the primary mirror of
+Faulkes Telescope North during the campaign, between 2025 April 7 and May 2 (the last Feige\,67 and the first
+GD\,153 exposure; a new pointing model of the telescope is in the headers from April 28). The gain is not grey: it is
+largest in the blue (Section~\ref{sec:shape_stability}). Feige\,67 in March--April comes
+out at about half its catalogue flux, GD\,153 in May at its catalogue flux. All BD$+28^\circ4211$ standards are from after the
 step (June--August), so every frame before it was calibrated $\approx1.8$ times too faint.
 
-The fix is a standard before the step. Feige\,67 (Oke 1990, 3200--9200\,\AA; ESO \texttt{okestan}) and GD\,153 (ESO
-X-shooter library) were added to \texttt{data/standards} in the format of the other references, at the positions LCO
-observes them (GD\,153 is $5''$ from its J2000 position because of its proper motion). The Feige\,67 reference ends at
-9200\,\AA, and the flux code holds a reference constant beyond its end, which would corrupt the red end of the
-sensitivity; it is extended to 11\,000\,\AA{} with a power law fitted to its own 7500--9200\,\AA{} continuum (index
-$-3.99$, the Rayleigh--Jeans slope of this hot subdwarf; header keywords \texttt{EXTRAP}, \texttt{EXTRAPSL}). With
-the two standards, the NGC\,4151 [O\,{\sc iii}] flux scatters by 9.4 per cent (COJ Fairall~9: 12.5 per cent over all
-100 spectra) and the levels before and after the step agree to 7 per cent (Fig.~\ref{fig:sites}); the remaining 7 per
-cent is plausibly the older Feige\,67 reference against the HST-based ones. The scatter that remains at both sites
-is mostly clouds and slit losses during the science exposures themselves (single exposures at 0.7 and 1.3 times the
-median have low counts or high airmass), which no calibration can remove and which the RM scaling to
-[O\,{\sc iii}] is designed for; the red/blue ratio, which they do not affect, scatters by 6--6.5 per cent. The 8 NGC\,4151 spectra of 2024 November and
-December have no standard within 90\,d; they use the nearest one (Feige\,67, before the step) instead of an ensemble.
+The fix is a standard taken before the step. We added the reference spectra of Feige\,67 (\citealt{Oke1990},
+3200--9200\,\AA; ESO file \texttt{okestan}) and GD\,153 (ESO X-shooter library) to the package's standards directory
+(\texttt{data/standards}), in the format of the other references and at the positions where LCO observes them
+(GD\,153 is $5''$ from its J2000 position because of its proper motion). The Feige\,67 reference ends at 9200\,\AA.
+Beyond the end of a reference, the flux code holds it constant, which would corrupt the red end of the sensitivity. We
+therefore extend it to 11\,000\,\AA{} with a power law fitted to its own 7500--9200\,\AA{} continuum (index $-3.99$,
+the Rayleigh--Jeans slope of this hot subdwarf; the reference file records this in the header keywords
+\texttt{EXTRAP} and \texttt{EXTRAPSL}). With the two added standards, the NGC\,4151 [O\,{\sc iii}] flux scatters by
+9.4 per cent (COJ Fairall~9: 12.5 per cent over all 100 spectra), and the levels before and after the step agree to
+7 per cent (Fig.~\ref{fig:sites}). The remaining 7 per cent is plausibly due to the older Feige\,67 reference, compared
+with the HST-based references of the other standards.
+
+The scatter that remains at both sites is mostly due to clouds and slit losses during the science exposures
+themselves: single exposures at 0.7 and 1.3 times the median have low counts or high airmass. No calibration can
+remove this, and the RM scaling to [O\,{\sc iii}] is designed for it. The red/blue [O\,{\sc iii}] flux ratio, which
+these losses do not affect, scatters by 6--6.5 per cent. The 8 NGC\,4151 spectra of 2024 November and December have no
+standard within 90\,d; they use the nearest one (Feige\,67, before the step) instead of an ensemble.
 
 Two lessons follow. The ensemble of the nearest standards is only valid if the throughput does not change within it;
 the nine nearest standards of a frame close to a step would mix both sides (here no NGC\,4151 frame falls between
 April 7 and May 2, so this did not happen). And a campaign needs standards throughout, of a star in the catalogue
 (Chapter~\ref{sec:recommendations}).
 
+\input{chapters/shape_stability}
+
 \section{The object zero point on NGC\,4151}
 \label{sec:sites_zp}
-NGC\,4151 is a strong test of the telluric zero point (Section~\ref{sec:wl_zp}): its zero points range from $-10$ to
-$+17$\,\AA{} in the red order (median $+10.7$\,\AA), i.e.\ the nucleus sits up to $\approx\pm2''$ from the slit centre
-from visit to visit. Before the correction the [O\,{\sc iii}] position scatters by 6.2\,\AA{} (red) and 3.1\,\AA{}
+NGC\,4151 is a strong test of the telluric zero point, i.e. the wavelength shift of the object's light measured
+from the telluric bands (Section~\ref{sec:wl_zp}). Its zero points range from $-10$ to $+17$\,\AA{} in the red order
+(median $+10.7$\,\AA): from visit to visit the nucleus sits up to $\approx\pm2''$ from the slit centre. Before the correction the [O\,{\sc iii}] position scatters by 6.2\,\AA{} (red) and 3.1\,\AA{}
 (blue); after it by 0.94 and 0.53\,\AA. Fairall~9 at COJ behaves the same way: without the correction its
 [O\,{\sc iii}] position scatters by 6.5\,\AA{} (red) and 3.2\,\AA{} (blue) in the final reduction, with it by 0.69
 and 0.45\,\AA{} (Fig.~\ref{fig:sites}). For both targets the correction is what aligns the epochs. Without this step the NGC\,4151
@@ -140,10 +159,10 @@ spectra would be misaligned by up to 27\,\AA{} between epochs.
 
 \section{Verification of every step at both sites}
 \label{sec:sites_verify}
-Table~\ref{tab:sites} and Fig.~\ref{fig:sites} collect the measurements of every step, made with the same script on
-both sites (\texttt{v3\_verify.py}). COJ is shown before and after the arc lines were added; the other COJ numbers
-do not change. All 317 spectra use the physical trace model, the joint fringe and telluric fit, and (science frames)
-the nine-standard telluric and flux ensembles.
+Table~\ref{tab:sites} collects the measurements of every step, made with the same script at both sites
+(\texttt{v3\_verify.py}), and Fig.~\ref{fig:sites} shows the two that matter most for RM: the [O\,{\sc iii}] flux and
+position. COJ is shown before and after the arc lines were added; the other COJ numbers do not change. All 317 spectra use the physical trace model and the joint fringe and telluric fit, and all science
+spectra use the telluric and flux ensembles of the nine nearest standards.
 
 \begin{table}[!htbp]
 \centering
@@ -184,28 +203,30 @@ COJ: Feige\,110.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_sites.png}
-\caption{The final pipeline at both sites. Top left: [O\,{\sc iii}]\,5007 flux of every exposure (blue order) over
-its median; grey band: the OGG throughput step, bridged by the added standards. Top right: pull rms of the two
-exposures of each visit (1 = correct uncertainties). Bottom left: [O\,{\sc iii}] position of every exposure before
-(grey) and after (colour) the telluric zero point. Bottom right: median flux standard over its reference at
-fringe scales (Feige\,110 at COJ, BD$+28^\circ4211$ at OGG; the telluric bands are flat by construction).}
+\caption{The final pipeline (v3) at both sites. Top: [O\,{\sc iii}]\,5007 flux of every exposure (blue order) over
+its median, NGC\,4151 at OGG and Fairall~9 at COJ (the time axis is cut between the two campaigns); grey band: the
+OGG throughput step, bridged by the added standards. Bottom: [O\,{\sc iii}] position of every exposure before (grey)
+and after (purple) the telluric zero point, with the robust rms. The pull test and the standards over their
+references are in Table~\ref{tab:sites}.}
 \label{fig:sites}
 \end{figure}
 
-\textit{Reading the comparison.} The two sites agree to within what their targets allow. The OGG pull rises to 1.2--1.3
-redward of 6500\,\AA: NGC\,4151 has a 2.4 times higher signal-to-noise ratio per bin than Fairall~9, so the same fringe and telluric
-residuals, which are not in the error array (Section~\ref{sec:raw_errors}), weigh more against the photon noise. The
-red fringe metric of NGC\,4151 (2.5 per cent) includes its own O\,{\sc i}\,8446 and Ca\,{\sc ii}/Paschen lines in the windows; the
-difference between the two exposures of a visit, which removes everything static, is the same at both sites
-(0.66--0.69 per cent). The red--blue [O\,{\sc iii}] difference at OGG (1.4\,\AA) is larger than at COJ (0.3\,\AA)
-because the added arc lines rarely enter the OGG fit; it is a constant per site and is removed by the usual alignment
-on [O\,{\sc iii}].
+\textit{Reading the comparison.} The two sites agree to within what their targets allow. At OGG the pull (the
+same-visit flux difference divided by its expected error; see the Conventions, p.~\pageref{sec:conventions}) rises to 1.2--1.3 redward
+of 6500\,\AA. NGC\,4151 has a 2.4 times higher signal-to-noise ratio per bin than Fairall~9, so the same fringe and
+telluric residuals, which are not included in the error array (Section~\ref{sec:raw_errors}), weigh more against the
+photon noise. The red fringe metric of NGC\,4151 (2.5 per cent) includes its own O\,{\sc i}\,8446 and
+Ca\,{\sc ii}/Paschen lines, which fall in the measurement windows. The difference between the two exposures of a
+visit, which removes everything static, is the same at both sites (0.66--0.69 per cent). The red--blue
+[O\,{\sc iii}] difference is larger at OGG (1.4\,\AA) than at COJ (0.3\,\AA) because the added arc lines rarely enter
+the OGG fit. It is a constant for each site and is removed by the usual alignment of the spectra on [O\,{\sc iii}].
 
 \section{Disk space}
 \label{sec:sites_disk}
-A processed 2-d spectrum is 47\,MB, of which 43\,MB is the uncompressed \texttt{BINNED2D} table. None of the 2-d
-diagnostic content is read back by the pipeline, so after a run the finished 2-d spectra are made lean
-(\texttt{lean\_2d.py}: the \texttt{PROFILE}, \texttt{BACKGROUND} and \texttt{FRINGE} images are dropped, and
-\texttt{BINNED2D} is kept only in a few example frames), and the arcs and lamp flats lose their \texttt{BINNED2D}
-during the run. A site-season of $\approx$400 frames then takes $\approx2$\,GB, of which 1.2\,GB are the processed
+A processed \texttt{-2d} file is 47\,MB, of which 43\,MB is the uncompressed \texttt{BINNED2D} table (the pixel table
+that lists every pixel of both orders with its wavelength and profile weight). The pipeline does not read any of the
+2-d diagnostic content back. After a run, the finished \texttt{-2d} files are therefore made lean with the script
+\texttt{lean\_2d.py}: the \texttt{PROFILE}, \texttt{BACKGROUND} and \texttt{FRINGE} images are dropped, and
+\texttt{BINNED2D} is kept only in a few example frames. The arcs and lamp flats lose their \texttt{BINNED2D} table
+already during the run. A site-season of $\approx$400 frames then takes $\approx2$\,GB, of which 1.2\,GB are the processed
 calibrations kept for re-reducing the science; the \texttt{-1d} spectra are 0.6\,MB each.

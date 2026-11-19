@@ -2,21 +2,23 @@
 \label{sec:raw}
 
 The corrections of Chapters~\ref{sec:traces}--\ref{sec:flux} were first developed on the archive products, undoing
-parts of the archive processing where necessary (Appendix~\ref{sec:app_v1}). Running the pipeline from the raw frames
-removes the need to undo anything:
-the destroyed pixels are not created, the 2-d frame is resampled once on the corrected wavelength grid, the
-uncertainties are propagated from read noise and photon counts, and standards and science are treated identically. It
-also gives the collaboration a reproducible pipeline for new data. This chapter describes the offline set-up, the
-\banzai{}~1.1.0 (stock) run that serves as the baseline, and the comparison of the five reductions
-(Table~\ref{tab:versions_names}).
+parts of the archive processing where necessary (improved v1, Appendix~\ref{sec:app_v1}). Running the pipeline from the
+raw frames removes the need to undo anything. The pixels destroyed in \banzai{}~1.0.1 by the division by a shifted
+lamp flat (Chapter~\ref{sec:fringe}) are never created. The 2-d frame is resampled only once, onto the corrected
+wavelength grid. The uncertainties are propagated from the read noise and the photon counts. Standards and science
+exposures are processed in the same way. Running from raw also gives the collaboration a reproducible pipeline for
+new data. This chapter describes how we ran \banzai{} on our own computer, the run of \banzai{}~1.1.0 with its
+default settings (`stock') that serves as the baseline, and the comparison of the five reductions
+(Table~\ref{tab:versions_names}; see also the Conventions, p.~\pageref{sec:conventions}).
 
 \section{Data and calibration database}
 \label{sec:raw_data}
 The raw data set (Table~\ref{tab:rawdata}) contains 100 Fairall~9 exposures in 50 blocks of two consecutive
 exposures on 47 nights (2026 August 28 -- November 11); every block has its own arc and lamp flat. The 57 standard-star
-exposures are all through the 2\,arcsec slit: Feige\,110 (39, in the \banzai{} standards catalogue, with a finely
-sampled reference spectrum) and EG\,21 (18). Forty of the 47 Fairall~9 nights have a standard (Feige\,110 on 25, EG\,21
-on 15); the nearest standard is a median of 1.5\,h from the science block, within 3\,h for 33 of the 50 blocks.
+exposures are all through the 2\,arcsec slit: 39 of Feige\,110, which is in the \banzai{} catalogue of flux standards
+and has a finely sampled reference spectrum, and 18 of EG\,21. Forty of the 47 Fairall~9 nights have a standard
+(Feige\,110 on 25, EG\,21 on 15). The nearest standard was observed a median of 1.5\,h from the science block, and
+within 3\,h for 33 of the 50 blocks.
 
 \begin{table}[!htbp]
 \centering
@@ -37,14 +39,16 @@ Sky flats (2025 December 8) & 1.2, 1.6, 2, 6 & 4 & -- \\
 \end{tabular}
 \end{table}
 
-\banzai{} (version 1.1.0 of this checkout, i.e. newer than the 1.0.1 that produced the archive) runs offline with a
-local SQLite calibration database. The set-up (scripts in \texttt{work/banzai\_run}) creates the sites and
-instruments, loads the order heights and locations, the line-spread-function parameters and the flux standards
-shipped with the package, and processes the four sky flats (relabelled as \texttt{SKYFLAT}, as the package's own
-calibration notebook does). Their order traces reproduce the archive \texttt{ORDER\_COEFFS} to $\leq0.7$\,px; the
-difference reflects the changes to the order fitting between 1.0.1 and 1.1.0. The frames are then reduced in the
-order arcs, lamp flats, standards and science, each with \texttt{run\_pipeline\_stages}, so that every frame can find
-its calibrations in the database. EG\,21 is not in the catalogue and is reduced as a science frame.
+We ran \banzai{}~1.1.0, newer than the 1.0.1 that produced the archive, on a laptop without access to the LCO
+servers. Instead of the LCO calibration database it uses a local database (an SQLite file). Our set-up scripts (in
+\texttt{work/banzai\_run}) create the sites and instruments in this database and load the files distributed with the
+package: the order heights and locations, the line-spread-function parameters and the flux standards. They then
+process the four sky flats, whose observation type we set to \texttt{SKYFLAT}, as the calibration notebook distributed
+with the package does. The order traces fitted on these sky flats reproduce the archive order traces (header
+\texttt{ORDER\_COEFFS}) to $\leq0.7$\,px; we attribute the difference to the changes to the order fitting between 1.0.1
+and 1.1.0. The frames are then reduced in this sequence: arcs, lamp flats, standards and science, so that every frame
+finds its calibrations already in the database. EG\,21 is not in the catalogue of flux standards, so it is reduced as
+a science frame.
 
 \section{Processing time}
 \label{sec:raw_time}
@@ -58,24 +62,31 @@ its calibrations in the database. EG\,21 is not in the catalogue and is reduced 
 
 \section{Uncertainties}
 \label{sec:raw_errors}
-The uncertainties were tested on the 25 pairs of Fairall~9 exposures taken in the same block (no variability, same
-arc, so the bins of the two extractions match one to one). After scaling the second spectrum to the first with a
-300\,\AA{} running ratio, the pull $(f_1-f_2)/\sqrt{\sigma_1^2+\sigma_2^2}$ should have unit rms (Fig.~\ref{fig:errors}).
-In the 2-d frames the uncertainty is $\sqrt{N+R^2}$ in electrons and the same pixels of the two exposures differ by
-1.05\,$\sigma$ on the sky; the extracted error of improved v3 equals the optimal-extraction (Horne) formula
-recomputed from the pixels to 1--2 per cent. The extracted pulls are 0.89--0.93 in the blue order and 0.92--1.05 in
-the red for improved v3 (1.1.0: up to 1.6 in the red; \banzai{}~1.0.1: 1.7--2.2 beyond 7700\,\AA, where its errors
-do not contain the fringe residuals). Measured along the spectrum, which includes exposure-to-exposure differences on
-scales of a few pixels, they are 1.09--1.12, rising to 1.2--1.4 in the fringe and telluric regions, and summing 4--30
-pixels raises them to $\approx1.2$--1.3: fringe and telluric residuals and small wavelength shifts, which no error
-array contains. For integrated line fluxes a systematic term of this size, or the scatter between exposures, should
-be added.
+We tested the uncertainties on the 24 pairs of Fairall~9 exposures taken in the same block. The AGN does not vary
+within a block, and both exposures share the same arc, so the wavelength bins of the two extracted spectra match one
+to one. We scaled the second spectrum to the first by their ratio smoothed over 300\,\AA{} and computed the pull
+$(f_1-f_2)/\sqrt{\sigma_1^2+\sigma_2^2}$ in each bin. If the uncertainties are right, its rms is 1
+(Fig.~\ref{fig:errors}).
+
+In the 2-d frames the uncertainty of a pixel is $\sqrt{N+R^2}$ electrons, with $N$ the counts in electrons and $R$ the
+read noise. On the sky, the pull between the same pixel in the two exposures has an rms of 1.05. The error of the
+extracted spectrum of improved v3 agrees to 1--2 per cent with the optimal-extraction error \citep{Horne1986}
+recomputed from the 2-d pixels. For the extracted spectra, the pull rms of improved v3 is 0.89--0.93 in the blue order
+and 0.92--1.05 in the red. For comparison, \banzai{}~1.1.0 reaches up to 1.6 in the red order, and \banzai{}~1.0.1
+reaches 1.7--2.2 beyond 7700\,\AA, where its errors do not include the fringe residuals.
+
+These pulls are computed at each wavelength across the 24 pairs. Computed instead along the wavelength axis of each
+pair, which also captures differences between the exposures on scales of a few pixels, the pull rms is 1.09--1.12,
+rising to 1.2--1.4 in the fringe and telluric regions. Summing 4--30 adjacent pixels raises it to $\approx1.2$--1.3.
+This excess comes from fringe and telluric residuals and small wavelength shifts, which no error array contains. For
+integrated line fluxes, a systematic term of this size should therefore be added to the pipeline errors, or the
+scatter between exposures used instead.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_error_check.png}
-\caption{Robust rms of the pull of 25 same-block Fairall~9 exposure pairs, per wavelength (smoothed); 1 means
-correct uncertainties. Blue order left, red order right.}
+\caption{Robust rms of the pull of 24 same-block Fairall~9 exposure pairs against wavelength (smoothed), for the
+four reductions; 1 means correct uncertainties. Blue order left, red order right.}
 \label{fig:errors}
 \end{figure}
 

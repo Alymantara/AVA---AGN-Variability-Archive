@@ -1,170 +1,221 @@
 \chapter{Cosmic rays, the sky model and quality flags}
 \label{sec:cosmics}
 
-This chapter comes from a search for the worst reductions of the final pipeline. The two worst kinds of frame were not
-caused by the steps of the earlier chapters but by two parts of \banzai{} we had not examined: the cosmic-ray
-detector and the sky model under the object. Both make the extracted spectrum scatter far more than its errors, and
-the cosmic-ray detector also clips bright emission lines, which in one NGC\,4151 frame made H$\alpha$ 2.6 times too
-bright. We describe what goes wrong, a change to each step, and how the changes were verified; the verification is
-the main part, because a cosmic-ray detector can always be tuned to look good on the cases it was tuned on. The
-changes are in the code (branch \texttt{rm-improvements}) but \textbf{the products of this report have not been
-re-reduced with them}: Table~\ref{tab:cr_status} gives the status. The chapter ends with per-frame quality keywords
-written into every product, which record these problems and those of the earlier chapters so that a table of all
-reductions can be built from the headers.
+This chapter comes from a search for the worst reductions of the final pipeline (improved v3). The two worst kinds of
+frame were not caused by the steps of the earlier chapters but by two parts of \banzai{} we had not examined: the
+cosmic-ray detector (LA Cosmic) and the sky model under the object. In both, the extracted spectrum scatters far more
+than its errors. The cosmic-ray detector also clips the peaks of bright emission lines; in one NGC\,4151 frame this
+made H$\alpha$ 2.6 times too bright. A cosmic-ray detector can always be tuned to look good on the cases it was tuned
+on, so most of the chapter is about testing the changes on data they were not tuned on. The changes are in the code
+(branch \texttt{rm-improvements} of \banzai{}), but \textbf{the products of this report have not been re-reduced with
+them}; Table~\ref{tab:cr_status} gives the status of each change.
+
+\paragraph{Summary of the chapter.} For each problem: what went wrong, what we changed, how we tested it, and the result.
+\begin{itemize}
+\item \textit{Bright star cores and emission-line peaks taken for cosmic rays}
+(Sections~\ref{sec:cr_method}--\ref{sec:cr_lines}). LA Cosmic in \banzai{}~1.1.0 flags the cores of bright stars and
+the peaks of narrow emission lines, and it misses real cosmic rays that land on these bright regions.
+\textit{Change} (Section~\ref{sec:cr_model}): before LA Cosmic searches the frame, we subtract a smooth model of the
+object (a 7-pixel running median along each detector row), so that only features sharper than the object are left.
+\textit{Tests} (Section~\ref{sec:cr_verify}): artificial cosmic rays added to real frames, and a comparison of the two
+exposures of each visit for 106 frames. \textit{Result}: in the brightest standard star the flagged share of the core
+falls from 46 to 0.1 per cent; on the worst H$\alpha$ line the flagged pixels fall from 179 to 15 and its flux from
+2.64 to 1.02 times that of the other exposure; of the artificial cosmic rays above 10$\sigma$ on line peaks and star
+cores, 97 instead of 66 per cent are found. The cost is a few more small false detections per frame on the trace of
+bright objects (median 1 to 5 per frame at OGG), which do not change the extracted fluxes beyond the noise.
+\item \textit{Line peaks that the object model still flags} (Section~\ref{sec:cr_pair}). \textit{Change}: a new
+pipeline stage, the \textit{same-visit check}, compares each exposure after LA Cosmic with the other exposure of its
+visit and removes flags on features that are present in both. \textit{Tests}: artificial cosmic rays in 8 frames, and
+the whole sample of 106 frames. \textit{Result}: it finds the same artificial cosmic rays as the object model alone and
+flags 22 (OGG) and 10 (COJ) per cent fewer pixels. It removes the 15 pixels still flagged on the worst H$\alpha$, and
+it brings the flagged pixels on the narrow lines of NGC\,4151 to 215, against 236 with \banzai{}~1.1.0 and 398 with
+the object model alone.
+\item \textit{The sky model beside a wide object} (Section~\ref{sec:cr_sky}). When a wide object leaves little sky in
+the slit, the sky model follows the noise and the spectrum scatters 3--4 times its errors. \textit{Change}: a sky line
+must also stand out from the scatter of the first-pass sky by 5 robust standard deviations. \textit{Result}: in the affected frames the
+scatter falls from 3.0--3.3 to 1.1--1.2 times the errors; in normal frames the flux changes by less than 0.2 per cent.
+\item \textit{A guard in the extraction} (Section~\ref{sec:cr_guard}). A wavelength bin that has lost more than half
+of its profile weight to cosmic-ray flags is now masked instead of being scaled up from the rest.
+\item \textit{Quality keywords} (Section~\ref{sec:qc}). Every product now carries per-frame quality measures and flags
+in its header. They were added to all 317 science and standard products of improved v3, and they find the problem
+frames that we found by hand in this report.
+\end{itemize}
 
 \section{How \banzai{} finds cosmic rays}
 \label{sec:cr_method}
-\banzai{}~1.1.0 runs LA Cosmic \citep{vanDokkum2001}, as implemented in \texttt{astroscrappy}, on each science and
-standard frame. Step by step:
+\banzai{}~1.1.0 runs LA Cosmic \citep{vanDokkum2001}, as implemented in the Python package \texttt{astroscrappy}, on
+each science and standard frame. The names in typewriter font below are the parameters of LA Cosmic. Step by step:
 \begin{enumerate}
-\item \textit{Sky.} A first sky fit $B(x,y)$ (a spline in wavelength times a low-order polynomial along the slit, fitted
-outside a mask around the object trace).
-\item \textit{Inputs.} The frame $D$ in electrons; its variance from the pipeline's error map; a mask of bad pixels,
-pixels outside the orders and a 2-pixel band at the order edges (which are sharp); $B$ as the background to subtract.
+\item \textit{Sky.} A first sky model $B(x,y)$ is fitted outside a mask around the object trace: a spline in wavelength
+times a low-order polynomial along the slit.
+\item \textit{Inputs.} LA Cosmic receives the frame $D$ in electrons, its variance from the pipeline's error map, and
+$B$ as the background to subtract. It also receives a mask of pixels it must not search: bad pixels, pixels outside the
+orders, and a band 2 pixels wide along the edges of each order, because those edges are sharp.
 \item \textit{Sharpness.} LA Cosmic subtracts the background, takes the Laplacian of the frame sampled at twice the
-resolution, and divides it by the noise: $S=\nabla^2(D-B)/2\sigma$, after removing its smooth part ($S-$ its
-5-pixel median). A cosmic ray deposits its charge in one or a few pixels and is far sharper than anything the optics
-make, so its $S$ is large.
-\item \textit{Candidates.} Pixels with $S>\texttt{sigclip}=5$.
-\item \textit{Fine-structure test.} A star or a line is also sharp, but as wide as the seeing. LA Cosmic builds a
-fine-structure image $F$ (the frame's 3-pixel median minus the 7-pixel median of that) and keeps a candidate only if
-its Laplacian is more than $\texttt{objlim}=5$ times $F$.
-\item \textit{Growth.} Neighbours of a detection are added if their $S$ exceeds $\texttt{sigfrac}\times\texttt{sigclip}$;
-\banzai{} uses $\texttt{sigfrac}=0.03$, i.e.\ 0.15$\sigma$, ten times below the LA Cosmic default (0.3), so detections
-grow over the whole of any bright region they touch. The detected pixels are replaced by the mean of their unmasked
-neighbours and the steps are repeated four times.
-\item \textit{Fill.} Holes inside detections are filled, and the pixels get mask bit 8.
-\item \textit{Use.} The sky is fitted again without them, and the extraction leaves them out:
-$f=\sum a(d-b)/\sum aP$ over the remaining pixels of each wavelength bin, so that a flagged pixel loses no flux
-\textit{if the profile model $P$ is right}.
+resolution, and divides it by the noise: $S=\nabla^2(D-B)/2\sigma$, where $\sigma$ is the noise of the pixel. It then
+subtracts the 5-pixel median of $S$ from $S$, to remove its smooth part. A cosmic ray deposits its charge in one or a
+few pixels and is far sharper than anything the optics produce, so its $S$ is large.
+\item \textit{Candidates.} Pixels with $S>5$ (\texttt{sigclip}) are candidates.
+\item \textit{Fine-structure test.} A star or a line is also sharp, but it is as wide as the seeing. LA Cosmic
+therefore builds a fine-structure image $F$: the 3-pixel median of the frame minus the 7-pixel median of that. It keeps
+a candidate only if its Laplacian is more than 5 times $F$ (\texttt{objlim}).
+\item \textit{Growth.} The neighbours of a detected pixel are added to it if their $S$ exceeds
+$\texttt{sigfrac}\times\texttt{sigclip}$. \banzai{} uses $\texttt{sigfrac}=0.03$, i.e.\ a threshold of 0.15$\sigma$,
+ten times below the LA Cosmic default (0.3). As a result a detection grows over the whole of any bright region it
+touches. The detected pixels are replaced by the mean of their unmasked neighbours, and steps 3--6 are repeated four
+times.
+\item \textit{Fill.} Holes inside a detection are filled in, and its pixels are marked with bit 8 of the mask.
+\item \textit{Use.} The sky is fitted again without the flagged pixels, and the extraction leaves them out. In each
+wavelength bin the flux is $f=\sum a(d-b)/\sum aP$ over the remaining pixels, where $d$ is the value of a pixel, $b$
+the sky model there, $P$ the spatial profile model of the object and $a$ the weight of the pixel in the extraction.
+A flagged pixel therefore loses no flux \textit{if the profile model $P$ is right}.
 \end{enumerate}
 
 \textit{Which versions do this.} \banzai{}~1.0.1, which made the archive products, has no cosmic-ray detection at all.
-The detector of final v3 is that of \banzai{}~1.1.0 unchanged: the module, its parameters, its place in the order of
-stages and the sky fit before it are identical to the 1.1.0 release. Its input differs in one respect: 1.1.0 divides
-the 2-d frame by the lamp-flat fringe pattern before the detector runs and v3 does not (Chapter~\ref{sec:fringe}), and
-the object trace that sets the sky mask is the physical model. This makes no difference to the flags: on the 46
-Fairall~9 frames of the test of Section~\ref{sec:cr_verify}, 1.1.0 as released and final v3 have the same number of
-real and false detections on the object (136 and 134 real, 1414 and 1420 false) in the same frames. The problems of
-this chapter are therefore those of \banzai{}~1.1.0. There is no reduction of OGG with 1.1.0 as released; with the same
-code we expect the same star cores and H$\alpha$ to be flagged there.
+The detector of improved v3 is that of \banzai{}~1.1.0 unchanged: the code, its parameters, its place in the order of
+pipeline stages and the sky fit before it are identical to the 1.1.0 release. Only its input differs, in two ways.
+First, 1.1.0 divides the 2-d frame by the lamp-flat fringe pattern before the detector runs, and improved v3 does not
+(Chapter~\ref{sec:fringe}). Second, in improved v3 the object trace that sets the sky mask comes from the physical
+trace model (Chapter~\ref{sec:traces}). Neither changes the flags. We checked this on the 46 Fairall~9 frames of the
+test of Section~\ref{sec:cr_verify}: \banzai{}~1.1.0 as released (without the object wavelength zero point) and
+improved v3 have the same number of real and false detections on the object (136 and 134 real, 1414 and 1420 false),
+in the same frames. The problems of this chapter are therefore those of \banzai{}~1.1.0. There is no reduction of OGG
+with 1.1.0 as released; since the code is the same, we expect the same star cores and H$\alpha$ to be flagged there.
 
 \section{The core of a bright star taken for cosmic rays}
 \label{sec:cr_stars}
-In the brightest standard, BD$+28^\circ4211$ at OGG (peaks of 30\,000--45\,000\,e$^-$ through the 2\,arcsec slit),
-LA Cosmic flags the core of the star in good seeing. In 10 of its 68 spectra more than 1 per cent of the trace core
-(the pixels within one FWHM of the trace) is flagged, in 6 more than 5 per cent, and on 2025 August 19 (seeing
-1.3\,arcsec) 46 per cent of the blue-order core (Fig.~\ref{fig:cr_smoothing}, top). The extraction then works from the
-wings, where the profile model is least right, and the spectrum scatters 2.9 times its errors bin to bin. No other
-standard and no AGN frame is affected: Feige\,110 and the other standards are fainter, and an AGN through a 6\,arcsec
-slit has a broader profile. That is why this appeared only among the OGG standards.
+The brightest standard star is BD$+28^\circ4211$ at OGG, with peaks of 30\,000--45\,000\,e$^-$ per pixel through the
+2\,arcsec slit. In good seeing LA Cosmic flags the core of the star. We measured the share of the trace core (the
+pixels within one FWHM of the trace) that is flagged. It is more than 1 per cent in 10 of the 68 spectra of this star
+and more than 5 per cent in 6 of them. On 2025 August 19 (seeing 1.3\,arcsec) it is 46 per cent of the core in the blue
+order (Fig.~\ref{fig:cr_smoothing}, top). The extraction then works from the wings of the profile, where the profile
+model is least right, and the spectrum scatters 2.9 times its errors from bin to bin. No other standard and no AGN frame
+is affected: Feige\,110 and the other standards are fainter, and an AGN through a 6\,arcsec slit has a broader profile.
+That is why the problem appeared only among the OGG standards.
 
 \section{Emission lines taken for cosmic rays}
 \label{sec:cr_lines}
-A bright narrow emission line is sharp along the dispersion. We looked for flags on the trace core within $\pm12$\,\AA{}
-of [O\,{\sc iii}]\,$\lambda\lambda$4959, 5007, H$\beta$ and H$\alpha$+[N\,{\sc ii}] in all 160 AGN spectra of the final
-reductions:
+A bright narrow emission line is sharp along the dispersion. In all 160 AGN spectra of improved v3 we looked for flags
+on the trace core within $\pm12$\,\AA{} of [O\,{\sc iii}]\,$\lambda\lambda$4959, 5007, H$\beta$ and
+H$\alpha$+[N\,{\sc ii}]:
 \begin{itemize}
-\item \textit{[O\,{\sc iii}]\,5007}: never flagged, in either object. One Fairall~9 frame has five pixels of the core of
-4959 flagged (2026 August 28; the pixels agree with the other exposure of the visit within the noise, so they are
-false positives), with no measurable effect on the flux.
-\item The flags on [O\,{\sc iii}]\,4959 in 12 NGC\,4151 frames are a warm detector pixel at $(x,y)=(1465,409)$ of the
-OGG camera (24\,500\,e$^-$ against 500--1000 in its neighbours), which is not in the bad-pixel mask and falls on the
-wing of 4959 because NGC\,4151 is always placed at the same position in the slit. Masking it is right.
-\item \textit{H$\alpha$ of NGC\,4151}: flagged in 7 of 60 frames, by up to 179 pixels covering the peak of the line
-(Fig.~\ref{fig:cr_halpha}). The two exposures of a visit normally agree on H$\alpha$+[N\,{\sc ii}] to 2.5 per cent;
-two clipped exposures were 2.64 and 1.18 times their partner; in the other five the flags changed the flux by no more than the noise (one pair differs by 6 per cent with or without flags).
+\item \textit{[O\,{\sc iii}]\,5007} is never flagged, in either object.
+\item \textit{[O\,{\sc iii}]\,4959.} In one Fairall~9 frame (2026 August 28) five pixels of the core of the line are
+flagged. They are false positives, because they agree with the other exposure of the visit within the noise; they have no
+measurable effect on the flux.
+\item \textit{[O\,{\sc iii}]\,4959 in 12 NGC\,4151 frames.} These flags are a warm detector pixel of the OGG camera at
+$(x,y)=(1465,409)$, with 24\,500\,e$^-$ against 500--1000 in its neighbours. It is not in the bad-pixel mask, and it
+falls on the wing of the line because NGC\,4151 is always placed at the same position in the slit. Masking it is right.
+\item \textit{H$\alpha$ of NGC\,4151} is flagged in 7 of 60 frames, by up to 179 pixels covering the peak of the line
+(Fig.~\ref{fig:cr_halpha}). The two exposures of a visit normally agree on the H$\alpha$+[N\,{\sc ii}] flux to 2.5 per
+cent. Two exposures with clipped lines had 2.64 and 1.18 times the flux of the other exposure of their visit. In the
+other five the flags changed the flux by no more than the noise (one pair differs by 6 per cent with or without flags).
 \end{itemize}
-The bias is upward and can be large because of the extraction: with the core of the line removed, what is left of the
-bin is the wings of an emission region that is resolved along the slit (the narrow-line region of NGC\,4151 is
-extended), divided by the small profile weight of those wings. \textit{This can happen in any bright object with
-strong narrow lines in good seeing}---Seyfert galaxies, H\,{\sc ii} galaxies, planetary nebulae---and it is not visible
-in the extracted spectrum unless one compares exposures: the spectrum shows an H$\alpha$ that is simply too strong.
+The flux is biased upwards, and the bias can be large, because of how the extraction treats flagged pixels
+(Section~\ref{sec:cr_method}, step 8). With the core of the line removed, what is left in the bin is the wings of an
+emission region that is resolved along the slit (the narrow-line region of NGC\,4151 is extended). Their flux is divided
+by the small profile weight of those wings, as if they held the same fraction of the light as in the continuum.
+\textit{This can happen in any bright object with strong narrow lines in good seeing}---Seyfert galaxies, H\,{\sc ii}
+galaxies, planetary nebulae. It is not visible in the extracted spectrum unless one compares exposures: the spectrum
+simply shows an H$\alpha$ that is too strong.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_cr_halpha.png}
-\caption{H$\alpha$ of NGC\,4151 flagged as cosmic rays (OGG, 6\,arcsec slit). Left three panels: the 2-d frame around
-H$\alpha$ of the flagged exposure with the final-v3 flags (red), the other exposure of the same visit, and the flagged
-exposure with the new detector (blue). Right: the extracted H$\alpha$ and its flux relative to the other exposure.
-Top: 2025 July 15, 179 pixels flagged and H$\alpha$+[N\,{\sc ii}] 2.64 times too bright; with the new detector 15
-pixels are flagged, the four bins where they remove most of the profile are masked by the extraction guard
-(Section~\ref{sec:cr_guard}) and the flux is 1.02 times the partner. Bottom: 2025 May 31, 119 pixels, 1.18 times;
-new detector: none, 1.00.}
+\caption{H$\alpha$ of NGC\,4151 flagged as cosmic rays (OGG, 6\,arcsec slit). Left: the 2-d frame around H$\alpha$
+(counts, same arcsinh grey scale in a row) of the flagged exposure with the flags of the 1.1.0 detector of improved v3
+(blue), the other exposure of the same visit, and the flagged exposure with the object model (purple). Right: the
+extracted H$\alpha$, with the H$\alpha$+[N\,{\sc ii}] flux of the flagged exposure divided by that of the other
+exposure. Top: 2025 July 15, 179 pixels flagged and the flux 2.64 times too high; with the object model 15 pixels are
+flagged, the four bins where they remove most of the profile are masked by the extraction guard
+(Section~\ref{sec:cr_guard}) and the ratio is 1.02. Bottom: 2025 May 31, 119 pixels and 1.18; with the object model
+none and 1.00.}
 \label{fig:cr_halpha}
 \end{figure}
 
 \section{A related problem: the sky model beside a wide object}
 \label{sec:cr_sky}
-The worst Fairall~9 spectra (six frames on 2026 September 3, 6 and 16) scatter 3--4 times their errors bin to bin
-although their 2-d frames have the noise their error maps say. The excess is already in the raw extraction, in both
-the optimal and the unweighted sums, and is absent from a plain box sum of the same pixels; it is the sky model. The
-sky is a spline in wavelength, with knots one pixel apart on sky lines and three pixels apart elsewhere; sky lines
-are found as pixels of a first-pass sky more than 15 per cent above its running median. With the Moon up (58--80 per
-cent illuminated) and seeing of 2.6--4.5\,arcsec, Fairall~9 fills much of the slit, the object mask shrinks
-(\texttt{L1BKMW}\,$<6$) and few sky pixels are left; the first-pass sky is noisy, its noise passes the contrast test,
-and nearly every column gets a knot (1464 instead of $\approx500$). The sky under the object then follows the noise of
-a few pixels at the edges of the slit, multiplied by every pixel of the extraction window: the second differences of
-the extracted flux and of the sky are anticorrelated at $-0.95$ to $-0.97$, and the sky scatters 3.5--3.8 times the
-flux errors against 0.1 in normal frames. The same noisy sky also makes LA Cosmic flag the object: the two frames of
-2026 September 3 have $\approx$240 flagged groups each on the object that are not in the other exposure
-(Section~\ref{sec:cr_verify}). \textit{Change}: a sky line must also stand out from the scatter of the first pass by 5
-robust standard deviations. On the affected frames the scatter falls from 3.0--3.3 to 1.1--1.2 times the errors and
-the knots to $\approx500$; on normal frames the flux changes by less than 0.2 per cent and the fringe residual is
-unchanged or slightly lower.
+\textit{The problem.} The worst Fairall~9 spectra (six frames on 2026 September 3, 6 and 16) scatter 3--4 times their
+errors from bin to bin, although their 2-d frames have the noise their error maps predict. The excess is already in the
+extraction before any correction, in both the optimal and the unweighted sums, and it is absent from a plain box
+sum of the same pixels. It therefore comes from the sky model.
+
+\textit{The cause.} The sky model is a spline in wavelength, with knots one pixel apart on sky lines and three pixels
+apart elsewhere. Sky lines are found as the pixels of a first-pass sky model that are more than 15 per cent above its
+running median. In these frames the Moon was up (58--80 per cent illuminated) and the seeing was 2.6--4.5\,arcsec, so
+Fairall~9 fills much of the slit. The mask that keeps the object out of the sky fit is then narrowed to less than
+6 times the width ($\sigma$) of the spatial profile on each side (header keyword \texttt{L1BKMW}\,$<6$), and few sky
+pixels are left. The first-pass sky is noisy, its noise passes the 15 per cent test, and nearly every column gets a
+knot (1464 instead of $\approx500$). The sky under the object then follows the noise of a few pixels at the edges of
+the slit, multiplied by the number of pixels in the extraction window. Two measurements show this. The bin-to-bin
+second differences of the extracted flux and of the sky are anticorrelated, with coefficients of $-0.95$ to $-0.97$.
+And the sky model scatters by 3.5--3.8 times the flux errors, against 0.1 in normal frames. The same noisy sky also
+makes LA Cosmic flag the object: the two frames of 2026 September 3 each have $\approx$240 flagged groups on the object
+that are not in the other exposure (Section~\ref{sec:cr_verify}).
+
+\textit{The change.} A sky line must now also stand out from the scatter of the first-pass sky by 5 robust standard
+deviations. \textit{Result}: on the affected frames the scatter falls from 3.0--3.3 to 1.1--1.2 times the errors and
+the number of knots to $\approx500$. On normal frames the flux changes by less than 0.2 per cent, and the fringe
+residual is unchanged or slightly lower.
 
 \section{The change to the detector: a model of the object}
 \label{sec:cr_model}
-LA Cosmic subtracts the background it is given before it measures sharpness (step 3); \texttt{astroscrappy} documents
-this input for spectra, to remove the sky lines \textit{and the cross-section of the object}. \banzai{} gives it the sky
-only, so the object itself is searched for cosmic rays and only the fine-structure test (step 5) stands between a
-bright core and a flag. The change adds one step between steps 1 and 2:
+LA Cosmic subtracts the background it is given before it measures sharpness (step 3 above). The documentation of
+\texttt{astroscrappy} says that, for spectra, this background should remove the sky lines \textit{and the
+cross-section of the object}. \banzai{} gives it the sky only. The object itself is therefore searched for cosmic
+rays, and only the fine-structure test (step 5) stands between a bright core and a flag. Our change adds one step
+between steps 1 and 2:
 \begin{enumerate}
-\item[1a.] \textit{Object model.} Take the frame minus the first sky, $R=D-B$, inside the orders (pixels outside an order
-take the nearest in-order value of their row, so the filter does not mix zeros into the ends of an order). Along each
-detector row, replace every pixel by the median of the 7 pixels centred on it: $M(x,y)=\mathrm{median}\{R(x-3..x+3,
-y)\}$, set to zero where negative. Give LA Cosmic $B+M$ instead of $B$.
+\item[1a.] \textit{Object model.} Take the frame minus the first sky model, $R=D-B$, inside the orders. (Pixels outside
+an order take the nearest in-order value of their row, so that the filter does not mix zeros into the ends of an
+order.) Along each detector row, replace every pixel by the median of the 7 pixels centred on it:
+$M(x,y)=\mathrm{median}\{R(x-3..x+3,y)\}$, set to zero where negative. Give LA Cosmic $B+M$ as the background instead
+of $B$.
 \end{enumerate}
-Everything else (parameters, noise, growth, use) is unchanged. LA Cosmic now searches $D-B-M$. Why 7 pixels along the
-row:
+Everything else (parameters, noise, growth of detections, use in the extraction) is unchanged. LA Cosmic now searches
+$D-B-M$. A 7-pixel median along the row treats the three kinds of sharp feature differently:
 \begin{itemize}
-\item \textit{A cosmic ray} covers 1--5 pixels: the 7-pixel median ignores it, so it stays in $D-B-M$ at full strength
-and is found, also on the trace (Fig.~\ref{fig:cr_method}, bottom row); on bright cores and line peaks it is found more
-often than before, because the object no longer hides it (Section~\ref{sec:cr_inject}).
-\item \textit{A star.} The traces are tilted on the detector, so along one row the core of a star is spread over tens of
-columns (about 40 for BD$+28^\circ4211$): a smooth hump that the median follows; $D-B-M$ is noise
+\item \textit{A cosmic ray} covers 1--5 pixels. The 7-pixel median ignores it, so it stays in $D-B-M$ at full strength
+and is found, also on the trace (Fig.~\ref{fig:cr_method}, bottom row). On bright cores and line peaks it is found
+more often than before, because the object no longer hides it (Section~\ref{sec:cr_inject}).
+\item \textit{A star.} The traces are tilted on the detector, so along one row the core of a star is spread over tens
+of columns (about 40 for BD$+28^\circ4211$). This is a smooth hump that the median follows, and $D-B-M$ is noise
 (Fig.~\ref{fig:cr_method}, top row: 950 pixels flagged before, 6 after, all on the sky).
-\item \textit{A narrow emission line} is narrow along the row too: the median cuts its peak and part of it is left in
-$D-B-M$ (Fig.~\ref{fig:cr_method}, middle row; 22 per cent of the peak of [O\,{\sc iii}]\,5007 in NGC\,4151,
-Fig.~\ref{fig:cr_smoothing}). That remainder is as wide as the object along the slit, so the fine-structure test
-rejects most of it, but not all: 15 pixels of the H$\alpha$ peak of 2025 July 15 are still flagged (180 before). They
-are false positives: the other exposure of the visit has the same line, and the same-visit check of
+\item \textit{A narrow emission line} is narrow along the row too. The median cuts its peak, and part of the peak is
+left in $D-B-M$ (Fig.~\ref{fig:cr_method}, middle row). For [O\,{\sc iii}]\,5007 in NGC\,4151 this is 22 per cent of
+the peak (Fig.~\ref{fig:cr_smoothing}). That remainder is as wide as the object along the slit, so the fine-structure
+test rejects most of it, but not all: 15 pixels of the H$\alpha$ peak of 2025 July 15 are still flagged (180 before).
+They are false positives, since the other exposure of the visit has the same line, and the same-visit check of
 Section~\ref{sec:cr_pair} removes all 15. This is the weak point of the object model alone, and the reason for that
 check and for the extraction guard (Section~\ref{sec:cr_guard}).
 \end{itemize}
 Figure~\ref{fig:cr_method} shows the steps on identical inputs: the same pixels, sky, errors and parameters, with LA
-Cosmic given $B$ (as in 1.1.0) or $B+M$; the counts reproduce those of the reductions (180 against 179 H$\alpha$ pixels
-in final v3, 15 against 15 with the new code).
+Cosmic given either $B$ (as in 1.1.0) or $B+M$. The flag counts in the figure reproduce those of the reductions: 180
+H$\alpha$ pixels against 179 in improved v3, and 15 against 15 with the new code.
 
-\textit{Alternatives tried.} (i) Restoring $\texttt{sigfrac}=0.3$ without the object model: the star core flagged falls
-only from 40 to 36 per cent and the H$\alpha$ flags from 180 to 109 pixels; it limits the growth of a detection but does
-not stop the core being detected. With the object model it reduces the flags further (H$\alpha$: 13 pixels) but also
-shrinks the masks of real hits (18 to 9 pixels), possibly leaving their faint edges unmasked; we kept 0.03 until the
-injection test settles it. (ii) Raising $\texttt{objlim}$ from 5 to 15 changed nothing for the star cores. (iii) A model
-from the fitted spatial profile (profile $\times$ flux of each bin), which carries the lines at full resolution, flagged
-up to 80 pixels of [O\,{\sc iii}] in NGC\,4151, whose narrow-line region has a different spatial profile from the
-continuum, and raised its flux by 10--16 per cent: rejected.
+\textit{Alternatives tried.}
+(i) Restoring the LA Cosmic default $\texttt{sigfrac}=0.3$ without the object model. The flagged share of the star core
+falls only from 40 to 36 per cent, and the H$\alpha$ flags from 180 to 109 pixels: the setting limits the growth of a
+detection but does not stop the core being detected. Together with the object model it reduces the flags further
+(H$\alpha$: 13 pixels), but it also shrinks the masks of real cosmic rays (from 18 to 9 pixels), possibly leaving their
+faint edges unmasked. We kept 0.03 until the injection test settles the question.
+(ii) Raising $\texttt{objlim}$ from 5 to 15 changed nothing for the star cores.
+(iii) An object model built from the fitted spatial profile (profile $\times$ flux of each bin), which keeps the lines
+at full resolution. It flagged up to 80 pixels of [O\,{\sc iii}] in NGC\,4151, whose narrow-line region has a
+different spatial profile from the continuum, and raised the line flux by 10--16 per cent. We rejected it.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_cr_method.png}
-\caption{The change step by step on identical inputs. Columns: \ding{172} the frame minus the sky; \ding{173} the object
-model, a 7-pixel running median along each detector row; \ding{174} the residual \ding{172}$-$\ding{173} in units of the
-error, which is what LA Cosmic searches with the change; \ding{175} the pixels flagged when LA Cosmic is given only the
-sky (\banzai{}~1.1.0 and final v3); \ding{176} the pixels flagged when it is given the sky and the object model. Rows:
-the core of BD$+28^\circ4211$ in 1.3\,arcsec seeing (2025 August 19); the H$\alpha$ peak of NGC\,4151 (2025 July 15);
-a real cosmic ray on the trace of NGC\,4151 (2025 July 19), found both ways. The 15 H$\alpha$ pixels still flagged
-with the object model are false positives, removed by the same-visit check (Fig.~\ref{fig:cr_pair}).}
+\caption{The change step by step on identical inputs. Columns: \ding{172} the frame minus the sky, which the 1.1.0
+detector searches; \ding{173} the same minus the object model (the 7-pixel running median along each detector row),
+which LA Cosmic searches with the change; both in units of the error, on one grey scale; \ding{174} the pixels flagged
+when LA Cosmic is given only the sky (\banzai{}~1.1.0 and improved v3, blue) and \ding{175} when it is given the sky
+and the object model (purple), with the number of flagged pixels in the panel. Rows: the core of BD$+28^\circ4211$ in
+1.3\,arcsec seeing (2025 August 19): 950 pixels against 6, all on the sky; the H$\alpha$ peak of NGC\,4151 (2025 July
+15): 180 against 15; a real cosmic ray on the trace of NGC\,4151 (2025 July 19), found both ways. The 15 H$\alpha$
+pixels still flagged with the object model are false positives, removed by the same-visit check
+(Fig.~\ref{fig:cr_pair}).}
 \label{fig:cr_method}
 \end{figure}
 
@@ -172,22 +223,25 @@ with the object model are false positives, removed by the same-visit check (Fig.
 \centering
 \includegraphics[width=\textwidth]{figures/fig_cr_smoothing.png}
 \caption{What the object model does. Left: one detector row through the core of BD$+28^\circ4211$ (top, blue order,
-2025 August 19) and through the peak of [O\,{\sc iii}]\,5007 of NGC\,4151 (bottom, 2025 July 20): data minus sky
-(black), the 7-pixel median along the row (green), the residual that LA Cosmic searches (orange) and the pixels
-flagged in that row by final v3 (red) and by the new detector (blue). Right: the 2-d frame with the flags of final v3
-(red) and of the new detector (blue). The blue flag near $x=1465$ is the warm pixel of the OGG camera.}
+2025 August 19) and through the peak of [O\,{\sc iii}]\,5007 of NGC\,4151 (bottom, 2025 July 20): frame minus sky
+(black), the object model, a 7-pixel median along the row (gold), the residual that LA Cosmic searches (orange), and
+the pixels flagged in that row by the 1.1.0 detector of improved v3 (blue ticks) and with the object model (purple
+ticks); the counts are written in the panel. Right: the 2-d frame (arcsinh grey scale) with the same flags outlined
+and the row of the left panel dotted. The flag near $x=1465$ is the warm pixel of the OGG camera, flagged by both.}
 \label{fig:cr_smoothing}
 \end{figure}
 
 \section{A safety net in the extraction}
 \label{sec:cr_guard}
-Whatever the detector does, the extraction should not turn a few flagged pixels into a factor 2.6. We measure, for
-each wavelength bin, the share of the profile weight in the extraction window removed by cosmic-ray flags. Single real
-hits on the trace remove at most 0.48 of it (injected hits: 0.15--0.42; the worst standard: 0.48); the clipped
-H$\alpha$ bins lose 0.51--0.75 even with the new detector. Bins where more than half is removed are now masked in the
-extracted spectrum (bit 4 of the \texttt{EXTRACTED} mask; the share is in the new column \texttt{cr\_masked\_weight})
-instead of being scaled up from the rest, and counted in the header (\texttt{L1QCRB1/2}). A masked bin is not recovered,
-but it is visible.
+Whatever the detector does, the extraction should not turn a few flagged pixels into a flux error of a factor 2.6. For
+each wavelength bin we therefore measure the share of the profile weight in the extraction window ($\sum aP$ of
+step 8, Section~\ref{sec:cr_method}) that belongs to pixels flagged as cosmic rays. A single real cosmic ray on the
+trace removes at most 0.48 of it (0.15--0.42 for the artificial cosmic rays of Section~\ref{sec:cr_inject}, and 0.48 in
+the worst standard star). The clipped H$\alpha$ bins lose 0.51--0.75, even with the new detector. Bins where more than
+half of the weight is removed are now masked in the extracted spectrum instead of being scaled up from the rest. We
+call this the \textit{extraction guard}. It sets bit 4 of the mask of the extracted spectrum (\texttt{EXTRACTED}
+extension), stores the share in a new column \texttt{cr\_masked\_weight}, and counts the masked bins in the header
+keywords \texttt{L1QCRB1} and \texttt{L1QCRB2} (red and blue order). A masked bin is not recovered, but it is visible.
 
 \input{chapters/cr_pair}
 
@@ -197,32 +251,44 @@ but it is visible.
 
 \section{Quality keywords in every product}
 \label{sec:qc}
-Each science and standard product now carries per-frame quality keywords (\texttt{L1Q*}) in the primary header of the
-\texttt{-1d} file and the \texttt{SCI} header of the \texttt{-2d} file, and a bitmask \texttt{L1QFLAG} with the names
-of the flags set in \texttt{L1QFLAGS} (Table~\ref{tab:qc_flags}). They are written by the last stage of the pipeline;
-for products already on disk the command \texttt{banzai\_floyds\_qc} computes the same values from the files, writes
-them into the headers and writes a table with one row per product, the observing conditions (\texttt{AGFWHM},
-\texttt{AIRMASS}, \texttt{MOONFRAC}, \texttt{MOONDIST}, \texttt{WMSCLOUD}, already in the headers from the raw frames)
-and all \texttt{L1} and \texttt{L1Q} keywords, to be joined to a master table on the file name. The keywords were added
-to all 317 science and standard products of the final reductions of both sites. Their definitions and normal ranges
-are in \texttt{docs/QC\_KEYWORDS.md} of the package; the thresholds were set just outside the normal range of these
-reductions and checked against the frames found by hand in this report.
+Each science and standard product now carries per-frame quality keywords, whose names start with \texttt{L1Q}. They
+are in the primary header of the \texttt{-1d} file and in the \texttt{SCI} header of the \texttt{-2d} file. A bitmask,
+\texttt{L1QFLAG}, marks the problems found, and \texttt{L1QFLAGS} lists the names of the flags set
+(Table~\ref{tab:qc_flags}). The last stage of the pipeline writes them. For products already on disk, the command
+\texttt{banzai\_floyds\_qc} computes the same values from the files and writes them into the headers. It also writes a
+table with one row per product, to be joined to a master table on the file name. The table holds all \texttt{L1} and
+\texttt{L1Q} keywords and the observing conditions already in the headers of the raw frames: the guider seeing
+(\texttt{AGFWHM}), the airmass (\texttt{AIRMASS}), the illuminated fraction of the Moon and its distance from the target
+(\texttt{MOONFRAC}, \texttt{MOONDIST}) and the cloud measure of the weather station (\texttt{WMSCLOUD}). We added the
+keywords to all 317 science and standard products of improved v3 at both sites. Their definitions and normal ranges are
+in the file \texttt{docs/QC\_KEYWORDS.md} of the package. We set the thresholds of the flags just outside the normal
+range of these reductions and checked them against the frames found by hand in this report.
 
-The values are: the median S/N per bin of each order (\texttt{L1QSN1/2}); the bin-to-bin scatter of the extracted flux
-over its errors (\texttt{L1QXJ1/2}; robust rms of the second difference, 1 for noise and insensitive to a smooth
-spectrum) and the same for the sky model (\texttt{L1QBJ1/2}); the per cent of the trace core flagged as cosmic rays
-(\texttt{L1QCR1/2}); cosmic-ray flags on the trace core of strong narrow emission lines (\texttt{L1QCRLN}, found in the
-spectrum itself, so no redshift is needed); bins masked by the extraction guard (\texttt{L1QCRB1/2}); the measured
-seeing in the slit (\texttt{L1QSEE1/2}, the FWHM of the fitted profile; the guider's \texttt{AGFWHM} is missing or zero
-in some frames) and the object's offset along the slit (\texttt{L1QPOFF}); for standards the light collected relative to
-the clear ensemble of the other standards (\texttt{L1QSTDGR}, which finds clouded standards and missed acquisitions);
-for science frames the days to the nearest and the farthest standard of the flux ensemble (\texttt{L1QSTDDT},
-\texttt{L1QSTDSP}).
+The keywords are (a trailing 1/2 means one keyword for each order, red and blue):
+\begin{itemize}
+\item \texttt{L1QSN1/2}: the median S/N per wavelength bin.
+\item \texttt{L1QXJ1/2}: the bin-to-bin scatter of the extracted flux over its errors. It is the robust rms of the
+second difference of the flux divided by its expected error: 1 for pure noise, and insensitive to a smooth spectrum.
+\texttt{L1QBJ1/2} is the same for the sky model under the object, still over the flux errors.
+\item \texttt{L1QCR1/2}: the per cent of the trace core (pixels within one FWHM of the trace) flagged as cosmic rays.
+\item \texttt{L1QCRLN}: cosmic-ray flags on the trace core of strong narrow emission lines. The lines are found in the
+spectrum itself, as bins well above a running median, so no redshift is needed.
+\item \texttt{L1QCRB1/2}: bins masked by the extraction guard (Section~\ref{sec:cr_guard}).
+\item \texttt{L1QSEE1/2}: the seeing measured in the slit, the FWHM of the fitted spatial profile. (The guider's
+\texttt{AGFWHM} is missing or zero in some frames.)
+\item \texttt{L1QPOFF}: the offset of the object along the slit.
+\item \texttt{L1QSTDGR}, standards only: the light collected relative to the clear ensemble of the other standards. It
+finds standards taken through clouds and failed acquisitions.
+\item \texttt{L1QSTDDT} and \texttt{L1QSTDSP}, science frames only: the days to the nearest and to the farthest standard
+of the flux ensemble.
+\end{itemize}
 
 \begin{table}[!htbp]
 \centering
-\caption{Quality flags (\texttt{L1QFLAG} bits) and how many products of the final reductions have each. ``Science''
-includes EG\,21 at COJ, which is not in the standards catalogue. A product can have several flags.}
+\caption{Quality flags (\texttt{L1QFLAG} bits) and how many products of improved v3 have each. ``Science''
+includes EG\,21 at COJ, which is not in the standards catalogue. A product can have several flags. ``Trace core'' is
+the pixels within one FWHM of the trace; the refraction scale is a parameter of the physical trace model
+(Chapter~\ref{sec:traces}); in the \texttt{BKMASK} row $\sigma$ is the width of the spatial profile.}
 \label{tab:qc_flags}
 \small
 \begin{tabular}{@{}rlp{6.4cm}rrrr@{}}
@@ -252,14 +318,19 @@ bit & flag & set when & sci. & std. & sci. & std. \\
 \end{tabular}
 \end{table}
 
-The flags find the problems of this chapter and of the earlier ones: \texttt{XJIT} and \texttt{BKJIT} the Fairall~9
-frames with the noisy sky and the BD$+28^\circ4211$ frame with half its core flagged; \texttt{CRCORE} only
-BD$+28^\circ4211$; \texttt{CRLINE} the clipped H$\alpha$; \texttt{STDGREY} GD\,153 on 2025 May 25 (0.09 of the light of
-the clear standards, also flagged \texttt{TRACE}, \texttt{PROFILE} and \texttt{FRINGE}) and BD$+28^\circ4211$ on 2025
-August 10 (0.06), as well as four standards taken through clouds. \texttt{STDFAR} shows that 44 COJ science frames are
-more than five days from a catalogue standard, because only Feige\,110 is in the catalogue: EG\,21, taken almost every
-night, would close the gap (Chapter~\ref{sec:recommendations}). \texttt{CRBIN} is zero in all these products because the
-guard did not exist when they were reduced.
+The flags find the problems of this chapter and of the earlier ones:
+\begin{itemize}
+\item \texttt{XJIT} and \texttt{BKJIT} find the Fairall~9 frames with the noisy sky model, and \texttt{XJIT} also the
+BD$+28^\circ4211$ frame with half its core flagged.
+\item \texttt{CRCORE} finds only BD$+28^\circ4211$, and \texttt{CRLINE} the clipped H$\alpha$.
+\item \texttt{STDGREY} finds GD\,153 on 2025 May 25 (0.09 of the light of the clear standards; also flagged
+\texttt{TRACE}, \texttt{PROFILE} and \texttt{FRINGE}), BD$+28^\circ4211$ on 2025 August 10 (0.06), and four standards
+taken through clouds.
+\item \texttt{STDFAR} shows that 44 COJ science frames are more than five days from a catalogue standard, because only
+Feige\,110 is in the catalogue. EG\,21, taken almost every night, would close the gap
+(Chapter~\ref{sec:recommendations}).
+\item \texttt{CRBIN} is zero in all these products, because the extraction guard did not exist when they were reduced.
+\end{itemize}
 
 \begin{table}[!htbp]
 \centering
@@ -273,7 +344,7 @@ Change & In the code & In the products of this report \\
 Sky lines must stand out from the first-pass scatter & yes, tested & no: re-reduction pending \\
 Object model for LA Cosmic & yes, tested & no: re-reduction pending \\
 Extraction guard (mask bit 4) & yes, tested & no: re-reduction pending \\
-Same-visit check after LA Cosmic & yes, tested (14 unit tests, 106 frames) & no: re-reduction pending \\
+Same-visit check after LA Cosmic & yes, tested (16 unit tests, 106 frames) & no: re-reduction pending \\
 Gaia lookup tries a second VizieR mirror & yes, tested & no: re-reduction pending \\
 Quality keywords & yes (last stage) & yes, added with \texttt{banzai\_floyds\_qc} \\
 Warm pixel of the OGG camera in the bad-pixel mask & no & no \\

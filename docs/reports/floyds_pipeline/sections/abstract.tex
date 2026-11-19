@@ -1,23 +1,32 @@
-We diagnose the LCO FLOYDS pipeline \banzai{} for reverberation mapping (RM), using a Fairall~9 campaign at Siding
-Spring (COJ; 100 spectra through the 6\,arcsec slit, 57 standard-star spectra, 122 arcs) and an NGC\,4151 campaign at
-Haleakal\=a (OGG; 60 spectra, 100 standard-star spectra), and we describe target-independent corrections, now built into
-\banzai{} and run from the raw frames. Our final version (improved v3) addresses every problem we found.
-(i) \textit{Wavelengths}: the arc fit leaves H$\beta$/[O\,{\sc iii}] and H$\alpha$ unconstrained (the archive red order
-is off by $-8$\,\AA{} at Hg\,4916) and a compact object's zero point in a wide slit depends on its position across the
-slit (up to $\pm2''$, i.e.\ $\pm17$\,\AA{} for NGC\,4151). Adding the detected but unused lines to the arc fit and
-measuring the object's zero point from the telluric bands in its own light bring the [O\,{\sc iii}] scatter from
-exposure to exposure to 0.5--0.9\,\AA{} and the two orders into agreement to 0.3\,\AA{} (COJ). (ii)
-\textit{Fringing}: the archive frames are divided by an eight-month-old lamp flat shifted along the slit by up to
-hundreds of pixels, which destroys data in 13 of 50 frames and biases the flux by up to $\pm10$ per cent; a lamp flat
-gives the phase of the fringes but not their shape. A two-harmonic fringe model with the lamp phase, fitted to each
-extracted spectrum jointly with a telluric template, reduces the red-order fringing of Fairall~9 from 13.7 (archive)
-and 8.1 (\banzai{}~1.1.0) to 1.9 per cent. (iii) \textit{Telluric and flux calibration}: standards are selected by
-proposal rather than slit width, several nightly standards are missing from the catalogue, a single standard
-transfers its clouds and its noise to the science, and the archive spectra are twice too bright because 1.0.1 does not
-scale by the exposure time. An ensemble of the nine nearest standards with the grey level of the clearest half, a
-telluric correction confined to the absorption bands and two added standards reduce the scatter of the red/blue
-[O\,{\sc iii}] flux ratio from 29.2 (archive) and 8.9 (1.1.0) to 6.9 per cent, and bridge a factor-1.8 throughput change
-of the OGG telescope. (iv) \textit{Traces}: a physical model of the object trace (refraction plus an instrumental
-shape for each site) keeps the faint ends of the orders at 0.1--0.3\,px where the polynomial fails. The uncertainties
-are correct per pixel at both sites. We list the open issues and give recommendations for observing and for the
-pipeline.
+We assess \banzai{}, the pipeline of Las Cumbres Observatory (LCO) for its FLOYDS spectrographs, for reverberation
+mapping (RM) of active galactic nuclei. We use a Fairall~9 campaign at Siding Spring (COJ; 100 spectra through the
+6\,arcsec slit, 57 standard-star spectra, 122 arcs) and an NGC\,4151 campaign at Haleakal\=a (OGG; 60 spectra, 100
+standard-star spectra). We compare the archive products (\banzai{}~1.0.1) and the current release (1.1.0) with
+corrections that use no knowledge of the science target; these are now built into \banzai{} and run from the raw
+frames. Our final version (improved v3) addresses every problem we found.
+(i) \textit{Wavelengths.} The arc fit uses no lamp line near H$\beta$/[O\,{\sc iii}] or H$\alpha$, so the wavelength
+scale there is interpolated or extrapolated: the archive red order is off by $-8$\,\AA{} at the Hg\,4916 line. In
+addition, in a wide slit the wavelength zero point of a compact object depends on where the object sits across the
+slit (up to $\pm2''$, i.e.\ $\pm17$\,\AA{} for NGC\,4151). We add to the arc fit the lines that are detected but were
+not used, and measure the zero point of each exposure from the telluric absorption bands in the object's own light.
+The position of [O\,{\sc iii}] then scatters by 0.5--0.9\,\AA{} from exposure to exposure, and the two orders agree to
+0.3\,\AA{} (COJ).
+(ii) \textit{Fringing.} The archive frames are divided by a lamp flat taken eight months earlier and shifted along the
+slit by up to hundreds of pixels. This destroys data in 13 of 50 frames and biases the flux by up to $\pm10$ per cent.
+Moreover, a lamp flat gives the phase of the fringes but not their shape. We instead fit a fringe model of two
+harmonics, with the phase from the lamp flats, to each extracted spectrum together with a telluric template. The
+residual fringing (rms) of the red order of Fairall~9 drops from 13.7 per cent (archive) and 8.1 per cent
+(\banzai{}~1.1.0) to 1.9 per cent.
+(iii) \textit{Telluric and flux calibration.} The pipeline selects standards by proposal rather than by slit width,
+and several standards observed nightly are missing from its catalogue. A single standard transfers its clouds and its
+noise to the science spectra. The archive spectra are also twice too bright, because 1.0.1 does not divide by the
+exposure time. We calibrate with the median of the nine standards nearest in time, set to the grey level of the
+clearest half of them; we apply the telluric correction only inside the absorption bands; and we add two standards to
+the catalogue. The scatter of the red/blue [O\,{\sc iii}] flux ratio drops from 29.2 per cent (archive) and 8.9 per
+cent (1.1.0) to 6.9 per cent, and the added standards make it possible to calibrate across the re-aluminisation of the
+OGG mirror, which raised the throughput by a factor 1.8 and changed the shape of the response. On 139 standards, the
+calibrated shape is good to 1.2--1.9 per cent at both sites.
+(iv) \textit{Traces.} A physical model of the object trace (atmospheric refraction plus an instrumental shape measured
+for each site) follows the trace to 0.1--0.3\,px at the faint ends of the orders, where the polynomial fit of
+\banzai{} fails. The propagated uncertainties are correct per pixel at both sites. We list the open issues and give
+recommendations for observing and for the pipeline.

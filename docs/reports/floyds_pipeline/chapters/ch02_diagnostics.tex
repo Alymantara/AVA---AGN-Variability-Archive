@@ -1,8 +1,9 @@
 \chapter{Diagnostic measurements}
 \label{sec:diagnostics}
 
-The following measurements are made on every spectrum and are independent of the reduction being tested. They are
-implemented in \texttt{banzai\_floyds.diagnostics} (\texttt{rm\_qa}, \texttt{sky\_lines}).
+We make the following measurements on every spectrum, in the same way for every reduction being tested. They are
+implemented in the Python modules \texttt{rm\_qa} and \texttt{sky\_lines} of \texttt{banzai\_floyds.diagnostics}
+(Chapter~\ref{sec:software}).
 
 \section{Narrow-line position and flux}
 \label{sec:diag_narrow}
@@ -16,16 +17,17 @@ F(\lambda) = \sum_{k=0}^{2} c_k\,\xi^k + A\left[ G(\lambda;\,\lambda_{2}+s,\,\si
 where $G(\lambda;\mu,\sigma)=\exp[-(\lambda-\mu)^2/2\sigma^2]$, $\lambda_{1,2}=(1+z)\{4958.911,5006.843\}$\,\AA,
 $r=1/2.98$ is the fixed line ratio \citep{Storey2000}, $\xi=(\lambda-\lambda_2)/100$\,\AA, and the free parameters are
 the shift $s$, the width $\sigma$, the amplitude $A$ and the quadratic continuum $c_k$ (which absorbs the
-H$\beta$ red wing). The fit minimises a soft-$L_1$ loss of the normalised residuals; the parameter covariance is
+H$\beta$ red wing). The fit minimises a soft-$L_1$ loss of the normalised residuals (quadratic for small residuals and linear for large
+ones, so that outliers carry less weight); the parameter covariance is
 $(J^{\rm T}J)^{-1}\chi^2_\nu$ with $J$ the Jacobian. The line flux is $A\sigma\sqrt{2\pi}$. Other narrow features
 ([Ne\,{\sc iii}]\,$\lambda3869$, host Ca\,{\sc ii}\,K) are fitted with a single Gaussian of either sign on a linear
 continuum.
 
 \section{Night-sky zero point}
 \label{sec:diag_sky}
-A sky spectrum is formed from the \texttt{BINNED2D} \emph{data} (not the sky model) of pixels with
-$|y_{\rm p}|>4\sigma_{\rm p}$ and more than 8 rows from the slit ends, as the median in wavelength bins of half a
-pixel. With a 6\,arcsec slit every sky line is a top-hat of the slit width ($\approx51$\,\AA{} red,
+A sky spectrum is formed from the \emph{data} (not the sky model) in the pixel table \texttt{BINNED2D}
+(Section~\ref{sec:data}). It uses the pixels more than $4\sigma_{\rm p}$ from the object trace and more than 8 rows
+from the slit ends, and takes their median in wavelength bins of half a pixel. With a 6\,arcsec slit every sky line is a top-hat of the slit width ($\approx51$\,\AA{} red,
 $\approx25$\,\AA{} blue), so its position is the flux-weighted centroid
 \begin{equation}
 \lambda_c = \frac{\sum_i \lambda_i\, \max(S_i - C_i, 0)}{\sum_i \max(S_i - C_i, 0)},
@@ -42,7 +44,7 @@ is excluded because it falls inside the window of the 6300 top-hat \citep{Osterb
 Telluric absorption is imprinted on the object's own light. For a band $b$, the extracted (uncalibrated) counts are
 divided by a straight line through the outer 12 per cent of the band window, $n(\lambda)$, and compared with a
 transmission template $T(\lambda)$ smoothed with a Gaussian of $\sigma=2$ pixels and raised to a free power $\alpha$
-(Beer--Lambert scaling, $T_X=T_1^{X}$):
+(Beer--Lambert scaling with airmass $X$, $T_X=T_1^{X}$):
 \begin{equation}
 \chi^2_b(s) = \sum_i \frac{\left[n_i - \exp\{\alpha(s)\ln T(\lambda_i - s)\}\right]^2}{\epsilon_i^2},\quad
 \alpha(s) = \frac{\sum_i w_i \ln T(\lambda_i-s) \ln n_i}{\sum_i w_i \ln^2 T(\lambda_i-s)},

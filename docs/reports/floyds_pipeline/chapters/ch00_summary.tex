@@ -3,7 +3,8 @@
 
 \section*{Reductions compared}
 Five reductions of the same exposures are compared in this report (Table~\ref{tab:versions_names}): two are
-\banzai{} as distributed, the other three successive improved versions of it. These names are used throughout.
+\banzai{} as distributed by LCO, the other three are successive improved versions of it. These names are used
+throughout (see also the Conventions, p.~\pageref{sec:conventions}).
 
 \begin{table}[!htbp]
 \centering
@@ -15,18 +16,19 @@ Five reductions of the same exposures are compared in this report (Table~\ref{ta
 Name & What it is \\
 \midrule
 \banzai{}~1.0.1 (archive) & The products in the LCO archive. \\
-\banzai{}~1.1.0 (stock) & The current release, run here from the raw frames with its default settings, except
-that the object wavelength zero point of this work (Section~\ref{sec:wl_zp}) was already applied; without it the
-[O\,{\sc iii}] position of Fairall~9 scatters by 6.6\,\AA{} (red order) and 3.1\,\AA{} (blue) between exposures,
-instead of 0.6 and 0.4\,\AA. Its fringe, telluric and flux results are those of 1.1.0. \\
+\banzai{}~1.1.0 (stock) & The current release, run here from the raw frames with its default settings, with one
+exception: the object wavelength zero point of this work (Section~\ref{sec:wl_zp}) was already applied. Without it,
+the [O\,{\sc iii}] position of Fairall~9 scatters by 6.6\,\AA{} (red order) and 3.1\,\AA{} (blue) between exposures,
+instead of 0.6 and 0.4\,\AA. Its fringe, telluric and flux results are those of the release. \\
 Improved v1 & The corrections of Chapters~\ref{sec:traces}--\ref{sec:flux} applied to the archive products
-(re-extraction, harmonic fringe model, arc refit, telluric zero point, template$\times$nightly flux
-calibration). \\
-Improved v2 & The first improved \banzai{} run from raw: harmonic fringe stage (bands masked, onset 6500\,\AA, nodes
-every 400\,\AA), combined trace model, telluric correction restricted to the bands and taken from the nine nearest
-standards; single-standard flux calibration. \\
-\textbf{Improved v3 (final)} & Our final version for now, and the default configuration of the branch: v2 plus the
-joint fringe + telluric fit, the residual fringe template of the slit, wider telluric bands, the O$_2$ A band flagged
+(re-extraction, harmonic fringe model, arc refit, telluric zero point, and a flux calibration that multiplies a
+sensitivity template by a nightly correction; Appendix~\ref{sec:app_v1}). \\
+Improved v2 & The first improved \banzai{} run from raw: the harmonic fringe model (telluric bands excluded from
+the fit, model starting at 6500\,\AA, amplitude allowed to change every 400\,\AA), the physical object-trace model,
+and a telluric correction restricted to the bands and taken from the nine nearest standards; flux calibration from a
+single standard. \\
+\textbf{Improved v3 (final)} & Our final version for now, and the default configuration of our code branch: v2 plus
+the joint fit of fringes and telluric absorption, a template of the fixed fringe residual for each slit, wider telluric bands, the O$_2$ A band flagged
 in science spectra, the ensemble flux calibration, the unused arc lines added to the arc fit, an object-trace template
 for each site, and Feige\,67 and GD\,153 as flux standards. Verified at both FLOYDS sites (Chapter~\ref{sec:sites}). \\
 \bottomrule
@@ -35,15 +37,15 @@ for each site, and Feige\,67 and GD\,153 as flux standards. Verified at both FLO
 
 \section*{Overview}
 
-This report examines every step of the FLOYDS reduction that matters for reverberation mapping (RM), shows for each
-step what the archive pipeline \banzai{}~1.0.1 does, where it fails (with examples from the Fairall~9 campaign), what we
-changed, and what the change achieves. The corrections are target-independent: no information about the science
-target is used. They were developed on the public \texttt{-1d}/\texttt{-2d} archive files
-(Chapters~\ref{sec:traces}--\ref{sec:flux}); the fringe and trace corrections now run inside \banzai{} from the
-raw frames, in one pass and with fewer steps than \banzai{}~1.1.0 (stock) (Chapter~\ref{sec:raw}), as do the
-telluric correction, the ensemble flux calibration with the grey level from the clearest standards and the added arc
-lines. Improved v3 is our final version for now; Chapter~\ref{sec:sites} verifies it on a second campaign taken with
-the other FLOYDS (OGG).
+This report examines every step of the FLOYDS reduction that matters for reverberation mapping (RM). For each step
+it shows what the archive pipeline \banzai{}~1.0.1 does, where it fails (with examples from the Fairall~9 campaign),
+what we changed, and what the change achieves. The corrections are target-independent: no information about the
+science target is used. We developed them on the public \texttt{-1d}/\texttt{-2d} archive files
+(Chapters~\ref{sec:traces}--\ref{sec:flux}). The following now run inside \banzai{} from the raw frames: the fringe and
+trace corrections (in one pass and with fewer steps than \banzai{}~1.1.0; Chapter~\ref{sec:raw}), the telluric
+correction, the ensemble flux calibration with the grey level from the clearest standards, and the added arc lines.
+Improved v3 is our final version for now; Chapter~\ref{sec:sites} verifies it on a second campaign taken with the
+other FLOYDS (OGG).
 Fig.~\ref{fig:flow} shows the chain and Table~\ref{tab:stages} summarises each step. The quality metrics of the
 archive products and of the recalibrated spectra are collected in Table~\ref{tab:summary}.
 
@@ -53,12 +55,12 @@ archive products and of the recalibrated spectra are collected in Table~\ref{tab
 \centering
 \begin{tikzpicture}[
   node distance=5mm and 7mm,
-  box/.style={draw=avaInkBlue, rounded corners=2pt, thick, align=left, font=\small, text width=6.1cm,
+  box/.style={draw=mnrasblue, rounded corners=2pt, thick, align=left, font=\small, text width=6.1cm,
               inner sep=4pt, fill=white},
   new/.style={box, fill=blue!6},
   inp/.style={draw=black!45, dashed, rounded corners=2pt, align=left, font=\footnotesize, text width=3.6cm,
               inner sep=3pt, fill=black!3},
-  arr/.style={-{Stealth[length=2.2mm]}, thick, avaInkBlue},
+  arr/.style={-{Stealth[length=2.2mm]}, thick, mnrasblue},
   side/.style={-{Stealth[length=1.8mm]}, black!50}]
 \node[box] (raw) {\textbf{Raw frames} (science, standards, arcs, lamp flats, sky flats)};
 \node[new, below=of raw] (trace) {\textbf{1. Order and object traces} (Ch.~\ref{sec:traces})\\
@@ -75,12 +77,12 @@ archive products and of the recalibrated spectra are collected in Table~\ref{tab
   beyond 8850\,\AA: fit on the telluric-corrected spectrum (one stage in the pipeline)};
 \node[box, below=of fr2] (out) {\textbf{Calibrated spectra per order} (red and blue kept separate)};
 \foreach \a/\b in {raw/trace, trace/rex, rex/fr1, fr1/wl, wl/flux, flux/fr2, fr2/out} \draw[arr] (\a) -- (\b);
-\node[inp, right=of trace] (i1) {sky flats (order shape, one per slit and epoch); same-block lamp flat (position)};
+\node[inp, right=of trace] (i1) {sky flats (order shape, one set per slit and period); same-block lamp flat (position)};
 \node[inp, right=of fr1] (i2) {lamp-flat phase master (median over 1--2 months, per slit): fringe \emph{phase} only};
 \node[inp, right=of wl] (i3) {raw arcs (Hg\,4916, Ar\,6416/6677/6753 added)};
 \node[inp, right=of flux] (i4) {standards (nine nearest in time, any slit); reference fluxes};
 \foreach \a/\b in {i1/trace, i2/fr1, i3/wl, i4/flux} \draw[side] (\a) -- (\b);
-\node[inp, left=of rex, text width=3.4cm] (q) {QA at every step: narrow lines, sky and telluric zero
+\node[inp, left=of rex, text width=3.4cm] (q) {Quality checks at every step: narrow lines, sky and telluric zero
   points, order overlap, per-spectrum residuals (Ch.~\ref{sec:diagnostics})};
 \draw[side] (q) -- (rex);
 \end{tikzpicture}
@@ -98,18 +100,19 @@ calibration inputs. The steps act on each order separately.}
 Step & \banzai{}~1.0.1 & Problem & This work \\
 \midrule
 Order trace &
-Order shape from a sky flat (hard-coded list, one per slit and epoch); per-frame vertical shift fitted on the science
-frame (red order only). &
+Order shape from a sky flat (fixed list in the code, one per slit and period); shift along the slit fitted on each
+science frame (red order only). &
 None for Fairall~9 (the shift agrees with the lamp flat to 0.14\,px), but the shift is fitted on the science light,
 which fails for faint targets. &
-Shift from the same-block lamp flat (signal-to-noise ratio in the thousands); the blue order is only traceable on lamp
-flats at $x>1300$. \\
+Shift from the same-block lamp flat (signal-to-noise ratio in the thousands); on lamp flats the blue order can be
+traced only at detector columns $x>1300$. \\
 Object trace &
-Polynomial in wavelength (degree 7 in 1.0.1, 5 with a curvature penalty in 1.1.0) through per-chunk centroids. &
+Polynomial in wavelength (degree 7 in 1.0.1, 5 with a curvature penalty in 1.1.0) fitted to the object's centroids
+in wavelength chunks. &
 Offsets of 0.8--1.4\,px at the faint red end (9250--9750\,\AA), 1--2 per cent flux loss. &
-Physical model: offset + atmospheric differential refraction along the slit + instrumental shape + penalised
-correction (default in the pipeline; a template per site). Equal for bright targets; holds at 0.1--0.3\,px where
-the polynomial fails ($\gtrsim30\times$ fainter than Fairall~9). \\
+Physical model: offset + atmospheric differential refraction along the slit + instrumental shape + a small smooth
+correction (default in the pipeline; an instrumental-shape template per site). Same result as the polynomial for
+bright targets; holds at 0.1--0.3\,px where the polynomial fails ($\gtrsim30\times$ fainter than Fairall~9). \\
 Fringing &
 Divides each frame by a whole 8-month-old lamp flat, shifted along the slit by up to hundreds of pixels. &
 Invalid flat edges destroy data in 13/50 frames; slit illumination biases the flux by up to $\pm10$ per cent; lamp
@@ -117,28 +120,32 @@ fringes are smoothed by the 6\,arcsec slit and do not match the object's. &
 No 2-d division: a two-harmonic fringe model with the phase from a lamp-flat master is fitted to each extracted
 spectrum, jointly with a telluric template, plus a static residual template per slit (for archive products the
 division is undone first, Appendix~\ref{sec:app_v1}). Red fringing \FrOld{}$\rightarrow$\FrNewOpt{} per cent
-(2.7 in the pipeline from raw). \\
+(1.9 with improved v3 run from the raw frames; Table~\ref{tab:versions}). \\
 Sky and extraction &
-Kelson-type 2-d background; optimal extraction. &
+Two-dimensional spline sky model (Kelson-type); optimal extraction. &
 Sky wrong where the flat was invalid; error bars not propagated through the flat. &
-Robust per-bin sky with adaptive object mask; optimal and fixed-aperture extractions with propagated errors. \\
+Sky fitted along the slit in each wavelength bin, with an object mask that adapts to the object's width (improved
+v1; from raw, \banzai{}'s own sky model); optimal and fixed-aperture extractions with propagated errors. \\
 Wavelengths &
 Arc fit without lines between Hg\,4358 and 5461\,\AA{} (blue) or blueward of 5461\,\AA{} (red); no object zero
 point. &
 H$\beta$/[O\,{\sc iii}] interpolated or extrapolated ($-8$\,\AA{} in the red at 4916\,\AA); the object's position
-in the wide slit shifts its wavelengths by up to 3\,\AA. &
+in the wide slit shifts its wavelengths (scatter of 3--7\,\AA{} between exposures, up to $\pm17$\,\AA{} for
+NGC\,4151). &
 The unused lines added to the arc fit; zero point from the telluric bands in the object's own light, transferred
 to the blue order. Narrow-line scatter 160--340$\rightarrow$20--40\,\kms; orders agree to 0.3\,\AA{} (COJ). \\
 Flux calibration &
-Standard chosen by block/proposal, not slit width; EG\,21 missing from the catalogue; fine-knot spline sensitivity. &
+Standard chosen by block or proposal, not by slit width; EG\,21 missing from the catalogue; sensitivity fitted as a
+spline with closely spaced knots. &
 Spikes and fringes in the sensitivity; a single standard's clouds and slit losses transferred to the science. &
-Median of the grey-normalised sensitivities of the nine nearest standards, grey level from the clearest of them
-(in the pipeline); template $\times$ nightly correction for coarse references; Feige\,67 and GD\,153 added to the
+Median of the sensitivities of the nine nearest standards, each scaled by its grey factor, with the overall level
+from the clearest of them (in the pipeline); for standards whose reference spectrum is coarse, a sensitivity
+template times a smooth nightly correction; Feige\,67 and GD\,153 added to the
 catalogue. Red/blue [O\,{\sc iii}] scatter \FRBOld{}$\rightarrow$\FRBBox{} per cent (6.9 in v3 from raw). \\
 Telluric &
 Measured on the standard, scaled with airmass. &
-Not matched to the seeing-set line-spread function of the 6\,arcsec spectra; red end beyond 8900\,\AA{}
-extrapolated. &
+Measured at the resolution of the 2\,arcsec standards, not of the 6\,arcsec science spectra, whose resolution the
+seeing sets; red end beyond 8900\,\AA{} extrapolated. &
 Transmission applied only inside the bands, median of the nine nearest standards; O$_2$ A band flagged. Open: a
 model transmission matched to each spectrum's resolution and water column (Chapter~\ref{sec:recommendations}). \\
 \bottomrule
