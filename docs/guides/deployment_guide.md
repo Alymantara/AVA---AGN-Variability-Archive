@@ -476,6 +476,18 @@ Saturated AGN (19 Nov 2026): calibration stores the AGN's peak counts (`frame_qc
 their image take that level from `photometry.calibration.camera_defaults`, which now includes MuSCAT (`ep`).
 Existing frames need a recalibration (`-c`) to get `agn_peak`.
 
+QC gate before PyTICS (20 Nov 2026): three new keys.
+- `ensemble.pytics_ignore_qc_flags` (`no_zp`, `zp_scatter`, `zp_offset`): these flags no longer keep a frame out
+  of PyTICS; they stay in `frame_qc` for the per-frame light curve.
+- `photometry.qc.agn_bad_flags` (28): `agn_flagged` only for AGN FLAGS 4 / 8 / 16, not 1 / 2 (deblended).
+- `photometry.qc.zp_dev_min_frames` (10): `zp_offset` against each camera's median ZP, not the family's.
+
+Sinistro is linear up to saturation (Mrk 817 stars), so `photometry.qc.per_camera.fa` / `fl` set
+`max_agn_peak_frac: 1.0`; MuSCAT keeps 0.8.
+
+After upgrading, the next calibration run (`-c`, which ends with `requalify`) refreshes the flags. Then run
+`--pytics-full` once. Evidence: `docs/figures/qc_gate_20261120/`.
+
 Error bars (19 Nov 2026): the products use the fitted error model by default (`ensemble.error_model: fitted`,
 `ava/photometry/errors.py`). It always includes a floor: `ensemble.error_model_default` (k 1.07, β 0.11,
 s0 1.1 mmag) where a fit is not possible, and `ensemble.error_model_min_floor` (1 mmag). Evidence:

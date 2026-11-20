@@ -253,6 +253,10 @@ change can be switched off from the \texttt{ensemble:} block of \texttt{config/a
   \item \textbf{Flux--flux intercalibration} of cameras with different apertures (Sect.~\ref{sec:intercal}).
   \item \textbf{AGN light curve}: a \texttt{good} flag per epoch, a separate random error, and an
         optional empirical error model (Sect.~\ref{sec:agnlc}).
+  \item \textbf{Frame gate} (20 Nov 2026). PyTICS takes every frame that passes the measurement checks.
+        Frames flagged only for the per-frame reference zero point (\texttt{no\_zp}, \texttt{zp\_scatter},
+        \texttt{zp\_offset}) are kept, because PyTICS fits its own zero points
+        (\texttt{pytics\_ignore\_qc\_flags}; Sect.~\ref{sec:gate}).
   \item \textbf{Stored solution}: for each filter, the folder \texttt{<phot>/pytics/<filter>/} holds
         the star, scope, epoch and star$\times$scope tables and a \texttt{meta.json}; the updates read
         them back.
@@ -1083,6 +1087,70 @@ is too small there.
 \paragraph{Consequences.} For lags and variability: use the model errors (now the default), exclude saturated
 epochs (now flagged), and treat the remaining $\sim$1\,\% of outliers robustly. The zero-point uncertainty
 plays no part.
+
+\section{Which frames enter PyTICS: ESO\,511-30}
+\label{sec:gate}
+
+Until 20 Nov 2026 PyTICS took only frames with \texttt{qc\_pass} = 1. On ESO\,511-30 (Turgon backfill
+pilot, 9339 Sinistro frames) that dropped 34\,\% of the frames, against 20\,\% for Mrk\,817. None of the drops
+was bad data:
+\begin{itemize}
+  \item \textbf{\texttt{agn\_flagged}, 940 frames in $g$, $r$ and $i$.} Every one has SExtractor FLAGS = 2: the
+        nucleus is deblended from the barred host. None has FLAGS 4, and the nucleus never exceeds 15\,\% of
+        saturation. Deblended and clean frames of the same night agree to +0.3/+2.1/+1.0\,mmag
+        ($g$/$r$/$i$; 27--45 nights each).
+  \item \textbf{\texttt{zp\_scatter} in $z$, 663 frames.} The field's typical scatter (0.123\,mag) sits at the
+        0.12 limit, on every camera and in every year.
+  \item \textbf{\texttt{zp\_offset} in $u$, 350 frames.} The deviation was measured from the median over all
+        Sinistro cameras, but the $u$ zero points of the individual cameras differ by up to $\pm$0.6\,mag.
+\end{itemize}
+
+The fix changes no threshold value:
+\begin{itemize}
+  \item the AGN uses the comparison stars' FLAGS mask (\texttt{agn\_bad\_flags} = 28);
+  \item the zero-point flags no longer gate PyTICS;
+  \item \texttt{zp\_offset} uses each camera's own median.
+\end{itemize}
+Frames entering PyTICS rise from 66\,\% to 96\,\% (Fig.~\ref{fig:gate}). Good epochs rise per filter:
+$r$ 616$\to$1187, $z$ 522$\to$1158, $i$ 755$\to$1152 and $u$ 737$\to$1130. The light curve keeps its shape
+(Fig.~\ref{fig:eso511lc}).
+
+The added frames are no noisier than the old ones: their model errors match those of the frames that passed
+before. The median model error still rises in $r$ (2.8$\to$6.6\,mmag) and $z$ (3.3$\to$13.8\,mmag). The
+camera-to-camera term $s_\mathrm{cam}$ causes it. With only 21--25 cross-camera pairs the old fit put it at
+zero; with 79--81 pairs it comes out at 6.1 ($r$) and 13.3\,mmag ($z$). The old $r$ and $z$ errors were too
+small, the camera term underestimated in Sect.~\ref{sec:pairs-all}.
+
+\paragraph{Sinistro linearity.} A bias test on Mrk\,817 comparison stars (5.1 million measurements) finds
+Sinistro and MuSCAT flat within $\pm$1.2\,mmag up to saturation (Fig.~\ref{fig:linearity}). The test
+compares each star with its own median, against the \emph{predicted} peak and corrected by the frame's faint
+stars. The pair test above could not see a steady compression, because the frames of a pair have almost the
+same peak. The AGN peak cut is therefore 1.0 on Sinistro and stays 0.8 on MuSCAT.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{../../figures/qc_gate_20261120/eso511_pytics_gate}
+  \caption{ESO\,511-30: frames entering PyTICS per filter, old gate (\texttt{qc\_pass}) against the new one.
+    Black line: all frames.}
+  \label{fig:gate}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.49\textwidth]{../../figures/qc_gate_20261120/lco_latest_ESO_511-30_merged_old}\hfill
+  \includegraphics[width=0.49\textwidth]{../../figures/qc_gate_20261120/lco_latest_ESO_511-30_merged_new}
+  \caption{ESO\,511-30 merged light curve (website plot) before (left) and after (right) the new frame gate.}
+  \label{fig:eso511lc}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{../../figures/qc_gate_20261120/sinistro_linearity_mrk817}
+  \caption{Mrk\,817 comparison stars: magnitude relative to the star's median against peak counts /
+    saturation. Blue: Sinistro; orange: MuSCAT. Both use the predicted peak and are corrected by the frame's
+    faint stars. Grey dotted: binned by the measured peak, which is biased by selection. Shaded: $\pm$1\,mmag.}
+  \label{fig:linearity}
+\end{figure}
 
 \section{Residual systematics}
 

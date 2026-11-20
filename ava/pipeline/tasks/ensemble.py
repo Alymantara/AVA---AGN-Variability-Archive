@@ -287,6 +287,7 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         intercal_min_pairs=int(ec.get("intercal_min_pairs", 10)),
         colour_bands=tuple(ec.get("colour_bands", ["g", "i"]) or ["g", "i"]),
         auto_refit=bool(ec.auto_refit), log=logger.info,
+        ignore_qc_flags=tuple(ec.get("pytics_ignore_qc_flags", ["no_zp", "zp_scatter", "zp_offset"]) or ()),
         update_kw=dict(refit_fraction=float(ec.get("refit_fraction", 0.1)),
                        refit_rms_factor=float(ec.get("refit_rms_factor", 2.0)),
                        refit_rms_floor=float(ec.get("refit_rms_floor", 0.002)), bad_flags=int(ec.bad_flags)),

@@ -576,11 +576,14 @@ def apply(sol: Solution, d: pd.DataFrame, zp: float = 0.0, zp_err: float = 0.0,
 # Target driver: whole data set (full) or new frames only (update)
 # ---------------------------------------------------------------------------
 
-def load_target(phot_dir: Path, db: Path, data_id: str, filt: str, qc_only: bool = True) -> pd.DataFrame:
-    """PyTICS input for one filter: measurements x frame_qc, scope = telescope-camera."""
-    from ava.photometry.store import load_pytics
+def load_target(phot_dir: Path, db: Path, data_id: str, filt: str, qc_only: bool = True,
+                ignore_flags=None) -> pd.DataFrame:
+    """PyTICS input for one filter: measurements x frame_qc, scope = telescope-camera.
+    ``ignore_flags``: QC flags that do not exclude a frame (None = store.PYTICS_IGNORE_FLAGS)."""
+    from ava.photometry.store import PYTICS_IGNORE_FLAGS, load_pytics
 
-    d = load_pytics(phot_dir, db, data_id, filt=filt, qc_only=qc_only)
+    d = load_pytics(phot_dir, db, data_id, filt=filt, qc_only=qc_only,
+                    ignore_flags=PYTICS_IGNORE_FLAGS if ignore_flags is None else ignore_flags)
     d["scope"] = d["telid"].astype(str) + "-" + d["camera"].astype(str)
     return d
 
@@ -645,7 +648,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
                min_epochs: int = 10, absolute: bool = True, colour_term: bool = True,
                scope_colour_terms="auto", colour_check_min_gain: float = 0.05, ref_cameras=("fa",),
                intercal_max_gap: float = 3.0, intercal_min_pairs: int = 10, colour_bands=("g", "i"),
-               auto_refit: bool = True, update_kw: dict | None = None,
+               auto_refit: bool = True, ignore_qc_flags=None, update_kw: dict | None = None,
                apply_kw: dict | None = None, zp_kw: dict | None = None, anchor_kw: dict | None = None,
                log=print, **fit_kw) -> dict:
     """Calibrate ``data_id`` per filter and write ``agn_lightcurve_pytics.parquet``.
@@ -666,6 +669,8 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     frames (:func:`anchor_stars` with these settings), not only the comparison stars.
     ``colour_bands``: the star / AGN colour of every colour term (per-scope CK_k and the absolute C),
     ``(blue, red)`` reference bands (``ensemble.colour_bands``, default g - i).
+    ``ignore_qc_flags``: frame_qc flags that do not keep a frame out (``ensemble.pytics_ignore_qc_flags``;
+    None = the zero-point flags, :data:`ava.photometry.store.PYTICS_IGNORE_FLAGS`).
     ``fit_kw`` go to :func:`fit`, ``update_kw`` to :func:`update`, ``apply_kw`` to :func:`apply`.
     """
     from ava.photometry.calibration import FILTER_TO_BAND
@@ -695,7 +700,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
 
     # ---- 1. fit (or update) every filter ------------------------------------------------
     for f in filters:
-        d = load_target(phot_dir, db, data_id, f)
+        d = load_target(phot_dir, db, data_id, f, ignore_flags=ignore_qc_flags)
         if d["frame"].nunique() < min_epochs:
             log(f"{f}: {d['frame'].nunique()} frames < {min_epochs}, skipped")
             continue

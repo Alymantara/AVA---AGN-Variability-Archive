@@ -1103,3 +1103,35 @@ Changes:
   files are fetched before the next page is requested; the per-run cap counts files in flight; the archive
   rate limiter is unchanged (searches stay at 1/s). A 1000-frame backfill: ~2.4 h → ~45 min, 10 → 1
   listing requests. Tests: `tests/test_download_parallel.py`, `test_parallel_spectra_fetch`.
+
+## QC gate before PyTICS; Sinistro linearity (20 Nov 2026)
+
+- **Problem.** ESO 511-30 (Turgon pilot) lost 34.4 % of its frames before PyTICS (Mrk 817: 20 %).
+  Two flags drove it, neither a sign of bad data:
+  - `agn_flagged`: 940 frames in g / r / i, every one with SExtractor FLAGS = 2 (nucleus deblended from the barred
+    host). Flagged and clean frames of the same night agree to +0.3 / +2.1 / +1.0 mmag (g / r / i).
+  - `zp_scatter` z: this field's typical z scatter (0.123) sits at the 0.12 threshold.
+  - `zp_offset` u: measured against the median of all Sinistro cameras, but the u ZP differs by up to ±0.6 mag
+    between Sinistro units.
+- **Fix (no threshold value changed).**
+  - `photometry.qc.agn_bad_flags: 28`: the AGN uses the same FLAGS mask as the comparison stars.
+  - `ensemble.pytics_ignore_qc_flags`: the zero-point flags no longer gate PyTICS, which solves its own epoch
+    zero points.
+  - `zp_offset` uses the camera's median (family median below `zp_dev_min_frames`).
+  - ESO 511-30: frames into PyTICS 66 % → 96 %.
+  - Tests: `tests/test_qc_gate.py`.
+- **Sinistro linearity, rechecked.** Mrk 817 comparison stars, 5.1 M legacy-catalogue peaks.
+  - A star's magnitude relative to its own median, binned by *predicted* peak (frame PSF × the star's mean flux)
+    and corrected by the faint stars of the same frame: flat within ±1.2 mmag from 0 to 1.0 × saturation on
+    Sinistro, and on MuSCAT for Mrk 817.
+  - Binning by the *measured* peak shows a spurious −7 mmag trend: frames where a star scatters bright also have
+    a higher peak.
+  - So the 0.8 cut (`max_agn_peak_frac`) is conservative on Sinistro. FLAGS 4 (pixels above SATURATE) already
+    catches true saturation there.
+  - Applied at Juan's request (20 Nov 2026): `per_camera.fa` / `fl: {max_agn_peak_frac: 1.0}`. MuSCAT keeps 0.8,
+    because its saturation level is less certain (NGC 4151).
+  - ESO 511-30 rerun with the new gate (`docs/figures/qc_gate_20261120/rerun_eso511.py`): good epochs
+    r 616→1187, z 522→1158. The light curve keeps its shape. The median model error rises in r (2.8→6.6 mmag)
+    and z (3.3→13.8). The cause is s_cam: the old fit had too few cross-camera pairs and put it at 0. The
+    new frames are no noisier than the old ones.
+  - Figure: `docs/figures/qc_gate_20261120/sinistro_linearity_mrk817.png`.

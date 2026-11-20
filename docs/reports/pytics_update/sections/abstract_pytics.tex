@@ -10,4 +10,7 @@ continuous merged light curves from 2020 to 2026.  A pair test of every AGN (89\
 the error distribution is Gaussian in its core but that the PyTICS error lacks a floor of about 1\,mmag that
 follows exposure, airmass and seeing, and over-counts the comparison-star scatter; the fitted error model,
 with the floor, is now the default.  The absolute zero point uses every star in the frames, which gives
-anchors to dense fields and to Y.
+anchors to dense fields and to Y.  PyTICS now takes every frame that passes the measurement checks. The per-frame zero-point flags no longer
+exclude frames, and a nucleus deblended from its host is kept. On ESO\,511-30 the frames entering PyTICS rise
+from 66\,\% to 96\,\%. A bias test of Mrk\,817 comparison stars finds Sinistro linear to within 1.2\,mmag up to
+saturation.

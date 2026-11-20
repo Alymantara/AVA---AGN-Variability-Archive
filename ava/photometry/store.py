@@ -200,18 +200,32 @@ def write_agn_lightcurve(phot_dir: Path, db: Path, data_id: str) -> pd.DataFrame
     return lc
 
 
+#: frame_qc flags that do not keep a frame out of PyTICS (ensemble.pytics_ignore_qc_flags): they test the
+#: per-frame reference zero point, which PyTICS does not use (it solves its own epoch zero points).
+PYTICS_IGNORE_FLAGS = ("no_zp", "zp_scatter", "zp_offset")
+
+
+def pytics_pass(fq: pd.DataFrame, ignore_flags=PYTICS_IGNORE_FLAGS) -> pd.Series:
+    """Frames PyTICS may use: qc_pass, or every QC flag of the frame in ``ignore_flags``."""
+    ign = set(ignore_flags or ())
+    flags = fq["qc_flags"].fillna("").astype(str)
+    only_ignored = flags.map(lambda s: bool(s) and set(s.split(",")) <= ign)
+    return (fq["qc_pass"] == 1) | only_ignored
+
+
 def load_pytics(phot_dir: Path, db: Path, data_id: str, filt: str | None = None,
-                qc_only: bool = True) -> pd.DataFrame:
+                qc_only: bool = True, ignore_flags=PYTICS_IGNORE_FLAGS) -> pd.DataFrame:
     """The long table PyTICS takes: one row per (frame, star) incl. the AGN.
 
     Columns: MJD, Filter, star_id, is_agn, mag_inst, magerr, telid, camera,
     airmass, seeing — read from measurements.parquet joined with frame_qc.
+    ``qc_only``: frames passing QC apart from the flags in ``ignore_flags`` (:func:`pytics_pass`).
     """
     fq = read_frame_qc(db, data_id)
     if filt:
         fq = fq[fq["filter"] == filt]
     if qc_only:
-        fq = fq[fq["qc_pass"] == 1]
+        fq = fq[pytics_pass(fq, ignore_flags)]
     if fq.empty:
         # No (passing) frame in this filter, e.g. Y for most targets. pyarrow rejects an empty "in" filter
         # ("large_string vs null", host run 18 Nov 2026), so return the empty table directly.

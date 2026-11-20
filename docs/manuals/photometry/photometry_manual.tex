@@ -1127,11 +1127,11 @@ Flag & Condition \\
 \texttt{no\_zp}       & ZP fit failed (too few standards or non-finite result) \\
 \texttt{few\_matched} & fewer than \texttt{min\_matched} (30) reference stars matched \\
 \texttt{agn\_missing} & AGN not detected in this frame \\
-\texttt{agn\_flagged} & AGN detected with non-zero SExtractor FLAGS \\
-\texttt{agn\_saturated} & AGN peak $\geq$ \path{max_agn_peak_frac} (0.8) $\times$ \texttt{SATURATE} (19 Nov 2026) \\
+\texttt{agn\_flagged} & AGN with SExtractor FLAGS 4, 8 or 16 (\path{agn_bad_flags} = 28; not 1/2, 20 Nov 2026) \\
+\texttt{agn\_saturated} & AGN peak $\geq$ \path{max_agn_peak_frac} $\times$ \texttt{SATURATE}: 0.8; Sinistro 1.0 (20 Nov 2026) \\
 \texttt{zp\_scatter}  & star-to-star ZP scatter $>$ \path{max_zp_scatter} (0.05\,mag) \\
 \texttt{seeing}       & median FWHM $>$ \path{max_fwhm_arcsec} (4.5\,arcsec) \\
-\texttt{zp\_offset}   & $|\mathrm{ZP} - \mathrm{med}(\mathrm{ZP}_\mathrm{camera/filter})|$ $>$ 0.5\,mag (clouds) \\
+\texttt{zp\_offset}   & $|\mathrm{ZP} - \mathrm{med}(\mathrm{ZP}_\mathrm{camera/filter})|$ $>$ 0.5\,mag (clouds); median per camera \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1152,6 +1152,52 @@ $Y$ & \path{max_zp_scatter} & 0.25\,mag \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{Which frames enter PyTICS (20 Nov 2026)}
+\label{sec:pytics-gate}
+
+PyTICS fits its own zero point for every epoch, so the flags that test the per-frame reference zero point
+(\texttt{no\_zp}, \texttt{zp\_scatter}, \texttt{zp\_offset}) no longer keep a frame out of it
+(\path{ensemble.pytics_ignore_qc_flags}). These frames keep their flags and stay out of the per-frame light
+curve. Measurement flags still exclude a frame from both: \texttt{few\_matched}, \texttt{agn\_missing},
+\texttt{agn\_flagged}, \texttt{agn\_saturated} and \texttt{seeing}.
+
+Three findings on ESO\,511-30 (9339 Sinistro frames, Turgon pilot) led to this. Before the change, 34\,\% of its
+frames were dropped, against 20\,\% for Mrk\,817.
+\begin{itemize}
+  \item \textbf{Deblended nucleus.} 940 $g$/$r$/$i$ frames had SExtractor FLAGS = 2: the nucleus was deblended
+        from the barred host. Frames with and without the flag on the same night agree to
+        +0.3/+2.1/+1.0\,mmag. The AGN now uses the comparison stars' mask (4 saturated, 8 truncated, 16 incomplete
+        aperture).
+  \item \textbf{$z$ scatter.} This field's typical $z$ zero-point scatter is 0.123\,mag, at the 0.12 limit,
+        on every camera and in every year.
+  \item \textbf{$u$ offsets per camera.} The $u$ zero points of the Sinistro cameras differ by up to
+        $\pm$0.6\,mag, so a median over all Sinistros flagged whole cameras. \texttt{zp\_offset} now uses
+        each camera's own median; a camera with fewer than \path{zp_dev_min_frames} (10) zero points in the
+        filter uses the median of its family.
+\end{itemize}
+After the change, 96\,\% of ESO\,511-30's frames enter PyTICS (66\,\% before).
+
+\paragraph{Sinistro linearity.} For each Mrk\,817 comparison star (5.1 million measurements), the
+ensemble-calibrated magnitude was compared with the star's own median and binned by peak counts / saturation.
+The peak was \emph{predicted}, as the frame's peak-per-flux ratio times the star's mean flux, and the median
+residual of the faint stars in the same frame was subtracted.
+
+Sinistro and MuSCAT are flat within $\pm$1.2\,mmag from 0 to 1.0 of saturation
+(Fig.~\ref{fig:linearity}). Binned by the \emph{measured} peak, Sinistro seems to brighten by 7\,mmag near
+saturation. This is selection bias: when a star scatters bright, its peak is higher too.
+
+The AGN peak cut is therefore 1.0 on Sinistro (\path{per_camera.fa/fl}). Pixels above \texttt{SATURATE}
+already raise FLAGS 4. MuSCAT keeps 0.8, because its saturation level is less certain (NGC\,4151, 2024--25).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{../../figures/qc_gate_20261120/sinistro_linearity_mrk817}
+  \caption{Mrk\,817 comparison stars: magnitude relative to the star's median against peak counts /
+    saturation. Blue: Sinistro; orange: MuSCAT. Both use the predicted peak and are corrected by the
+    frame's faint stars. Grey dotted: binned by the measured peak, which is biased. Shaded: $\pm$1\,mmag.}
+  \label{fig:linearity}
+\end{figure}
 
 %%============================================================
 \section{Known Limitations and AVA v2 Status}

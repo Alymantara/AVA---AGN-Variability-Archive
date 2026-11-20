@@ -375,6 +375,12 @@ photometry:
     max_zp_scatter: 0.05       # mag, star-to-star scatter about the frame zero point
     max_fwhm_arcsec: 4.5
     max_zp_dev: 0.5            # mag, |ZP - median ZP of the target's camera/filter| (clouds, focus)
+    # The median is per camera (fa03, fa15, ...): Sinistro u zero points differ by up to ±0.6 mag between units.
+    # A camera with fewer zero points than this in the filter uses the family median (20 Nov 2026).
+    zp_dev_min_frames: 10
+    # SExtractor FLAGS on the AGN that flag agn_flagged: 4 saturated | 8 truncated | 16 aperture incomplete
+    # (as ensemble.bad_flags). 1 / 2 (neighbours / deblended from the host) do not bias MAG_APER (ESO 511-30).
+    agn_bad_flags: 28
     # AGN peak (FLUX_MAX + BACKGROUND) above this x the frame's saturation level: flag agn_saturated (19 Nov 2026).
     # Same fraction as the zero-point standards (calibration.max_peak_frac). Saturated MuSCAT frames of NGC 4151
     # (2024-25) passed without it; below ~0.8 of saturation the pair test shows no non-linearity on Sinistro.
@@ -383,7 +389,11 @@ photometry:
     # more until LCO<->SDSS-z / PS1-y colour terms exist; u has few standards.
     # Per-camera overrides (applied after per_filter).  MuSCAT3's 9' field holds only
     # ~9 Gaia GSPC stars around Mrk 817 (median; Sinistro 26': ~134).
+    # Sinistro (fa; fl before Sep 2018) is linear to within ±1.2 mmag up to saturation (Mrk 817 stars, 20 Nov 2026,
+    # docs/figures/qc_gate_20261120): AGN peak cut at 1.0 there (FLAGS 4 catches pixels above SATURATE). MuSCAT keeps 0.8.
     per_camera:
+      fa: {max_agn_peak_frac: 1.0}
+      fl: {max_agn_peak_frac: 1.0}
       ep: {min_matched: 5}
       kb: {min_matched: 15}      # SBIG 15.9' field (Sinistro 26'): ~1/3 of the reference stars; check on NGC 5548
       fs: {min_matched: 5}       # Spectral 10.5' field (~1/6 of Sinistro's; ~15-20 stars), like MuSCAT's 9'
@@ -499,6 +509,10 @@ ensemble:
   filters: ["up", "B", "gp", "V", "rp", "ip", "zs", "Y"]
   mode: "auto"            # auto = update the stored solution if any, else full fit; or full / update
   min_epochs: 10          # skip a filter with fewer QC-pass frames
+  # frame_qc flags that do NOT keep a frame out of PyTICS: they test the per-frame reference zero point, which
+  # PyTICS does not use (it solves its own epoch zero points). The frames keep the flags for the per-frame light
+  # curve. ESO 511-30: 34 % of frames dropped -> 4 % (20 Nov 2026). After a change run mode full.
+  pytics_ignore_qc_flags: ["no_zp", "zp_scatter", "zp_offset"]
   # --- PyTICS fit (ava.photometry.ensemble.fit; defaults = published PyTICS) ------
   max_loops: 200          # PyTICS MAX_LOOPS
   safe: 0.6               # PyTICS damping of dmagt, m_star (and the colour terms)

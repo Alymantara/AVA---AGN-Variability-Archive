@@ -119,7 +119,11 @@ def qc_flags(row: dict, q: dict) -> list[str]:
         f.append("few_matched")
     if not row.get("agn_matched"):
         f.append("agn_missing")
-    elif row.get("agn_flags") not in (0, None) and np.isfinite(num("agn_flags")):
+    # SExtractor FLAGS on the AGN: only those that spoil the aperture flux (4 saturated | 8 truncated |
+    # 16 aperture incomplete; photometry.qc.agn_bad_flags, as ensemble.bad_flags for the stars). 1 / 2
+    # (neighbours / deblended from the host) leave MAG_APER unchanged: ESO 511-30, 940 frames with FLAGS 2
+    # agree with clean frames of the same night to 0.3-2 mmag (20 Nov 2026).
+    elif np.isfinite(num("agn_flags")) and int(num("agn_flags")) & int(q.get("agn_bad_flags", 28)):
         f.append("agn_flagged")
     # AGN close to saturation: non-linear before SExtractor's saturation flag (pair test, 19 Nov 2026;
     # NGC 4151 on MuSCAT after the 2-m mirror was realuminised). Needs the frame's saturation level.
@@ -134,6 +138,19 @@ def qc_flags(row: dict, q: dict) -> list[str]:
     return f
 
 
+def zp_dev(fq: pd.DataFrame, min_frames: int = 10) -> pd.Series:
+    """ZP minus the median ZP of the same camera and filter (QC flag zp_offset).
+
+    Per camera, not per family: the u zero points of the Sinistro units differ by -0.6 to +0.6 mag (ESO 511-30,
+    Mrk 817), so a family median flagged whole cameras (20 Nov 2026).  A camera with fewer than ``min_frames``
+    zero points in the filter falls back to the family (2-letter prefix) median."""
+    fam = fq["camera"].astype(str).str[:2]
+    by_cam = fq.groupby(["camera", "filter"])["zp"]
+    med = by_cam.transform("median").where(by_cam.transform("count") >= min_frames,
+                                           fq.groupby([fam, "filter"])["zp"].transform("median"))
+    return fq["zp"] - med
+
+
 def requalify(frame_db: Path, data_id: str, q: dict) -> pd.DataFrame:
     """Recompute every frame's QC flags from the stored frame_qc values (no
     recalibration) — run after changing photometry.qc thresholds."""
@@ -142,7 +159,7 @@ def requalify(frame_db: Path, data_id: str, q: dict) -> pd.DataFrame:
     fq = store.read_frame_qc(frame_db, data_id)
     if fq.empty:
         return fq
-    fq["zp_dev"] = fq["zp"] - fq.groupby([fq["camera"].str[:2], "filter"])["zp"].transform("median")
+    fq["zp_dev"] = zp_dev(fq, int(q.get("zp_dev_min_frames", 10)))
     upd = []
     for r in fq.to_dict("records"):
         flags = ",".join(qc_flags(r, q))
