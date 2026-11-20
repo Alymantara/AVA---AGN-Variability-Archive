@@ -87,7 +87,8 @@ def main(target, kind, proposals, start, end, names, filters, live, max_frames, 
 
     res = dl.run(archive_client(), q, dest, live=live, max_frames=max_frames, data_id=target,
                  verify_existing=verify_existing, registry_db=lcodb_path(kind), log=click.echo,
-                 done=dl.catalogued(cfg.sextractor_dir(target)) if kind == "phot" else None)
+                 done=dl.catalogued(cfg.sextractor_dir(target)) if kind == "phot" else None,
+                 parallel=int(cfg.download.get("parallel_fetches", 1)))
     click.echo(f"[AVA] found {res.found} {res.by_type}; on disk {res.on_disk}; "
                f"already processed (catalogue, image deleted) {res.processed}; missing {res.missing}")
     if live:

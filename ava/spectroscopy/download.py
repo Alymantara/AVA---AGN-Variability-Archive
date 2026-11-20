@@ -10,8 +10,16 @@ Unlike the photometry download (an archive search by object name), the set is pl
 already pairs every raw spectrum with its calibrations (view ``spectrum_calibs``) and its
 standard (view ``spectrum_standards``: same slit > 2" > nearest, same block first, within
 30 d).  So a dry run sends **no** archive request; a live run asks the archive only for the
-signed download URL of each missing frame (one request per file), then fetches it,
-md5-checks it against the DB value and registers it in ``local_files``.
+signed download URLs of the missing frames, then fetches each file from its signed URL (S3, not
+the archive API), md5-checks it against the DB value and registers it in ``local_files``.
+
+URL lookup (decided 20 Nov 2026, to save archive requests): **one listing per observing request**
+(``GET /frames/?request_id=R``, page of up to 1000; a FLOYDS request holds its spectra, arc, lamp
+flat and their BANZAI products, 5 frames on average, 79 at most), done the first time a missing
+frame of that request is met, so its URLs are used within minutes.  A frame with no
+``request_id`` in the DB, or absent from its request's listing, falls back to one detail request
+(``GET /frames/<id>/``).  A night with one target request and one standard request thus costs
+2 archive requests instead of ~10.
 
 Roles (column ``role``): ``science``, ``arc``, ``flat``, ``standard``, ``std_arc``,
 ``std_flat``; with ``archive_products`` also the archive's BANZAI ``-1d`` / ``-2d`` of the
@@ -35,7 +43,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ava.lco.download import LOCAL_FILES_DDL, fetch, md5sum
+from ava.lco.download import LOCAL_FILES_DDL, fetch, fetch_many, md5sum
 
 RAW_ROLES = ("science", "arc", "flat", "standard", "std_arc", "std_flat")
 PRODUCT_ROLES = ("archive_1d", "archive_2d", "std_archive_1d", "std_archive_2d")
@@ -70,11 +78,11 @@ def science_nights(db: Path, ava_id: int, *, since: str | None = None, until: st
 
 def plan(db: Path, ava_id: int, nights: list[str], *, archive_products=True) -> pd.DataFrame:
     """One row per frame to have on disk for these nights: frame_id, basename, role, rlevel,
-    day_obs, md5, filename, sci_id (the science spectrum it serves; a shared calibration
+    day_obs, md5, request_id, filename, sci_id (the science spectrum it serves; a shared calibration
     keeps the first).  ``archive_products``: True (-1d and -2d), "1d", "2d" or False."""
     if not nights:
         return pd.DataFrame(columns=["frame_id", "basename", "filename", "role", "rlevel", "day_obs",
-                                     "md5", "sci_id", "side"])
+                                     "md5", "request_id", "sci_id", "side"])
     q = ",".join("?" * len(nights))
     with _ro(db) as con:
         sci = pd.read_sql(
@@ -104,8 +112,10 @@ def plan(db: Path, ava_id: int, nights: list[str], *, archive_products=True) -> 
                          + m.basename.str[-2:])
             p = pd.concat([p, m[["frame_id", "role", "sci_id"]]], ignore_index=True).drop_duplicates("frame_id")
         ids = ",".join(map(str, p.frame_id)) or "NULL"
-        f = pd.read_sql(f"SELECT id AS frame_id, basename, filename, extension, rlevel, day_obs, md5, obstype "
-                        f"FROM frames WHERE id IN ({ids})", con)
+        has_req = "request_id" in {r[1] for r in con.execute("PRAGMA table_info(frames)")}
+        req = "request_id" if has_req else "NULL AS request_id"
+        f = pd.read_sql(f"SELECT id AS frame_id, basename, filename, extension, rlevel, day_obs, md5, obstype, "
+                        f"{req} FROM frames WHERE id IN ({ids})", con)
     out = p.merge(f, on="frame_id", how="left")
     out["filename"] = out["filename"].fillna(out["basename"] + out["extension"].fillna(".fits.fz"))
     out["side"] = out.role.map(lambda r: "standard" if r.startswith("std") or r == "standard" else "target")
@@ -150,15 +160,40 @@ def frame_url(client, frame_id: int) -> tuple[str, str | None]:
     return url, md5
 
 
+def request_urls(client, request_id: int, stats: dict | None = None) -> dict[int, tuple[str, str | None]]:
+    """Signed URLs (and md5) of every frame of one observing request: one archive listing
+    (more only if a request ever held over 1000 frames), ``{frame_id: (url, md5)}``."""
+    from ava.lco.download import frame_download_url, frame_md5
+    from ava.lcodb import api
+
+    out = {}
+    url = f"{api.ARCHIVE}/frames/"
+    params = {"request_id": int(request_id), "limit": 1000, "include_related_frames": "false"}
+    while url:
+        d = client.get(url, params)
+        if stats is not None:
+            stats["requests"] = stats.get("requests", 0) + 1
+        for f in d.get("results", []):
+            u = frame_download_url(f)
+            if u:
+                out[int(f["id"])] = (u, frame_md5(f))
+        url, params = d.get("next"), None      # `next` carries the query
+    return out
+
+
 def run(client, p: pd.DataFrame, *, spec_raw_root: Path, spec_root: Path, target: str, live: bool,
         max_frames: int, registry_db: Path | None = None, verify_existing: bool = False,
-        fetcher=None, log=print) -> SpecRunResult:
-    """Download the missing frames of plan ``p`` (live) or only count them (dry run: no request)."""
+        fetcher=None, log=print, parallel: int = 1) -> SpecRunResult:
+    """Download the missing frames of plan ``p`` (live) or only count them (dry run: no request).
+    Live: first the signed URLs (one listing per request, see the module docstring), then the
+    files, ``parallel`` at a time (S3, no archive request)."""
     fetcher = fetcher or fetch
     res = SpecRunResult(planned=len(p), by_role=p.role.value_counts().to_dict())
-    reg = []
+    reg, jobs, rows = [], [], {}
+    by_request: dict[int, dict] = {}   # request_id -> {frame_id: (url, md5)}, listed on first need
+    stats: dict = {}
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    for row in p.itertuples():
+    for k, row in enumerate(p.itertuples()):
         dest = destination(row, spec_raw_root=spec_raw_root, spec_root=spec_root, target=target)
         if dest.exists() and dest.stat().st_size > 0 and not (verify_existing and row.md5
                                                               and md5sum(dest) != row.md5):
@@ -167,29 +202,42 @@ def run(client, p: pd.DataFrame, *, spec_raw_root: Path, spec_root: Path, target
         res.missing += 1
         if not live:
             continue
-        if len(res.downloaded) + len(res.failed) >= max_frames:
+        if len(res.failed) + len(jobs) >= max_frames:
             res.capped = True
             continue
-        part = dest.with_name(dest.name + ".part")
         try:
-            res.requests += 1
-            url, md5 = frame_url(client, row.frame_id)
+            rid = getattr(row, "request_id", None)
+            hit = None
+            if rid is not None and pd.notna(rid):
+                rid = int(rid)
+                if rid not in by_request:
+                    by_request[rid] = None          # a failed listing is not repeated for its other frames
+                    by_request[rid] = request_urls(client, rid, stats)
+                if by_request[rid] is None:
+                    raise RuntimeError(f"archive listing of request {rid} failed")
+                hit = by_request[rid].get(int(row.frame_id))
+            if hit is None:                     # no request id, or not in its listing: one detail request
+                stats["requests"] = stats.get("requests", 0) + 1
+                hit = frame_url(client, row.frame_id)
+            url, md5 = hit
             md5 = row.md5 or md5
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            n = fetcher(url, part, getattr(client, "limiter", None))
-            if md5 and md5sum(part) != md5:
-                raise RuntimeError("md5 mismatch")
-            part.replace(dest)
-            res.downloaded.append(str(dest))
-            res.bytes += n
-            reg.append((int(row.frame_id), "spec", row.role, target if row.side == "target" else "standards",
-                        str(dest), md5, 1 if md5 else None, n, now))
+            jobs.append((k, url, dest, md5))
+            rows[k] = (row, dest, md5)
         except Exception as exc:  # noqa: BLE001 — record, go on with the next frame
-            part.unlink(missing_ok=True)
             res.failed[row.filename] = f"{type(exc).__name__}: {exc}"
             if type(exc).__name__ == "Throttled":
                 log(f"archive throttled — stopping: {exc}")
                 break
+    for k, n, exc in fetch_many(fetcher, jobs, getattr(client, "limiter", None), parallel):
+        row, dest, md5 = rows[k]
+        if exc is not None:
+            res.failed[row.filename] = f"{type(exc).__name__}: {exc}"
+            continue
+        res.downloaded.append(str(dest))
+        res.bytes += n
+        reg.append((int(row.frame_id), "spec", row.role, target if row.side == "target" else "standards",
+                    str(dest), md5, 1 if md5 else None, n, now))
+    res.requests = stats.get("requests", 0)
     if res.capped:
         log(f"reached the per-run cap of {max_frames} files")
     if registry_db is not None and reg:

@@ -9,8 +9,8 @@ and flat, and (``archive_products``) the archive's BANZAI -1d/-2d for comparison
 Settings: ``spectroscopy.download`` in the AVA config.
 
 * ``mode: dry_run`` (default): plan and report on disk / missing — **no archive request**;
-  ``mode: live``: fetch the missing files (one URL request per file), at most
-  ``max_frames_per_run``.
+  ``mode: live``: fetch the missing files, at most ``max_frames_per_run``; their signed URLs
+  come from one archive listing per observing request (``request_id``), not one request per file.
 * nights: ``nights`` (explicit list) or ``select``: ``new`` (nights after the last successful
   run, minus ``overlap_days``; the daily mode), ``latest`` / ``oldest``; at most ``max_nights``.
 * tracking: ``ava.db`` ``download_state`` (kind ``spec``: last run, status, counts; the date
@@ -35,7 +35,8 @@ def spec_download_settings():
                 max_nights=s.get("max_nights"), archive_products=s.get("archive_products", True),
                 max_frames_per_run=int(s.get("max_frames_per_run", 100)),
                 overlap_days=int(s.get("overlap_days", 2)), initial_lookback_days=int(s.get("initial_lookback_days", 30)),
-                verify_existing=bool(s.get("verify_existing", False)))
+                verify_existing=bool(s.get("verify_existing", False)),
+                parallel_fetches=int(s.get("parallel_fetches") or cfg.download.get("parallel_fetches", 1)))
 
 
 @task(name="spec-download", tags=["spectroscopy", "download", "lco-archive"])
@@ -76,7 +77,8 @@ def spec_download(target: str, mode: str | None = None, nights: list[str] | None
     live = mode == "live"
     res = SD.run(archive_client() if live else None, p, spec_raw_root=cfg.spec_raw(target).parent,
                  spec_root=cfg.spec_root, target=target, live=live, max_frames=s["max_frames_per_run"],
-                 registry_db=db, verify_existing=s["verify_existing"], log=logger.warning)
+                 registry_db=db, verify_existing=s["verify_existing"], log=logger.warning,
+                 parallel=s["parallel_fetches"])
     logger.info("%s spec: %d planned, %d on disk, %d missing; %d downloaded (%.1f MB), %d failed; "
                 "%d archive request(s)%s", target, res.planned, res.on_disk, res.missing, len(res.downloaded),
                 res.bytes / 1e6, len(res.failed), res.requests, " — capped" if res.capped else "")

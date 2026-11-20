@@ -1056,3 +1056,50 @@ needed 25 hand fixes. The changes, item by item:
     the test jobs now, as cron would.
 - Tests: `tests/test_lco_token.py`. The LCO-usage tests now stub the token through the environment, and never
   print a token in a failure message.
+
+
+## Archive requests per download: fewer listings, no per-frame lookups (20 Nov 2026)
+
+Question (Juan): does a download cost one archive request per frame? Counted from the code, and checked
+live on 20 Nov with 6 archive requests:
+
+- **What counts.** Only calls to `archive-api.lco.global` (DRF throttles). The files themselves come from
+  signed S3 URLs (`archive-lco-global.s3.us-west-2.amazonaws.com`, valid 48 h) that the archive hands out in
+  every listing: those fetches never reach the archive API (open-source `science-archive`: `Frame.as_dict()`
+  puts a presigned `url` on every frame of a list; throttles are DRF `anon`/`user` only).
+- **Photometry (before):** no per-frame request (URLs come with the listing), but one listing per LCO name of
+  every active target per night, even when the target was not observed: 91 targets, 145 names → ~145
+  requests/day (~1 s each at `rate_per_s: 1`), plus an extra page per 100 frames.
+- **Spectra (before):** one `GET /frames/<id>/` per missing frame just to get its URL: ~10–11 per
+  target-night (science, arc, flat, standard + arc + flat, archive -1d/-2d).
+- **lcodb:** sync pages of 1000; headers one request per new exposure (no bulk header endpoint exists).
+
+Changes:
+
+- Spectra: one listing per observing request (`GET /frames/?request_id=R&limit=1000`), done when the
+  first missing frame of that request is met; per-frame detail only as a fallback (no `request_id`, or not in
+  the listing). Live check, Mrk 817 2026-09-15: the 11 planned frames are covered by 2 listings (87 and 39
+  frames, 1.7 s and 0.3 s) instead of 11 detail requests (~1 s each); same S3 objects. 2 requests/night
+  instead of ~11.
+- Photometry: `download.lcodb_precheck` (default true). The archive is searched only if the lcodb photometry
+  DB, synced within `lcodb_max_age_hours` (24, capped at `overlap_days` × 24 so frames after the sync fall in
+  the next run's window), lists a frame of the target in the window that is not on disk and not processed.
+  Otherwise the listing is skipped (logged; `skipped_by_lcodb` in the task result). A stale or missing lcodb
+  means the usual search. ~145 → ~15 requests/day (only the ~11 targets observed each night).
+- Not adopted (yet): one proposal-wide listing per run (live: 488 frames of 21 objects over 3 days in one
+  request, 3.2 s) and split by object locally — fewer requests still, but the per-target windows differ;
+  `POST /frames/zip/` (one request for many `frame_ids`, streamed zip) — not needed, the S3 fetches are free.
+- Speed: S3 fetches dominate (37.7 MB BANZAI frame in ~5 s, 7–8 MB/s; 0.6 MB FLOYDS frame ~1.3 s). The
+  changes save ~2 min/night of photometry listings and ~9 s per spectra night; file transfer time is unchanged.
+- Tests: `tests/test_download_precheck.py`, `tests/test_spec_download.py` (request listings, fallback,
+  failed listing not repeated).
+- Then (Juan, same day): **pages of 1000 and parallel file downloads.** Live tests: a page of 1000 frames
+  took 2.4 s against 3.2 s for a page of 100, so `download.page_size: 1000` (the maximum with a token) cuts
+  the listing requests 10x for free; URLs stay valid 48 h, far longer than a page takes. Fetching 4 files at
+  once from S3: 14.4 against 4.4 MB/s (8 BANZAI frames, 302 MB); end to end through `ava.lco.download.run`
+  (1 request, 8 files) 9.5 against 5.4 MB/s, back to back; this connection varies. New
+  `download.parallel_fetches: 4` (1 = one at a time) for the daily and backfill photometry download
+  and for the spectra download (`spectroscopy.download.parallel_fetches` overrides it). Each page's
+  files are fetched before the next page is requested; the per-run cap counts files in flight; the archive
+  rate limiter is unchanged (searches stay at 1/s). A 1000-frame backfill: ~2.4 h → ~45 min, 10 → 1
+  listing requests. Tests: `tests/test_download_parallel.py`, `test_parallel_spectra_fetch`.

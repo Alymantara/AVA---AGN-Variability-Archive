@@ -123,3 +123,81 @@ def test_archive_products_1d_only(tmp_path):
     db = _db(tmp_path)
     roles = set(SD.plan(db, 2, ["2026-08-13"], archive_products="1d").role)
     assert {"archive_1d", "std_archive_1d"} <= roles and "archive_2d" not in roles
+
+
+class FakeListingClient(FakeClient):
+    """Archive with ``request_id`` listings: /frames/?request_id=R returns that request's frames."""
+    def __init__(self, requests_of):
+        super().__init__()
+        self.requests_of = requests_of     # request_id -> [frame_id, ...]
+        self.listings = self.details = 0
+
+    def get(self, url, params=None):
+        if params and "request_id" in params:
+            self.calls += 1; self.listings += 1
+            assert params["limit"] == 1000 and params["include_related_frames"] == "false"
+            return {"results": [{"id": f, "url": f"fake://{f}", "md5": _md5(BODY[f])}
+                                for f in self.requests_of.get(params["request_id"], [])], "next": None}
+        self.details += 1
+        return super().get(url, params)
+
+
+def test_urls_by_request_one_listing_per_request(tmp_path):
+    db = _db(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("ALTER TABLE frames ADD COLUMN request_id INTEGER")
+    reqs = {}
+    for b in (100, 200, 300):                         # per night: target request, standard request
+        tgt, std = [b + i for i in (1, 2, 3, 4, 11, 12, 19)], [b + i for i in (5, 6, 7, 15)]
+        reqs[b + 50], reqs[b + 60] = tgt, std
+        con.executemany("UPDATE frames SET request_id=? WHERE id=?", [(b + 50, f) for f in tgt] + [(b + 60, f) for f in std])
+    con.execute("UPDATE frames SET request_id=NULL WHERE id=104")      # no request id: detail fallback
+    reqs[160].remove(105)                                               # standard missing from its listing
+    con.commit(); con.close()
+    p = SD.plan(db, 2, ["2026-08-13", "2026-08-18"])
+    assert "request_id" in p.columns
+    c = FakeListingClient(reqs)
+    kw = dict(spec_raw_root=tmp_path / "raw_data", spec_root=tmp_path, target="Mrk_817", registry_db=db)
+    res = SD.run(c, p, live=True, max_frames=100, fetcher=fake_fetch, **kw)
+    assert not res.failed and len(res.downloaded) == len(p) == 2 * 10
+    # 2 nights x (target + standard listing) + 2 fallbacks (frame 104 without id, 105 not listed)
+    assert c.listings == 4 and c.details == 2 and res.requests == c.calls == 6
+
+
+def test_failed_request_listing_not_repeated(tmp_path):
+    db = _db(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("ALTER TABLE frames ADD COLUMN request_id INTEGER")
+    con.execute("UPDATE frames SET request_id=1")
+    con.commit(); con.close()
+    p = SD.plan(db, 2, ["2026-08-13"])
+
+    class Broken(FakeClient):
+        def get(self, url, params=None):
+            self.calls += 1
+            raise RuntimeError("HTTP 500")
+    c = Broken()
+    res = SD.run(c, p, spec_raw_root=tmp_path / "r", spec_root=tmp_path, target="T", live=True,
+                 max_frames=100, fetcher=fake_fetch)
+    assert c.calls == 1 and len(res.failed) == len(p)
+
+
+def test_parallel_spectra_fetch(tmp_path):
+    db = _db(tmp_path)
+    p = SD.plan(db, 2, SD.science_nights(db, 2, select="latest", max_nights=2))
+    lock, state = __import__("threading").Lock(), {"now": 0, "max": 0}
+
+    def slow(url, dest, limiter=None):
+        with lock:
+            state["now"] += 1; state["max"] = max(state["max"], state["now"])
+        __import__("time").sleep(0.03)
+        n = fake_fetch(url, dest)
+        with lock:
+            state["now"] -= 1
+        return n
+    res = SD.run(FakeClient(), p, spec_raw_root=tmp_path / "r", spec_root=tmp_path, target="T", live=True,
+                 max_frames=100, fetcher=slow, parallel=4, registry_db=db)
+    assert not res.failed and len(res.downloaded) == len(p) and 1 < state["max"] <= 4
+    capped = SD.run(FakeClient(), p, spec_raw_root=tmp_path / "r2", spec_root=tmp_path / "x", target="T",
+                    live=True, max_frames=3, fetcher=fake_fetch, parallel=4)
+    assert capped.capped and len(capped.downloaded) == 3

@@ -13,6 +13,10 @@ Per kind in ``download.daily_kinds`` (``phot``: BANZAI L91 → ``cfg.phot_raw``;
 * search from the last successful update (``ava.db`` ``download_state``)
   minus ``overlap_days`` — or ``initial_lookback_days`` the first time — to
   tomorrow, over ``daily_proposals`` and every LCO spelling of the target;
+* ``lcodb_precheck`` (default true): the archive is searched only if the lcodb photometry DB,
+  synced within ``lcodb_max_age_hours`` (capped at ``overlap_days`` x 24), lists a frame of the
+  target in the window that is not on disk and not yet processed — most targets are not observed
+  on a given night, so this saves one listing request per LCO name for each of them;
 * ``mode: dry_run`` (default): report found / on disk / missing (listing
   requests only — no file fetched);  ``mode: live``: also fetch up to
   ``max_frames_per_run`` files, and advance the update date only if the run
@@ -61,6 +65,17 @@ def lcodb_path(kind: str):
         from ava.lcodb.config import load_config
 
         p = load_config(cfg.lcodb_config_path).db_path("photometry" if kind == "phot" else "spectra")
+        return p if p.exists() else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def lcodb_state_path():
+    """lcodb state DB (``sync_state``: how far each proposal is synced), or None."""
+    try:
+        from ava.lcodb.config import load_config
+
+        p = load_config(cfg.lcodb_config_path).db_dir / "state.sqlite"
         return p if p.exists() else None
     except Exception:  # noqa: BLE001
         return None
@@ -126,13 +141,27 @@ def download(target: str, mode: str | None = None, kinds: list[str] | None = Non
         q = make_query(entry, kind, dc.daily_proposals, start, now + timedelta(days=1))
         logger.info("%s %s: searching %s .. %s, names %s, proposals %s (%s)", target, kind,
                     start.date(), q.end.date(), q.names, q.proposals, mode)
-        res = dl.run(archive_client(), q, raw_dir(target, kind), live=(mode == "live"),
-                     max_frames=int(dc.max_frames_per_run), data_id=target,
-                     verify_existing=bool(dc.verify_existing), registry_db=lcodb_path(kind), log=logger.warning,
-                     done=dl.catalogued(cfg.sextractor_dir(target)) if kind == "phot" else None)
+        done = dl.catalogued(cfg.sextractor_dir(target)) if kind == "phot" else None
+        skip, why = False, ""
+        if kind == "phot" and bool(dc.get("lcodb_precheck", True)):
+            # never older than the overlap: frames after the lcodb sync must fall in the next run's window
+            age = min(float(dc.get("lcodb_max_age_hours", 24)), 24.0 * int(dc.overlap_days))
+            skip, why = dl.lcodb_precheck(lcodb_path(kind), lcodb_state_path(), q, raw_dir(target, kind),
+                                          done=done, now=now, max_age_hours=age)
+        if skip:
+            logger.info("%s %s: archive search skipped — %s", target, kind, why)
+            res = dl.RunResult()
+        else:
+            if why:
+                logger.info("%s %s: archive search needed — %s", target, kind, why)
+            res = dl.run(archive_client(), q, raw_dir(target, kind), live=(mode == "live"),
+                         max_frames=int(dc.max_frames_per_run), data_id=target,
+                         verify_existing=bool(dc.verify_existing), registry_db=lcodb_path(kind), log=logger.warning,
+                         done=done, parallel=int(dc.get("parallel_fetches", 1)))
         out[kind] = dict(found=res.found, on_disk=res.on_disk, processed=res.processed, missing=res.missing,
                          downloaded=len(res.downloaded), failed=len(res.failed), capped=res.capped,
-                         bytes=res.bytes, requests=res.requests, by_type=res.by_type)
+                         bytes=res.bytes, requests=res.requests, by_type=res.by_type,
+                         skipped_by_lcodb=bool(skip))
         logger.info("%s %s: %d found (%s), %d on disk, %d already processed, %d missing; %d downloaded (%.1f MB), "
                     "%d failed; %d archive request(s)%s", target, kind, res.found, res.by_type, res.on_disk,
                     res.processed, res.missing,

@@ -207,6 +207,17 @@ volume): on a network-mounted home the ephemeral API server times out at start. 
 (`download.rate_per_s: 1`, lcodb `header_rate_per_s: 4`, `sync_rate_per_s`). Do not raise these, and do
 not run several archive jobs at the same time (the cron times in section 7 are spaced for that).
 
+**What counts as an archive request (20 Nov 2026).** Only calls to `archive-api.lco.global`: listing pages,
+frame details, headers. Image files come from signed S3 URLs handed out with each listing and do not count.
+The photometry download searches a target only when the lcodb photometry DB (job 1, synced within
+`download.lcodb_max_age_hours`, 24) lists a new frame of it (`download.lcodb_precheck: true`;
+if lcodb is stale the target is searched as before), and the spectra download gets its URLs with one listing
+per observing request instead of one request per file. A night costs about 15 photometry listings and 2 per
+spectra night, rather than ~145 and ~11.
+Listings use pages of 1000 frames (`download.page_size`, the archive maximum with a token), and the files are
+fetched `download.parallel_fetches` (4) at a time from S3 (about 3x faster in the 20 Nov test; it adds no
+archive request). Lower it to 1 if the host's network is shared with something that needs the bandwidth.
+
 **Server errors stop a job (19 Nov 2026).** An HTTP 5xx is not treated as transient: one request is retried at
 most `server_error_retries` times (default 1), and after `server_error_limit` consecutive failed requests
 (default 3) the client sends nothing more and the step stops. The frames it had not reached stay pending for the
@@ -412,7 +423,8 @@ then nearest time. `tools/headers_backfill.sh` is no longer needed.
 
 **How the pipeline decides what to download** (checked in the code, 16 Nov 2026):
 
-- **Photometry** (`ava/pipeline/tasks/download.py` → `ava/lco/download.py`): for each AVA target, the
+- **Photometry** (`ava/pipeline/tasks/download.py` → `ava/lco/download.py`): for each AVA target with a
+  new frame in the lcodb photometry DB (`download.lcodb_precheck`; every target if lcodb is older than 24 h), the
   live LCO archive is searched (every LCO spelling of the name, `download.daily_proposals`, reduction level
   91, the configured filters), from the target's **last successful download date minus
   `overlap_days` (2)** to tomorrow (first run: the last 30 days). The date is kept in `ava.db`
@@ -429,7 +441,8 @@ then nearest time. `tools/headers_backfill.sh` is no longer needed.
 - **Spectroscopy** (`ava/pipeline/tasks/spec_download.py`): planned **offline from `spectra.sqlite`**
   (hence job 1 must run first): the new nights of each target (after the last successful run minus
   `overlap_days`), with each night's science spectra, arc and lamp flat, **and the night's flux standard
-  with its own arc and flat**. Only missing files are fetched (one URL request per file).
+  with its own arc and flat**. Only missing files are fetched; their URLs come from one archive listing per
+  observing request (`request_id`), not one request per file.
 
 The processing steps check their own outputs: SExtractor skips frames that already have a catalogue;
 calibration skips frames already in `frame_qc` with the current pipeline version; spectra reduction

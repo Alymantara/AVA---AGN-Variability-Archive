@@ -143,11 +143,19 @@ download:
   max_frames_per_run: 50        # files per target per run (daily); backfill: --max-frames
   window_days: 365              # archive search window (pagination handles any number of frames;
                                 # each page's URLs are used before the next page is requested)
-  page_size: 100                # frames per archive page (URLs are used before the next page)
+  page_size: 1000               # frames per archive page: the maximum with a token (was 100; 20 Nov 2026: same
+                                # time per page, 10x fewer requests). A page's URLs are used before the next page.
+  parallel_fetches: 4           # files fetched at once from their signed S3 URLs (no archive request; 20 Nov
+                                # 2026 test: 4.4 -> 14.4 MB/s). 1 = one at a time. Also used by the spectra download.
   rate_per_s: 1.0               # archive requests per second (lcodb sees blocks above ~4/s)
   server_error_retries: 1       # HTTP 5xx is not transient: retry one request at most this many times ...
   server_error_limit: 3         # ... and stop the download after this many consecutive failed requests
   verify_existing: false        # md5-check files already on disk
+  # Skip a target's archive search when the lcodb photometry DB (lcodb daily, 01:00), synced within
+  # lcodb_max_age_hours (capped at overlap_days x 24), lists no new frame of it in the window (20 Nov 2026):
+  # saves one listing request per LCO name for every target not observed. false = always search.
+  lcodb_precheck: true
+  lcodb_max_age_hours: 24
   unlinked_radius_arcmin: 10    # report unlinked LCO OBJECT names this close to the AGN
   # Archive query parameter names (the API renamed the legacy OBJECT / PROPID / RLEVEL).
   archive_params:

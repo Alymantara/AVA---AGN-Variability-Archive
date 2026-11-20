@@ -109,7 +109,7 @@ class Query:
     cameras: list[str] | None = None    # phot: imaging camera prefixes kept (photometry.imaging_camera_prefixes)
     camera_telescopes: dict | None = None   # phot: prefix -> telescope classes, e.g. {"kb": ["1m0"]}
     window_days: int = 365             # windows only bound each query; pagination does the rest
-    page_size: int = 100                # small pages: URLs used within minutes
+    page_size: int = 1000               # archive maximum with a token; URLs stay valid 48 h
     params: dict = field(default_factory=lambda: dict(DEFAULT_PARAMS))
 
     @property
@@ -180,6 +180,57 @@ def pages(client, q: Query, stats: dict) -> Iterator[list[dict]]:
                     url, params = d.get("next"), None      # `next` carries the query
 
 
+def lcodb_precheck(phot_db: Path | None, state_db: Path | None, q: Query, dest_dir: Path, *,
+                   done: Callable[[str], bool] | None = None, now: datetime | None = None,
+                   max_age_hours: float = 24.0) -> tuple[bool, str]:
+    """Can the archive listing of ``q`` be skipped?  ``(True, why)`` when the lcodb photometry DB
+    (``lcodb daily``, 01:00) was synced for every proposal of ``q`` within ``max_age_hours`` and
+    lists no frame of ``q``'s names / proposals / level in [start, end) that ``q`` keeps and that is
+    neither on disk nor already processed (``done``).  Anything else → ``(False, why)``: search the
+    archive as usual.  Offline (local SQLite only).
+
+    Safe because frames newer than the lcodb sync fall inside the next run's window as long as
+    ``max_age_hours`` <= ``overlap_days`` x 24 (the task enforces it)."""
+    if q.kind != "phot":
+        return False, "only photometry is pre-checked"
+    if not phot_db or not state_db or not Path(phot_db).exists() or not Path(state_db).exists():
+        return False, "no lcodb DB"
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
+    oldest = (now - timedelta(hours=float(max_age_hours))).strftime("%Y-%m-%dT%H:%M:%S")
+    props = list(q.proposals)
+    ph = ",".join("?" * len(props))
+    try:
+        with closing(sqlite3.connect(f"file:{state_db}?mode=ro", uri=True)) as con:
+            synced = dict(con.execute(f"SELECT proposal_id, synced_until FROM sync_state "
+                                      f"WHERE proposal_id IN ({ph})", props).fetchall())
+        stale = [pp for pp in props if not synced.get(pp) or str(synced[pp])[:19] < oldest]
+        if stale:
+            return False, f"lcodb not synced in the last {max_age_hours:g} h for {', '.join(stale)}"
+        nh = ",".join("?" * len(q.names))
+        with closing(sqlite3.connect(f"file:{phot_db}?mode=ro", uri=True)) as con:
+            rows = con.execute(
+                f"SELECT filename, basename, extension, day_obs, filter, instrument_id, telescope_id, obstype "
+                f"FROM frames WHERE rlevel=? AND proposal_id IN ({ph}) AND object IN ({nh}) "
+                f"AND date_obs >= ? AND date_obs < ?",
+                (q.rlevel, *props, *q.names, q.start.strftime("%Y-%m-%dT%H:%M:%S"),
+                 q.end.strftime("%Y-%m-%dT%H:%M:%S"))).fetchall()
+    except sqlite3.Error as exc:
+        return False, f"lcodb DB unreadable ({exc})"
+    new = 0
+    for fn, base, ext, day, filt, inst, tel, obstype in rows:
+        f = {"filename": fn or f"{base}{ext or '.fits.fz'}", "observation_day": day, "primary_optical_element": filt,
+             "instrument_id": inst, "telescope_id": tel, "configuration_type": obstype}
+        if not q.keep(f):
+            continue
+        dest = Path(dest_dir) / frame_day(f) / f["filename"]
+        if (dest.exists() and dest.stat().st_size > 0) or (done is not None and done(f["filename"])):
+            continue
+        new += 1
+    if new:
+        return False, f"lcodb lists {new} new frame(s)"
+    return True, f"lcodb (synced for {', '.join(props)}) lists no new frame in the window"
+
+
 # ---------------------------------------------------------------------------
 # Run (search + download page by page)
 # ---------------------------------------------------------------------------
@@ -218,20 +269,58 @@ def fetch(url: str, dest: Path, limiter=None, timeout: float = 600.0) -> int:
     return n
 
 
+def fetch_checked(fetcher, url: str, dest: Path, md5: str | None, limiter=None) -> int:
+    """Fetch ``url`` into ``dest.part``, md5-check it, rename it to ``dest``; bytes written.
+    On any error the ``.part`` file is removed and the error raised.  Safe to run in threads."""
+    part = dest.with_name(dest.name + ".part")
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        n = fetcher(url, part, limiter)
+        if md5 and md5sum(part) != md5:
+            raise RuntimeError("md5 mismatch")
+        part.replace(dest)
+        return n
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+
+
+def fetch_many(fetcher, jobs: list, limiter=None, parallel: int = 1) -> Iterator[tuple]:
+    """Run ``fetch_checked`` for every ``(key, url, dest, md5)`` of ``jobs``, ``parallel`` at a time
+    (the signed URLs point at S3, not at the archive API: no archive request is spent).
+    Yields ``(key, bytes, None)`` or ``(key, None, exception)`` in job order."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(job):
+        key, url, dest, md5 = job
+        try:
+            return key, fetch_checked(fetcher, url, dest, md5, limiter), None
+        except Exception as exc:  # noqa: BLE001 — reported per file
+            return key, None, exc
+
+    if max(1, int(parallel)) == 1 or len(jobs) < 2:
+        yield from map(one, jobs)
+        return
+    with ThreadPoolExecutor(min(int(parallel), len(jobs))) as ex:
+        yield from ex.map(one, jobs)
+
+
 def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_id: str,
         verify_existing: bool = False, registry_db: Path | None = None, log=print,
-        fetcher=None, done: Callable[[str], bool] | None = None) -> RunResult:
+        fetcher=None, done: Callable[[str], bool] | None = None, parallel: int = 1) -> RunResult:
     """Search the archive for ``q`` and, if ``live``, download missing frames
-    (each page before the next is requested), at most ``max_frames``.
+    (each page's files, ``parallel`` at a time, before the next page is requested), at most ``max_frames``.
     Not live: list only — no file is fetched (listing requests are still sent).
     ``done(filename)``: True for a frame already processed whose image was deleted
     (``ava.archive.cleanup``) — it is not downloaded again."""
     fetcher = fetcher or fetch   # looked up at call time (replaceable in tests)
     res, stats, seen, reg = RunResult(), {}, set(), []
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    limiter = getattr(client, "limiter", None)
     with _DOWNLOAD_LOCK:
         try:
             for page in pages(client, q, stats):
+                jobs, meta = [], {}
                 for f in page:
                     fid = int(f["id"])
                     if not q.object_ok(f):
@@ -255,26 +344,24 @@ def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_i
                     res.missing += 1
                     if not live:
                         continue
-                    if len(res.downloaded) + len(res.failed) >= max_frames:
+                    if len(res.downloaded) + len(res.failed) + len(jobs) >= max_frames:
                         res.capped = True
                         continue
-                    part = dest.with_name(dest.name + ".part")
-                    try:
-                        url = frame_download_url(f)
-                        if not url:
-                            raise RuntimeError("archive record has no download URL")
-                        dest.parent.mkdir(parents=True, exist_ok=True)
-                        n = fetcher(url, part, getattr(client, "limiter", None))
-                        if md5 and md5sum(part) != md5:
-                            raise RuntimeError("md5 mismatch")
-                        part.replace(dest)
-                        res.downloaded.append(str(dest))
-                        res.bytes += n
-                        reg.append((fid, q.kind, f.get("configuration_type"), data_id, str(dest), md5,
-                                    1 if md5 else None, n, now))
-                    except Exception as exc:  # noqa: BLE001 — record, continue with the next frame
-                        part.unlink(missing_ok=True)
+                    url = frame_download_url(f)
+                    if not url:
+                        res.failed[f["filename"]] = "RuntimeError: archive record has no download URL"
+                        continue
+                    jobs.append((fid, url, dest, md5))
+                    meta[fid] = (f, dest, md5)
+                for fid, n, exc in fetch_many(fetcher, jobs, limiter, parallel):
+                    f, dest, md5 = meta[fid]
+                    if exc is not None:
                         res.failed[f["filename"]] = f"{type(exc).__name__}: {exc}"
+                        continue
+                    res.downloaded.append(str(dest))
+                    res.bytes += n
+                    reg.append((fid, q.kind, f.get("configuration_type"), data_id, str(dest), md5,
+                                1 if md5 else None, n, now))
                 if res.capped:
                     log(f"reached the per-run cap of {max_frames} files — stopping the search")
                     break
