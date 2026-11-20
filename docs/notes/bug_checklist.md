@@ -93,6 +93,14 @@ line in `future_improvements.md`.
   3 days away (up to 714 h). Flag them in `spec_qc`, and check them after the [O III] calibration.
 - [ ] **E07** *decision*: the AGN magnitude system. Publish in the LCO natural AB system, with reference-system fluxes
   as a derived product (emission lines: up to 0.18 mag in r)? See the calibration report.
+- [ ] **B44** *bug* (ESO 511-30 QC-gate session, 20 Nov): the error model sets `s_cam` = 0 for a filter with fewer than
+  `error_model_min_cross_pairs` (30) cross-camera pairs (`ava/photometry/errors.py`, `fillna(0.0)`).
+  - Effect: the camera-to-camera term is dropped, so per-epoch errors are too small. ESO 511-30 r / z had 21 / 25
+    pairs: s_cam 0, median error 2.8 / 3.3 mmag. With the new gate (79 / 81 pairs) s_cam is 6.1 / 13.3 mmag and the
+    errors are 6.6 / 13.8 mmag.
+  - Fix: fall back to the pooled s_cam of the camera family (all targets), or a configured default, not 0; record
+    the source in `error_model.csv`. Test with a synthetic light curve that has few cross pairs.
+  - Check which DR1 targets / filters have `n_cross_pairs` < 30 and `s_cam` = 0.
 
 ## Low
 
@@ -128,6 +136,17 @@ Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and `docs/reports/ab
 - [ ] **E08**: per-camera passbands (mirrors; MuSCAT, SBIG, Spectral) and the B/V/i synthetic-vs-empirical colour-term
   mismatch, before relying on B, V, i and u at the 1 % level.
 - [ ] **E09**: PS1 DR2 y anchors for 12.5 < G < 14.2 (dec > −30°), so Y has bright anchors.
+
+- [ ] **B45** *action*: after the Turgon `-c` + `--pytics-full` rerun, look at two ESO 511-30 points that the new gate
+  lets in: i near MJD 60690 (high) and r near MJD 60490 (large error bar). Local rerun:
+  `docs/figures/qc_gate_20261120/`.
+- [ ] **B46** *action*: rebuild `docs/guides/deployment_guide.pdf` once the guide's `gspc_model_u` text (QC-0003,
+  uncommitted) is committed. `e37a563` was built from the committed guide only. Header for the build: fvextra
+  `breaklines` plus `newunicodechar` for ≈ β ≥ ≤, and ″ from STIX Two Text inside `\AtBeginDocument` (unicode-math).
+- [ ] **B47** *bug* (dev environment): on the Mac the base Anaconda pyarrow fails to import (`pyarrow._gcsfs` binary
+  mismatch) and Prefect is missing, so parquet tests and the 5 Prefect tests do not run there.
+  - Workaround: a `sitecustomize.py` on `PYTHONPATH` that sets `sys.modules['pyarrow._gcsfs'] = None`.
+  - Fix: an `ava` conda environment on the Mac from `environment.yml`.
 
 **On hold or running elsewhere**
 
