@@ -163,21 +163,15 @@ def frame_url(client, frame_id: int) -> tuple[str, str | None]:
 def request_urls(client, request_id: int, stats: dict | None = None) -> dict[int, tuple[str, str | None]]:
     """Signed URLs (and md5) of every frame of one observing request: one archive listing
     (more only if a request ever held over 1000 frames), ``{frame_id: (url, md5)}``."""
-    from ava.lco.download import frame_download_url, frame_md5
-    from ava.lcodb import api
+    from ava.lco.download import frame_download_url, frame_md5, listing_pages
 
     out = {}
-    url = f"{api.ARCHIVE}/frames/"
-    params = {"request_id": int(request_id), "limit": 1000, "include_related_frames": "false"}
-    while url:
-        d = client.get(url, params)
-        if stats is not None:
-            stats["requests"] = stats.get("requests", 0) + 1
-        for f in d.get("results", []):
+    params = {"request_id": int(request_id), "include_related_frames": "false"}
+    for page in listing_pages(client, params, 1000, stats):     # by offset, not `next` (B25)
+        for f in page:
             u = frame_download_url(f)
             if u:
                 out[int(f["id"])] = (u, frame_md5(f))
-        url, params = d.get("next"), None      # `next` carries the query
     return out
 
 

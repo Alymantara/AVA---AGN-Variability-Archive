@@ -1136,6 +1136,18 @@ Changes:
     new frames are no noisier than the old ones.
   - Figure: `docs/figures/qc_gate_20261120/sinistro_linearity_mrk817.png`.
 
+## B25: the archive search read only the first page of each window (20 Nov 2026)
+
+- **Bug.** `ava/lco/download.py::pages()` followed the archive's `next` link. For some filters `next` / `count` are
+  estimates, so a window could stop after its first page. On ESO 511-30 (Turgon pilot), 365-day windows found 4331
+  frames with exactly the minimum 34 listing requests; 90-day windows found 9151. The spectra request listing
+  (`spectroscopy/download.py::request_urls`) followed `next` too.
+- **Fix.** `listing_pages` pages by `offset` with `ordering=id` until a short page, as `lcodb.api.Client.frames` does,
+  and counts each request in `stats`. Both the photometry windows and the spectra request listings use it. A window
+  whose size is an exact multiple of the page size costs one extra (empty) request.
+- **Retires** the Turgon workaround of `--window-days` per target (< 800 frames per window).
+- Tests: `tests/test_download_parallel.py` (2,500 frames in one window with `next = None`: all listed, 3 requests).
+
 ## ESA Gaia archive: sync fallback when async jobs fail (20 Nov 2026)
 
 - **What happened.** During Turgon's weekend backfill (20 Nov, ~15:00-16:40 CET) the reference step failed for every

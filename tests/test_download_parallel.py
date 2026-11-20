@@ -38,7 +38,8 @@ def _frame(i):
 
 
 class Pages:
-    """Fake archive: ``n`` frames in pages of ``page_size``, following ``next``."""
+    """Fake archive: ``n`` frames, served by ``offset`` / ``limit`` (at most ``page_size`` per page).
+    ``next`` is always None, as the real archive's estimate can be (B25)."""
     limiter = None
 
     def __init__(self, n, page_size):
@@ -46,9 +47,9 @@ class Pages:
 
     def get(self, url, params=None):
         self.calls += 1
-        off = 0 if params else int(url.split("=")[-1])
-        nxt = off + self.ps
-        return {"results": self.frames[off:nxt], "next": f"fake?offset={nxt}" if nxt < len(self.frames) else None}
+        assert params["ordering"] == "id"
+        off, lim = params["offset"], min(params["limit"], self.ps)
+        return {"results": self.frames[off:off + lim], "next": None, "count": 1}
 
 
 def _q(page_size=1000):
@@ -88,3 +89,18 @@ def test_run_parallel_respects_cap_and_sequential_default(tmp_path):
     dl.run(Pages(5, 1000), _q(), tmp_path / "seq", live=True, max_frames=10, data_id="X", fetcher=f1,
            log=lambda *_: None)
     assert f1.max == 1 and f1.calls == 5
+
+
+def test_listing_pages_by_offset_ignores_next():
+    """B25: one 365-day window holding 2,500 frames, with the archive's ``next`` = None (an estimate):
+    every frame is listed, in 3 requests (1000 + 1000 + 500)."""
+    c, stats = Pages(2500, 1000), {}
+    got = [f["id"] for page in dl.pages(c, _q(page_size=1000), stats) for f in page]
+    assert got == list(range(1, 2501))
+    assert stats["requests"] == c.calls == 3
+
+
+def test_listing_pages_exact_multiple_ends_on_empty_page():
+    c, stats = Pages(2000, 1000), {}
+    pages = list(dl.listing_pages(c, {"target_name": "Mrk 817"}, 1000, stats))
+    assert [len(p) for p in pages] == [1000, 1000, 0] and stats["requests"] == 3

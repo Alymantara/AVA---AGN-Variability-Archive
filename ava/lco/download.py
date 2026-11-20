@@ -6,7 +6,8 @@ B. J. Fulton), keeping its reasoning:
 
 * search the archive by **object name, proposal, date range and reduction
   level**;
-* walk the result **page by page, following ``next``**, and download each
+* walk the result **page by page** (by ``offset``, until a short page: the
+  archive's ``next`` is an estimate, B25), and download each
   page's frames before requesting the next page — download URLs are signed
   and expire (48 h), so they are always used fresh;
 * save to ``<raw dir>/YYYYMMDD/<filename>``, skip files already on disk and
@@ -172,23 +173,35 @@ def n_listing_requests(q: Query) -> int:
                               for p in q.proposals)
 
 
-def pages(client, q: Query, stats: dict) -> Iterator[list[dict]]:
-    """Yield archive result pages for every (name, proposal, window), following ``next``."""
+def listing_pages(client, params: dict, page_size: int, stats: dict | None = None) -> Iterator[list[dict]]:
+    """Yield every page of one archive ``/frames/`` listing, paged by ``offset`` with ``ordering=id``
+    until a short page (B25).  The archive's ``next`` / ``count`` are estimates for some filters: following
+    ``next`` stopped after the first page (ESO 511-30, 365-day windows: 4331 of 9151 frames), so ``next`` is
+    ignored, as in ``lcodb.api.Client.frames``.  Each request adds 1 to ``stats["requests"]``."""
     from ava.lcodb import api
 
+    params = dict(params, limit=page_size, offset=0, ordering="id")
+    while True:
+        d = client.get(f"{api.ARCHIVE}/frames/", dict(params))
+        if stats is not None:
+            stats["requests"] = stats.get("requests", 0) + 1
+        res = d.get("results", []) or []
+        yield res
+        if len(res) < page_size:
+            return
+        params["offset"] += len(res)
+
+
+def pages(client, q: Query, stats: dict) -> Iterator[list[dict]]:
+    """Yield archive result pages for every (name, proposal, window); see ``listing_pages``."""
     p = q.params
     for name in q.names:
         for prop in q.proposals:
             for t0, t1 in windows(proposal_start(prop, q.start), q.end, q.window_days):
                 params = {p["object"]: name, p["proposal"]: prop, p["rlevel"]: q.rlevel,
                           "start": t0.strftime(DATEFMT), "end": t1.strftime(DATEFMT),
-                          "limit": q.page_size, "include_related_frames": "false"}
-                url = f"{api.ARCHIVE}/frames/"
-                while url:
-                    d = client.get(url, params)
-                    stats["requests"] = stats.get("requests", 0) + 1
-                    yield d.get("results", [])
-                    url, params = d.get("next"), None      # `next` carries the query
+                          "include_related_frames": "false"}
+                yield from listing_pages(client, params, q.page_size, stats)
 
 
 def lcodb_precheck(phot_db: Path | None, state_db: Path | None, q: Query, dest_dir: Path, *,
