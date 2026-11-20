@@ -116,7 +116,8 @@ class Query:
     end: datetime
     kind: str                           # "phot" | "spec"
     filters: list[str] | None = None    # phot: keep only these (primary_optical_element)
-    cameras: list[str] | None = None    # phot: imaging camera prefixes kept (photometry.imaging_camera_prefixes)
+    cameras: list[str] | None = None    # camera prefixes kept: phot photometry.imaging_camera_prefixes,
+                                        # spec the lcodb instruments.spectra (FLOYDS: en)
     camera_telescopes: dict | None = None   # phot: prefix -> telescope classes, e.g. {"kb": ["1m0"]}
     window_days: int = 365             # windows only bound each query; pagination does the rest
     page_size: int = 1000               # archive maximum with a token; URLs stay valid 48 h
@@ -136,12 +137,12 @@ class Query:
         name = str(f.get("filename") or "")
         if name.endswith("_cat.fits"):
             return False
+        inst = str(f.get("instrument_id") or "").lower()
+        if inst and self.cameras and not any(inst.startswith(str(c).lower()) for c in self.cameras):
+            return False                # e.g. a SOAR Goodman spectrum under the same OBJECT name (C06)
         if self.kind == "spec":
             return f.get("configuration_type") in ("SPECTRUM", "ARC", "LAMPFLAT")
         if self.filters and f.get("primary_optical_element") not in self.filters:
-            return False
-        inst = str(f.get("instrument_id") or "").lower()
-        if inst and self.cameras and inst[:2] not in self.cameras:
             return False
         allowed = (self.camera_telescopes or {}).get(inst[:2])
         if inst and allowed and not any(str(f.get("telescope_id") or "").lower().startswith(t) for t in allowed):

@@ -85,6 +85,11 @@ def raw_dir(target: str, kind: str):
     return cfg.phot_raw(target) if kind == "phot" else cfg.spec_raw(target)
 
 
+
+def spectrograph_prefixes() -> list[str]:
+    """Spectrograph camera prefixes kept for spectra: the lcodb ``instruments.spectra`` (FLOYDS: en)."""
+    from ava.lcodb.config import load_config
+    return [str(p).lower() for p in load_config(cfg.lcodb_config_path)["instruments"]["spectra"]]
 def make_query(entry: dict, kind: str, proposals, start, end):
     from ava.lco.download import Query
     from ava.photometry.process import camera_telescopes, imaging_prefixes
@@ -93,7 +98,7 @@ def make_query(entry: dict, kind: str, proposals, start, end):
     return Query(
         names=list(entry.get("lco_names") or []), proposals=list(proposals), start=start, end=end, kind=kind,
         filters=list(cfg.photometry.filters) if kind == "phot" else None,
-        cameras=list(imaging_prefixes()) if kind == "phot" else None,
+        cameras=list(imaging_prefixes()) if kind == "phot" else spectrograph_prefixes(),
         camera_telescopes=camera_telescopes() if kind == "phot" else None,
         window_days=int(dc.window_days), page_size=int(dc.page_size),
         params=dict(vars(dc.archive_params)),
