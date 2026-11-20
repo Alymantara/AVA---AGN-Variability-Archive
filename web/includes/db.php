@@ -51,11 +51,13 @@ function ava_stats(): array
         return $s;
     }
     $db = ava_db();
-    $agn = (int) $db->query('SELECT COUNT(*) FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id WHERE ' . ava_target_filter_sql())->fetchColumn();
-    $row = $db->query('SELECT SUM(db_lco_images) AS images, SUM(db_floyds_epochs) AS spectra,
-                              MIN(db_lco_start) AS first FROM agn_lco')->fetch();
-    $first = $db->query('SELECT MIN(d) FROM (SELECT MIN(lco_start) AS d FROM agn
-                         UNION ALL SELECT MIN(db_lco_start) FROM agn_lco)')->fetchColumn();
+    // every number over the same targets as the Targets table (C12)
+    $from = ' FROM agn a LEFT JOIN agn_lco l ON l.db_ava_id = a.id WHERE ' . ava_target_filter_sql();
+    $row = $db->query('SELECT COUNT(*) AS agn, SUM(l.db_lco_images) AS images, SUM(l.db_floyds_epochs) AS spectra,
+                              MIN(a.lco_start) AS first_agn, MIN(l.db_lco_start) AS first_lco' . $from)->fetch();
+    $agn = (int) $row['agn'];
+    $starts = array_filter([$row['first_agn'], $row['first_lco']]);
+    $first = $starts ? min($starts) : null;
     $years = 0;
     if ($first) {
         $years = (int) floor((time() - strtotime((string) $first)) / (365.25 * 86400));
