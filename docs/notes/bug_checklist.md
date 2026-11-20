@@ -137,7 +137,7 @@ line in `future_improvements.md`.
 - [x] **C08** (fixed with B12: capped at 0.5 mag): `errors.fit_s_cam` (`brentq` up to 0.5 mag) can raise.
 - [ ] **C09**: `colour_term_check` ignores `intercal_min_pairs`; `run_target` hard-codes `g − i`.
 - [ ] **C10**: fa08 `up` gets no zero point (0 of 172 frames). Hardware or a U/up label? (Look at it together with B04.)
-- [ ] **C11**: stars with NaN RUWE pass `quality_ok`.
+- [x] **C11** (fixed 20 Nov: `quality_ok` needs a known RUWE when built, and `read_reference` applies it to existing catalogues, so no rebuild; 0–13 stars per field, ~0.5 %): stars with NaN RUWE passed `quality_ok`.
 - [ ] **C12**: the website's `ava_stats()` sums over all targets, without the target filter.
 
 ## 6. PyTICS error bars and calibration: decisions from the pair test (19 Nov 2026)

@@ -594,7 +594,7 @@ def anchor_u(
         out["fit_ok"] & ~out["is_agn"]
         & (out["gspc_u_sdss_flag"] == 1)
         & out["gspc_u_sdss"].notna() & out["lco_u"].notna()
-        & ~(out["gaia_ruwe"] > max_ruwe)
+        & (out["gaia_ruwe"] <= max_ruwe)              # NaN RUWE fails (C11)
     )
     d = (out.loc[use, "lco_u"] - (out.loc[use, "gspc_u_sdss"] + sdss_u_ab_offset)).to_numpy()
     for _ in range(5):  # iterative sigma clip around the median
@@ -771,7 +771,7 @@ def build_gspc_catalog(
     """Reference stars from Gaia DR3 GSPC, mapped to LCO bands (AB).
 
     One row per GSPC source.  ``lco_<b>`` is NaN where the GSPC validity flag
-    for that band is 0.  ``quality_ok`` = RUWE <= ``max_ruwe`` and no Gaia
+    for that band is 0.  ``quality_ok`` = RUWE known and <= ``max_ruwe`` and no Gaia
     neighbour within ``neighbour_arcsec`` brighter than G + ``neighbour_dmag``
     (XP spectra of such stars are contaminated).
     """
@@ -825,7 +825,7 @@ def build_gspc_catalog(
         if gmag_all[b_] < cat["gaia_g"].iat[a] + neighbour_dmag:
             bad[a] = True
     cat["gaia_neighbour"] = bad
-    cat["quality_ok"] = ~bad & ~(cat["gaia_ruwe"] > max_ruwe)
+    cat["quality_ok"] = ~bad & (cat["gaia_ruwe"] <= max_ruwe)   # NaN RUWE fails (C11)
 
     cat["ref_method"] = "gspc"
     cat, agn_info = assign_star_ids(
@@ -1008,3 +1008,14 @@ def build_apass_model_catalog(
         "u_anchor": u_meta,
     }
     return stars, meta
+
+
+def read_reference(path) -> pd.DataFrame:
+    """``reference_stars.csv`` as the calibration and the ensemble use it.
+
+    A star with no Gaia RUWE (two-parameter astrometric solution, or no Gaia match) is not a comparison star: its
+    ``quality_ok`` is set to False here, so catalogues built before that rule (C11, 20 Nov 2026) need no rebuild."""
+    ref = pd.read_csv(path)
+    if "quality_ok" in ref and "gaia_ruwe" in ref:
+        ref["quality_ok"] = ref["quality_ok"].fillna(False).astype(bool) & ref["gaia_ruwe"].notna()
+    return ref

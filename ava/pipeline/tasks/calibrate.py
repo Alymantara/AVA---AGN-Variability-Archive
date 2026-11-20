@@ -85,6 +85,7 @@ def calibrate(target: str, force: bool = False, max_frames: int | None = None) -
     """Calibrate ``target``'s catalogues (see module docstring)."""
     from ava.photometry.calibration import ZPSettings
     from ava.photometry.process import calibrate_target
+    from ava.photometry.reference import read_reference
 
     logger = get_run_logger()
     ref_path = cfg.phot_dir(target) / "reference_stars.csv"
@@ -96,7 +97,7 @@ def calibrate(target: str, force: bool = False, max_frames: int | None = None) -
                           clip_kappa=float(cc.clip_kappa), min_standards=int(cc.min_standards))
     out = calibrate_target(
         target, catdir=cfg.sextractor_dir(target), phot_dir=cfg.phot_dir(target),
-        ref=pd.read_csv(ref_path), frame_db=frame_db_path(), meta_provider=raw_meta_provider(target),
+        ref=read_reference(ref_path), frame_db=frame_db_path(), meta_provider=raw_meta_provider(target),
         settings=settings, q=dict(vars(cfg.photometry.qc)), force=force, max_frames=max_frames,
         n_workers=int(cc.n_workers), log=logger.info, filters=list(cfg.photometry.filters))
     return {"target": target, **out}

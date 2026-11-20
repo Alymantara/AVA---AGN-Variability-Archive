@@ -668,7 +668,9 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     update_kw, apply_kw = dict(update_kw or {}), dict(apply_kw or {})
     sols, data, report = {}, {}, {}
     ref_path = phot_dir / "reference_stars.csv"
-    ref = pd.read_csv(ref_path) if ref_path.exists() else None
+    from ava.photometry.reference import read_reference
+
+    ref = read_reference(ref_path) if ref_path.exists() else None
     star_colours = None
     if scope_colour_terms and ref is not None:
         star_colours = (ref["lco_g"] - ref["lco_i"]).set_axis(ref["star_id"]).dropna()
