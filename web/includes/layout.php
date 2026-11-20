@@ -49,10 +49,13 @@ function ava_page_start(string $active, string $title, string $description = '')
 <html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
+<?php if (defined('AVA_BASE')): /* a page in a sub-folder: relative links resolve from the site root */ ?>
+  <base href="<?= h(AVA_BASE) ?>">
+<?php endif; ?>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= h($full) ?></title>
   <meta name="description" content="<?= h($description) ?>">
-<?php if (AVA_STAGING !== ''): ?>
+<?php if (AVA_STAGING !== '' || defined('AVA_NOINDEX')): ?>
   <meta name="robots" content="noindex, nofollow">
 <?php endif; ?>
   <meta name="theme-color" content="#0A1628">
@@ -246,4 +249,32 @@ function ava_target_card(array $t): void
     </a>
   </article>
 <?php
+}
+
+/** The site's 404: the page fell into a black hole. Sends the status, renders the page and stops. */
+function ava_not_found(): never
+{
+    http_response_code(404);
+    header('X-Robots-Tag: noindex');
+    if (!defined('AVA_NOINDEX')) {
+        define('AVA_NOINDEX', true);
+    }
+    ava_page_start('', 'Page not found', 'This page fell past the event horizon.');
+    ?>
+<section class="ava-404" style="background-image: url('<?= h(asset('assets/img/blackhole_404.webp')) ?>')">
+  <div class="container-xxl ava-404__content">
+    <p class="ava-404__code" aria-label="Error 404"><span>4</span><span>0</span><span>4</span></p>
+    <h1>Spaghettified.</h1>
+    <p class="ava-404__lead">This page strayed too close to the event horizon. The tidal forces stretched it into a
+      very long, very thin noodle, and nothing has come back out. Not even the URL.</p>
+    <p class="ava-404__small">On the bright side, its information may still be encoded on the horizon. We just can’t read it.</p>
+    <div class="ava-404__cta">
+      <a class="btn btn-ava btn-ava-gold" href="./">Escape to safety <span aria-hidden="true">→</span></a>
+      <a class="btn btn-ava btn-ava-outline" href="targets.php">Browse the targets</a>
+    </div>
+  </div>
+</section>
+<?php
+    ava_page_end();
+    exit;
 }

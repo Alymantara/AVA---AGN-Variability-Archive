@@ -568,3 +568,52 @@ html:not([data-view="modern"]) .ava-view-modern { display: none !important; }
 /* Targets table: the shared "Current" heading over Status / Photo / Spec; cadence columns sized to their content. */
 .ava-table thead .ava-th-note { font-weight: 400; color: var(--ava-muted); }
 .ava-classic .ava-cad { width: 1%; white-space: nowrap; padding-left: .5rem; padding-right: .5rem; }
+
+/* Daily status page (report/, unlisted) */
+.ava-report { --ok: var(--ava-aurora); --warn: var(--ava-gold); --fail: var(--ava-copper); }
+.ava-report__banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem 1rem; padding: 1rem 1.25rem;
+  border-radius: var(--ava-radius); border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.ava-report__banner strong { font-size: 1.35rem; color: var(--ava-strong); }
+.ava-report__banner span { color: var(--ava-muted); }
+.ava-report__banner.is-passed { --c: var(--ok); }
+.ava-report__banner.is-warnings, .ava-report__banner.is-missing { --c: var(--warn); }
+.ava-report__banner.is-failed { --c: var(--fail); }
+.ava-report__stale { margin: .75rem 0 0; color: var(--ava-copper-text); font-weight: 600; }
+.ava-report__table tr.is-ok { --c: var(--ok); } .ava-report__table tr.is-warn { --c: var(--warn); } .ava-report__table tr.is-fail { --c: var(--fail); }
+.ava-report__table tr.is-fail td, .ava-report__table tr.is-fail th { font-weight: 600; }
+.ava-report__dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: var(--c); margin-right: .45rem; }
+.ava-report__history { display: flex; flex-wrap: wrap; gap: .3rem; list-style: none; padding: 0; margin: 0; }
+.ava-report__history li { display: flex; flex-direction: column; align-items: center; min-width: 3.1rem; padding: .3rem .25rem;
+  border-radius: .35rem; font-size: .72rem; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+.ava-report__history li span { color: var(--ava-strong); font-weight: 600; }
+.ava-report__history li b { font-weight: 400; color: var(--ava-muted); font-size: .65rem; }
+.ava-report__history li.is-passed { --c: var(--ok); } .ava-report__history li.is-warnings { --c: var(--warn); } .ava-report__history li.is-failed { --c: var(--fail); }
+
+/* 404: the page fell into a black hole (layout.php ava_not_found). The photo stays dark in both themes. */
+.ava-404 { position: relative; isolation: isolate; min-height: min(78vh, 760px); display: flex; align-items: center;
+  padding-block: 4rem; color: #F2F1EC; background: #02040c center right / cover no-repeat; overflow: hidden; }
+.ava-404::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(90deg, rgba(2, 4, 12, .92) 0%, rgba(2, 4, 12, .7) 38%, rgba(2, 4, 12, 0) 70%); }
+.ava-404__content { max-width: 1320px; }
+.ava-404 h1 { color: #fff; font-size: clamp(2.4rem, 6vw, 4.25rem); margin: .25rem 0 1rem; }
+.ava-404__lead { font-size: clamp(1.05rem, 2vw, 1.3rem); max-width: 34ch; color: rgba(242, 241, 236, .9); }
+.ava-404__small { max-width: 44ch; color: rgba(242, 241, 236, .62); font-size: .95rem; }
+.ava-404__cta { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.75rem; }
+.ava-404 .btn-ava-outline { --bs-btn-color: #F2F1EC; --bs-btn-border-color: rgba(242, 241, 236, .5); }
+.ava-404__code { display: flex; gap: .05em; margin: 0; font-weight: 800; letter-spacing: -.02em; line-height: 1;
+  font-size: clamp(4.5rem, 14vw, 9rem); color: var(--ava-gold); }
+/* each digit is stretched thin and pulled toward the hole, then drifts back; staggered */
+.ava-404__code span { display: inline-block; transform-origin: left center; animation: ava-spaghetti 7s cubic-bezier(.6, 0, .9, .4) infinite; }
+.ava-404__code span:nth-child(2) { animation-delay: .35s; }
+.ava-404__code span:nth-child(3) { animation-delay: .7s; }
+@keyframes ava-spaghetti {
+  0%, 45% { transform: none; opacity: 1; filter: none; }
+  75% { transform: translate(28vw, -2vh) scale(6, .08) skewX(-20deg); opacity: 0; filter: blur(2px); }
+  76% { transform: translate(-6vw, 0) scale(.6); opacity: 0; filter: blur(4px); }
+  100% { transform: none; opacity: 1; filter: none; }
+}
+@media (max-width: 767.98px) {
+  .ava-404 { background-position: 70% center; }
+  .ava-404::before { background: rgba(2, 4, 12, .72); }
+}
+@media (prefers-reduced-motion: reduce) { .ava-404__code span { animation: none; } }

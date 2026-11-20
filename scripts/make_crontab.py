@@ -29,7 +29,8 @@ Each test line has a fixed day and month, so it runs once (then again a year lat
     02:00 daily        pipeline        run_pipeline.py with pipeline.prefect.nightly_steps, all targets
     05:00 daily        cleanup         scripts/cleanup.py: dry run until --cleanup-live (read the first nights' logs)
     every 6 h          lco_usage       scripts/lco_usage.py --live-snapshot
-    07:00 daily        daily_check     scripts/daily_check.py (non-zero exit -> cron mails MAILTO)
+    07:00 daily        daily_check     scripts/daily_check.py --web (non-zero exit -> cron mails MAILTO; also writes
+                                       the short report for the website's unlisted status page, <site>/report/)
 
 The pipeline line replaces the Prefect deployment of deployment_guide section 7.3 (use one or the other).
 """
@@ -95,7 +96,7 @@ def production(cfg, log_dir: Path, mailto: str | None, cleanup_live: bool = Fals
         job_line("0 2 * * *", "pipeline", log_dir, py, "scripts/run_pipeline.py", *nightly_flags(steps)),
         job_line("0 5 * * *", "cleanup", log_dir, py, "scripts/cleanup.py", *cleanup),
         job_line("0 */6 * * *", "lco_usage", log_dir, py, "scripts/lco_usage.py", "--live-snapshot"),
-        job_line("0 7 * * *", "daily_check", log_dir, py, "scripts/daily_check.py"),
+        job_line("0 7 * * *", "daily_check", log_dir, py, "scripts/daily_check.py", "--web"),
         END]
     return lines
 
