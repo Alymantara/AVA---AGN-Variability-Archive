@@ -1169,6 +1169,11 @@ Changes:
   a `KeyError` rather than a clean "rejected" reason; worth a guard in `build_gspc_catalog` some day.
 - **Also seen:** IRSA (E(B-V) for model u) failed from ~16:39 CET (XML parse errors, dropped connections).
   `_gspc_model_u` then keeps GSPC u only and records the error in the meta, as designed.
+- **Timeout** (20 Nov 2026, later): a sync job hung for 30 min when the network dropped (laptop asleep); astroquery's
+  Gaia client opens connections with no timeout. Each ESA call (async job, sync query, page) now runs in a
+  daemon thread and is given up after `ESA_TIMEOUT_S` (600 s; module constant, not yet a config key): a hung
+  async job falls back to sync, a hung sync call raises. Not a process-wide socket timeout, because Prefect runs
+  targets in threads. Tests: `test_hung_async_falls_back_to_sync`, `test_hung_sync_raises_timeout`.
 
 ## B25: the archive search read only the first page of each window (20 Nov 2026)
 

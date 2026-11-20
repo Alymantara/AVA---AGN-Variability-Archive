@@ -233,6 +233,32 @@ ESA_GAIA_TABLES = {
 
 #: Seconds between the pages of a paged sync query (keep the ESA archive load low).
 ESA_PAGE_PAUSE_S = 1.0
+#: Seconds before one ESA archive call (an async job, or one sync query or page) is given up.  astroquery's Gaia
+#: client opens connections with no timeout: on 20 Nov 2026 a sync job hung for 30 min after the network dropped.
+ESA_TIMEOUT_S = 600.0
+
+
+def _timed(fn, *args, **kwargs):
+    """``fn(*args, **kwargs)`` in a daemon thread; ``TimeoutError`` after :data:`ESA_TIMEOUT_S`.  A hung call is
+    left behind in its thread (it holds one idle socket) rather than blocking the pipeline."""
+    import threading
+
+    box = {}
+
+    def run():
+        try:
+            box["value"] = fn(*args, **kwargs)
+        except BaseException as exc:  # noqa: BLE001 — re-raised in the caller
+            box["error"] = exc
+
+    th = threading.Thread(target=run, daemon=True, name="esa-gaia-job")
+    th.start()
+    th.join(ESA_TIMEOUT_S)
+    if th.is_alive():
+        raise TimeoutError(f"ESA Gaia archive: no answer in {ESA_TIMEOUT_S:.0f} s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
 
 
 def _esa_job(adql: str):
@@ -245,7 +271,7 @@ def _esa_job(adql: str):
 
     Gaia.ROW_LIMIT = -1
     try:
-        return Gaia.launch_job_async(adql, verbose=False).get_results()
+        return _timed(lambda: Gaia.launch_job_async(adql, verbose=False).get_results())
     except Exception as exc:  # noqa: BLE001 — try the sync endpoint once
         try:
             return _esa_job_sync(adql, Gaia)
@@ -264,8 +290,12 @@ def _esa_job_sync(adql: str, gaia):
     from astropy.table import vstack
 
     m = re.search(r"\sFROM\s(.+)$", adql, flags=re.S | re.I)
-    n = int(gaia.launch_job("SELECT COUNT(*) AS n FROM " + m.group(1), verbose=False).get_results()[0][0])
-    t = gaia.launch_job(adql, verbose=False).get_results()
+
+    def job(q):
+        return _timed(lambda: gaia.launch_job(q, verbose=False).get_results())
+
+    n = int(job("SELECT COUNT(*) AS n FROM " + m.group(1))[0][0])
+    t = job(adql)
     if len(t) == n:
         return t
     if "gaiadr3.gaia_source AS gs" not in adql or len(t) == 0:
@@ -273,7 +303,7 @@ def _esa_job_sync(adql: str, gaia):
     pages, got, last = [], 0, -1
     while got < n:
         time.sleep(ESA_PAGE_PAUSE_S)
-        p = gaia.launch_job(f"{adql} AND gs.source_id > {last} ORDER BY gs.source_id", verbose=False).get_results()
+        p = job(f"{adql} AND gs.source_id > {last} ORDER BY gs.source_id")
         if len(p) == 0:
             break
         pages.append(p)

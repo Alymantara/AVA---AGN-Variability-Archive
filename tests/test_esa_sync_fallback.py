@@ -78,3 +78,41 @@ def test_incomplete_paging_raises(monkeypatch):
     _fake_gaia(monkeypatch, 7, cap=3, lose_rows=True)
     with pytest.raises(RuntimeError, match="ESA async: .*sync: .*incomplete"):
         R._esa_job(ADQL)
+
+
+def _hanging_gaia(monkeypatch, hang_async=True, hang_sync=False):
+    """Fake Gaia whose async (and optionally sync) calls hang; ESA_TIMEOUT_S cut to 0.2 s."""
+    import time
+
+    class Gaia:
+        ROW_LIMIT = 50
+
+        @staticmethod
+        def launch_job_async(q, verbose=False):
+            if hang_async:
+                time.sleep(2)
+            return _Job(Table({"source_id": [1], "ra": [1.0]}))
+
+        @staticmethod
+        def launch_job(q, verbose=False):
+            if hang_sync:
+                time.sleep(2)
+            if q.startswith("SELECT COUNT(*)"):
+                return _Job(Table({"n": [2]}))
+            return _Job(Table({"source_id": [1, 2], "ra": [1.0, 1.0]}))
+
+    mod = types.ModuleType("astroquery.gaia")
+    mod.Gaia = Gaia
+    monkeypatch.setitem(sys.modules, "astroquery.gaia", mod)
+    monkeypatch.setattr(R, "ESA_TIMEOUT_S", 0.2)
+
+
+def test_hung_async_falls_back_to_sync(monkeypatch):
+    _hanging_gaia(monkeypatch, hang_async=True)
+    assert list(R._esa_job(ADQL)["source_id"]) == [1, 2]
+
+
+def test_hung_sync_raises_timeout(monkeypatch):
+    _hanging_gaia(monkeypatch, hang_async=True, hang_sync=True)
+    with pytest.raises(RuntimeError, match="TimeoutError.*TimeoutError"):
+        R._esa_job(ADQL)
