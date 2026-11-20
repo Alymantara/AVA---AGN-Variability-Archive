@@ -133,7 +133,7 @@ line in `future_improvements.md`.
   Fix together with B03.
 - [x] **C05** (fixed 20 Nov: `ava.lco.download.describe_error` removes URL query strings from every recorded download failure and log line, photometry and spectra): signed S3 URLs (valid 48 h) appeared in download error logs.
 - [x] **C06** (fixed 20 Nov: `Query.keep` checks the camera prefix for spectra too, from the lcodb `instruments.spectra` (en); the night-based spectra download reads the lcodb spectra DB, which holds FLOYDS only, so it was already safe): the spectra download filter had no instrument check (a SOAR spectrum with the same target name would be kept).
-- [ ] **C07**: `arm_offsets` keeps stale offsets after the `align_*` settings change.
+- [x] **C07** (fixed 20 Nov: the template stores its settings (windows, masks, max shift, red range, high-pass); a change rebuilds the template and every offset, like a change of z. Existing templates are rebuilt once on the next run): `arm_offsets` kept stale offsets after the `align_*` settings changed.
 - [x] **C08** (fixed with B12: capped at 0.5 mag): `errors.fit_s_cam` (`brentq` up to 0.5 mag) can raise.
 - [ ] **C09**: `colour_term_check` ignores `intercal_min_pairs`; `run_target` hard-codes `g − i`.
 - [ ] **C10**: fa08 `up` gets no zero point (0 of 172 frames). Hardware or a U/up label? (Look at it together with B04.)

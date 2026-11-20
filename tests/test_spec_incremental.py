@@ -92,3 +92,23 @@ def test_pending_nights(tmp_path):
     (red / "20260101").mkdir(parents=True)
     (red / "20260101" / "ogg2m001-en06-20260101-0005-e91-1d.fits.fz").write_bytes(b"x")
     assert pending_nights(raw, red) == ["20260102"]
+
+
+def test_offsets_rebuilt_when_align_settings_change(tmp_path):
+    """C07: new align_* settings rebuild the template and every offset; unchanged settings reuse them."""
+    files = [make(tmp_path / "r", f"202601{i + 1:02d}", "0001", 61000 + i, sb, 0.0)
+             for i, sb in enumerate((0.0, 0.8, -0.5))]
+    t = pd.DataFrame({"path": [str(f) for f in files]})
+    tpl = tmp_path / "spec_align_template.npz"
+    P.arm_offsets(t, Z, tmp_path)
+    m1 = tpl.stat().st_mtime_ns
+    P.arm_offsets(t, Z, tmp_path)
+    assert tpl.stat().st_mtime_ns == m1                                     # same settings: template kept
+    w = {k: list(v) for k, v in P.ALIGN_WINDOWS.items()}
+    w["blue"] = [w["blue"][0] - 20.0, w["blue"][1]]
+    P.arm_offsets(t, Z, tmp_path, windows=w)
+    assert tpl.stat().st_mtime_ns != m1                                     # new window: rebuilt
+    assert str(w["blue"][0]) in str(np.load(tpl)["settings"])              # the settings are stored
+    m2 = tpl.stat().st_mtime_ns
+    P.arm_offsets(t, Z, tmp_path, windows=w, highpass_A=80.0)
+    assert tpl.stat().st_mtime_ns != m2                                     # any stored setting counts

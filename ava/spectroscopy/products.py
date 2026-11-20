@@ -372,7 +372,7 @@ def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.
     narrow-line window (``ALIGN_WINDOWS``) with a stored reference template.
 
     Files in ``spec_dir``: ``spec_align_template.npz`` (the template: median of the aligned spectra, built once
-    from the series, or again with ``rebuild``) and ``spec_offsets.csv`` (one row per spectrum: shift_blue_A,
+    from the series, again with ``rebuild``, or when ``z`` or the alignment settings change) and ``spec_offsets.csv`` (one row per spectrum: shift_blue_A,
     shift_red_A, file size/mtime).  A new spectrum costs one cross-correlation; unchanged ones are read back.
     |shift| > ``max_shift`` → NaN (that arm of that spectrum is left out of the mean/RMS)."""
     spec_dir = Path(spec_dir)
@@ -380,18 +380,25 @@ def arm_offsets(t: pd.DataFrame, z: float, spec_dir: Path, max_shift: float = 6.
     masks = {k: tuple(tuple(x) for x in v) for k, v in (masks or ALIGN_MASK).items()}
     rmin, rmax = red_range
     tpl_f, off_f = spec_dir / "spec_align_template.npz", spec_dir / "spec_offsets.csv"
+    # the settings the template and offsets depend on: a change rebuilds both (C07); a template written
+    # before they were stored is rebuilt once
+    import json
+    settings = json.dumps({"windows": {k: list(v) for k, v in sorted(windows.items())},
+                           "masks": {k: [list(x) for x in v] for k, v in sorted(masks.items())},
+                           "max_shift": float(max_shift), "red_range": [float(rmin), float(rmax)],
+                           "highpass_A": float(highpass_A)}, sort_keys=True)
     tpl = None
     if tpl_f.exists() and not rebuild:
         d = np.load(tpl_f)
         tpl = {k: d[k] for k in d.files}
-        if abs(float(tpl.get("z", z)) - z) > 1e-6:
+        if abs(float(tpl.get("z", z)) - z) > 1e-6 or str(tpl.get("settings", "")) != settings:
             tpl = None
     grids, steps = {}, {}
     for arm, (lo, hi) in windows.items():
         steps[arm] = arm_dispersion(t["path"], arm) / (1 + z)        # measured bin width, rest Å
         grids[arm] = np.arange(lo - highpass_A, hi + highpass_A, steps[arm])
     if tpl is None:                                   # build the template: median, aligned twice
-        tpl = {"z": np.array(z)}
+        tpl = {"z": np.array(z), "settings": np.array(settings)}
         for arm, g in grids.items():
             k = max(int(highpass_A / steps[arm]) | 1, 5)
             H = [_highpass(f, k) for f, _ in (_arm_on_grid(p, arm, z, g, rmin, rmax) for p in t["path"]) if f is not None]
