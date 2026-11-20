@@ -131,7 +131,7 @@ line in `future_improvements.md`.
 - [x] **C03** (fixed 19 Nov, 6baad1e/48be80c: `lcodb_config_path` honours `LCODB_CONFIG`, then `data/config/`, then the template): AVA ignored `LCODB_CONFIG` (`ava/config.py:248`).
 - [ ] **C04**: cleanup can delete a standard that an unreduced night elsewhere still needs (`archive/cleanup.py:291`).
   Fix together with B03.
-- [ ] **C05**: signed S3 URLs (valid 48 h) appear in download error logs.
+- [x] **C05** (fixed 20 Nov: `ava.lco.download.describe_error` removes URL query strings from every recorded download failure and log line, photometry and spectra): signed S3 URLs (valid 48 h) appeared in download error logs.
 - [ ] **C06**: the spectra download filter has no instrument check (a SOAR spectrum with the same target name would be kept).
 - [ ] **C07**: `arm_offsets` keeps stale offsets after the `align_*` settings change.
 - [x] **C08** (fixed with B12: capped at 0.5 mag): `errors.fit_s_cam` (`brentq` up to 0.5 mag) can raise.

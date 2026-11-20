@@ -36,6 +36,7 @@ LAMPFLAT (the arcs and flats of a FLOYDS request carry the target's name).
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 import threading
 from contextlib import closing
@@ -61,6 +62,15 @@ DATEFMT = "%Y-%m-%d %H:%M:%S"
 # ---------------------------------------------------------------------------
 # Archive records
 # ---------------------------------------------------------------------------
+
+_QUERY = re.compile(r"\?[^\s'\"<>()]+")
+
+
+def describe_error(exc: BaseException) -> str:
+    """``Type: message`` for logs and ``failed`` lists, with every URL query string removed (C05): the
+    signed S3 download URLs carry their signature in the query and stay valid for 48 h."""
+    return _QUERY.sub("?<query removed>", f"{type(exc).__name__}: {exc}")
+
 
 def frame_download_url(f: dict) -> str | None:
     """Signed URL: top-level ``url`` (legacy script) or ``version_set[0].url``."""
@@ -356,7 +366,7 @@ def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_i
                 for fid, n, exc in fetch_many(fetcher, jobs, limiter, parallel):
                     f, dest, md5 = meta[fid]
                     if exc is not None:
-                        res.failed[f["filename"]] = f"{type(exc).__name__}: {exc}"
+                        res.failed[f["filename"]] = describe_error(exc)
                         continue
                     res.downloaded.append(str(dest))
                     res.bytes += n
@@ -366,8 +376,8 @@ def run(client, q: Query, dest_dir: Path, *, live: bool, max_frames: int, data_i
                     log(f"reached the per-run cap of {max_frames} files — stopping the search")
                     break
         except Exception as exc:  # noqa: BLE001 — e.g. lcodb.api.Throttled
-            res.failed["<search>"] = f"{type(exc).__name__}: {exc}"
-            log(f"archive search stopped: {exc}")
+            res.failed["<search>"] = describe_error(exc)
+            log(f"archive search stopped: {res.failed['<search>']}")
     res.requests = stats.get("requests", 0)
     if registry_db is not None and reg:
         with closing(sqlite3.connect(registry_db, timeout=60)) as con:

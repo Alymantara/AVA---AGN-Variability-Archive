@@ -43,7 +43,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ava.lco.download import LOCAL_FILES_DDL, fetch, fetch_many, md5sum
+from ava.lco.download import LOCAL_FILES_DDL, describe_error, fetch, fetch_many, md5sum
 
 RAW_ROLES = ("science", "arc", "flat", "standard", "std_arc", "std_flat")
 PRODUCT_ROLES = ("archive_1d", "archive_2d", "std_archive_1d", "std_archive_2d")
@@ -224,14 +224,14 @@ def run(client, p: pd.DataFrame, *, spec_raw_root: Path, spec_root: Path, target
             jobs.append((k, url, dest, md5))
             rows[k] = (row, dest, md5)
         except Exception as exc:  # noqa: BLE001 — record, go on with the next frame
-            res.failed[row.filename] = f"{type(exc).__name__}: {exc}"
+            res.failed[row.filename] = describe_error(exc)
             if type(exc).__name__ == "Throttled":
-                log(f"archive throttled — stopping: {exc}")
+                log(f"archive throttled — stopping: {describe_error(exc)}")
                 break
     for k, n, exc in fetch_many(fetcher, jobs, getattr(client, "limiter", None), parallel):
         row, dest, md5 = rows[k]
         if exc is not None:
-            res.failed[row.filename] = f"{type(exc).__name__}: {exc}"
+            res.failed[row.filename] = describe_error(exc)
             continue
         res.downloaded.append(str(dest))
         res.bytes += n
