@@ -471,3 +471,30 @@ def test_fvar_random_reads_the_qc_file(tmp_path):
         c.execute("CREATE TABLE agn (data_id TEXT)"); c.execute("INSERT INTO agn VALUES ('T')"); c.commit()
     out = PV.update_from_merged(tmp_path / "ava.db", lambda t_: tmp_path, error="random", dry_run=True)
     assert out["T"]["g"] == pytest.approx(0.1, abs=0.01)
+
+
+def test_colour_term_check_uses_min_pairs(monkeypatch):
+    """C09: colour_term_check passes intercal_min_pairs on to the intercalibration."""
+    from ava.photometry import intercal as IC
+    seen = []
+    monkeypatch.setattr(IC, "intercalibrate", lambda lc, scopes, max_gap=3.0, min_pairs=10, **k:
+                        seen.append(min_pairs) or pd.DataFrame())
+    lc = pd.DataFrame({"good": True, "scope": ["1m0-fa01", "1m0-fa02"] * 20, "MJD": np.arange(40.0),
+                       "mag": 15.0})
+    E.colour_term_check(lc, lc, ("fa",), 0.05, 3.0, 25)
+    assert seen and set(seen) == {25}
+
+
+def test_run_target_colour_bands(tmp_path):
+    """C09: the colour of the colour terms comes from colour_bands (default g - i), not hard-coded."""
+    import json
+
+    db = _target_folder(tmp_path)
+    ref = pd.read_csv(tmp_path / "reference_stars.csv")
+    ref.assign(lco_r=ref["lco_i"] + 0.1, lco_r_err=0.01).to_csv(tmp_path / "reference_stars.csv", index=False)
+    E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="full", log=lambda *a: None)
+    meta = json.loads((E.solution_dir(tmp_path, "gp") / "meta.json").read_text())
+    assert meta["zp_fit"]["colour"] == "lco_g-lco_i"
+    E.run_target(tmp_path, db, "T", ["gp", "ip"], mode="full", colour_bands=("g", "r"), log=lambda *a: None)
+    meta = json.loads((E.solution_dir(tmp_path, "gp") / "meta.json").read_text())
+    assert meta["zp_fit"]["colour"] == "lco_g-lco_r"

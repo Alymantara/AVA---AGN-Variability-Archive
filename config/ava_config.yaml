@@ -514,6 +514,7 @@ ensemble:
   # reference cameras (offsets + same-night pairs) by >= colour_check_min_gain. Or true / false / list of filters.
   scope_colour_terms: "auto"
   colour_check_min_gain: 0.05
+  colour_bands: [g, i]    # colour of every colour term (per-scope CK_k and the absolute C); after a change run mode full
   # --- incremental update (ensemble.update) -------------------------------------
   auto_refit: true        # full refit when an update reports needs_refit
   refit_fraction: 0.1     # needs_refit when more than this fraction of epochs come from updates

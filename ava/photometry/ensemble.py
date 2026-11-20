@@ -594,7 +594,7 @@ def _ref_scopes(scopes, prefixes):
 
 
 def colour_term_check(lc0: pd.DataFrame, lc1: pd.DataFrame, ref_cameras=("fa",), min_gain: float = 0.05,
-                      max_gap: float = 3.0) -> dict:
+                      max_gap: float = 3.0, min_pairs: int = 10) -> dict:
     """Is the per-scope colour term worth it for this target and filter?
 
     Compares two AGN light curves of one filter (``lc0`` without, ``lc1`` with
@@ -602,7 +602,8 @@ def colour_term_check(lc0: pd.DataFrame, lc1: pd.DataFrame, ref_cameras=("fa",),
     cameras agree with each other: (a) rms of each camera's additive AGN offset
     against the others (flux-flux, a = 1, % of flux) and (b) robust σ of the flux
     ratio on nights seen by two cameras (< 0.4 d apart).  ``use`` = the mean
-    relative improvement of (a) and (b) is >= ``min_gain``.  With fewer than two
+    relative improvement of (a) and (b) is >= ``min_gain``.  (a) needs ``min_pairs`` nights per camera
+    (``ensemble.intercal_min_pairs``, as the intercalibration).  With fewer than two
     reference cameras or no usable metric the answer is ``use = False``
     (plain PyTICS)."""
     from ava.photometry import intercal as IC
@@ -614,7 +615,7 @@ def colour_term_check(lc0: pd.DataFrame, lc1: pd.DataFrame, ref_cameras=("fa",),
         out = {"n_cameras": len(scopes), "offset_rms_pct": np.nan, "pair_sigma_pct": np.nan, "n_pairs": 0}
         if len(scopes) < 2:
             return out
-        t = IC.intercalibrate(x, scopes, max_gap=max_gap)
+        t = IC.intercalibrate(x, scopes, max_gap=max_gap, min_pairs=min_pairs)
         if len(t):
             out["offset_rms_pct"] = float(np.sqrt(np.mean((t["b1"] / t["F_mean"] * 100) ** 2)))
         F = IC.to_mjy(x["mag"])
@@ -643,7 +644,8 @@ def colour_term_check(lc0: pd.DataFrame, lc1: pd.DataFrame, ref_cameras=("fa",),
 def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "auto",
                min_epochs: int = 10, absolute: bool = True, colour_term: bool = True,
                scope_colour_terms="auto", colour_check_min_gain: float = 0.05, ref_cameras=("fa",),
-               intercal_max_gap: float = 3.0, auto_refit: bool = True, update_kw: dict | None = None,
+               intercal_max_gap: float = 3.0, intercal_min_pairs: int = 10, colour_bands=("g", "i"),
+               auto_refit: bool = True, update_kw: dict | None = None,
                apply_kw: dict | None = None, zp_kw: dict | None = None, anchor_kw: dict | None = None,
                log=print, **fit_kw) -> dict:
     """Calibrate ``data_id`` per filter and write ``agn_lightcurve_pytics.parquet``.
@@ -662,9 +664,19 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     stored zero point (star means do not change in an update).
     ``anchor_kw``: when given (``ensemble.absolute_all_stars``), the absolute ZP uses every star in the
     frames (:func:`anchor_stars` with these settings), not only the comparison stars.
+    ``colour_bands``: the star / AGN colour of every colour term (per-scope CK_k and the absolute C),
+    ``(blue, red)`` reference bands (``ensemble.colour_bands``, default g - i).
     ``fit_kw`` go to :func:`fit`, ``update_kw`` to :func:`update`, ``apply_kw`` to :func:`apply`.
     """
+    from ava.photometry.calibration import FILTER_TO_BAND
+
     phot_dir = Path(phot_dir)
+    ref_cols = tuple(f"lco_{b}" for b in colour_bands)
+    band_filter = {}
+    for filt, band in FILTER_TO_BAND.items():      # first (LCO) filter of each band: g -> gp, i -> ip
+        band_filter.setdefault(band, filt)
+    colour_filters = tuple(band_filter[b] for b in colour_bands)
+    zp_kw = {**(zp_kw or {}), "colour": ref_cols}
     update_kw, apply_kw = dict(update_kw or {}), dict(apply_kw or {})
     sols, data, report = {}, {}, {}
     ref_path = phot_dir / "reference_stars.csv"
@@ -673,7 +685,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     ref = read_reference(ref_path) if ref_path.exists() else None
     star_colours = None
     if scope_colour_terms and ref is not None:
-        star_colours = (ref["lco_g"] - ref["lco_i"]).set_axis(ref["star_id"]).dropna()
+        star_colours = (ref[ref_cols[0]] - ref[ref_cols[1]]).set_axis(ref["star_id"]).dropna()
     auto_ck = scope_colour_terms == "auto"
     forced = set(filters) if scope_colour_terms is True else (
         set() if auto_ck or not scope_colour_terms else set(scope_colour_terms))
@@ -706,7 +718,7 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     refitted = [f for f in sols if report[f]["mode"] in ("full", "update->full")]
     agn = {f: data[f][data[f]["is_agn"]] for f in sols}
 
-    all_colours = (ref["lco_g"] - ref["lco_i"]).set_axis(ref["star_id"]).dropna() if ref is not None else None
+    all_colours = (ref[ref_cols[0]] - ref[ref_cols[1]]).set_axis(ref["star_id"]).dropna() if ref is not None else None
 
     def anchors(sol, f):
         """Star means for the absolute ZP of ``sol`` (None: the comparison stars)."""
@@ -717,7 +729,8 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
     def zero_points():
         rel = {f: apply(s, agn[f], **apply_kw)["mag"].to_numpy() for f, s in sols.items()}
         stars = {f: anchors(s, f) for f, s in sols.items()} if anchor_kw is not None else None
-        return agn_zero_points(sols, ref, rel, colour_term=colour_term, zp_kw=zp_kw, stars=stars)
+        return agn_zero_points(sols, ref, rel, colour_term=colour_term, colour=colour_filters, zp_kw=zp_kw,
+                               stars=stars)
 
     # ---- 2. per-scope colour terms: decide per filter from the data ------------------------
     if auto_ck and refitted and ref is not None and star_colours is not None:
@@ -726,12 +739,13 @@ def run_target(phot_dir: Path, db: Path, data_id: str, filters, *, mode: str = "
         for f in refitted:
             t0 = time.time()
             s1 = fit(data[f], agn_id=sols[f].meta["agn_id"], log=None, colours=star_colours, **fit_kw)
-            z1 = absolute_zp(s1, ref, colour_term=colour_term, stars=anchors(s1, f), **(zp_kw or {}))
+            z1 = absolute_zp(s1, ref, colour_term=colour_term, stars=anchors(s1, f), **zp_kw)
             zp1 = z1["zp"] + z1["C"] * (c_agn - z1["c0"])
             s1.meta["agn_colour"] = c_agn
             lc0 = apply(sols[f], agn[f], zps[f][0], **apply_kw)
             lc1 = apply(s1, agn[f], zp1, colour=c_agn, **apply_kw)
-            chk = colour_term_check(lc0, lc1, ref_cameras, colour_check_min_gain, intercal_max_gap)
+            chk = colour_term_check(lc0, lc1, ref_cameras, colour_check_min_gain, intercal_max_gap,
+                                    intercal_min_pairs)
             log(f"{f}: colour terms {'ON' if chk['use'] else 'off'} (camera-consistency gain "
                 f"{chk['gain']:+.0%}; offsets {chk['without']['offset_rms_pct']:.2f}->{chk['with']['offset_rms_pct']:.2f}%,"
                 f" same-night {chk['without']['pair_sigma_pct']:.2f}->{chk['with']['pair_sigma_pct']:.2f}%)")

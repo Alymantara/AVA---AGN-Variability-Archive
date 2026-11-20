@@ -284,6 +284,8 @@ def ensemble(target: str, mode: str | None = None, plot: bool = True) -> dict:
         min_epochs=int(ec.min_epochs), absolute=bool(ec.absolute), colour_term=bool(ec.colour_term),
         scope_colour_terms=sct, colour_check_min_gain=float(ec.get("colour_check_min_gain", 0.05)),
         ref_cameras=tuple(ec.intercal_reference_cameras), intercal_max_gap=float(ec.intercal_max_gap_days),
+        intercal_min_pairs=int(ec.get("intercal_min_pairs", 10)),
+        colour_bands=tuple(ec.get("colour_bands", ["g", "i"]) or ["g", "i"]),
         auto_refit=bool(ec.auto_refit), log=logger.info,
         update_kw=dict(refit_fraction=float(ec.get("refit_fraction", 0.1)),
                        refit_rms_factor=float(ec.get("refit_rms_factor", 2.0)),
