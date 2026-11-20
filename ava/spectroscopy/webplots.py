@@ -23,6 +23,7 @@ from ava.spectroscopy import lines as L
 WIDTH = 9.0                      # inches; every spectroscopy web figure. The website shows plots ~650 px wide, so
                                  # 9 in at 150 dpi keeps 14 pt text at ~15-16 px on screen (the page body size)
 BLUE, RED, GREEN, GREY = "#0072B2", "#D55E00", "#009E73", "0.45"
+ORANGE = "#E69F00"     # with GREEN: both [O III] lines; separable for colour-blind readers (B42)
 INK, MUTED = "0.15", "0.45"
 LINES = {"[Ne V]": 3426.0, "[O II]": 3727.4, "Hδ": 4101.7, "Hγ": 4340.5, "He II": 4685.7, "Hβ": 4861.3,
          "[O III]": 5006.8, "He I": 5875.6, "[O I]": 6300.3, "Hα": 6562.8, "[S II]": 6724.0,
@@ -222,13 +223,13 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
 
     if has_g:
         a = ax["g"]
-        h = a.errorbar(gband.MJD, gband.flux, gband.err, fmt="o", ms=7, color=g_colour, mec="white", mew=0.8,
-                       elinewidth=1.4, capsize=0)
+        h = a.errorbar(gband.MJD, gband.flux, gband.err, fmt="o", ms=5, color=g_colour, elinewidth=1.1,
+                       capsize=0)
         a.set_ylabel("g (mJy)")
         label(a, h, "LCO g band", g_colour)
     a = ax["hb"]
-    h = a.errorbar(night.MJD, night.hb / 1e-13, night.hb_err / 1e-13, fmt="o", ms=9, color=INK, mec="white",
-                   mew=0.9, elinewidth=1.6, capsize=0, zorder=3)
+    h = a.errorbar(night.MJD, night.hb / 1e-13, night.hb_err / 1e-13, fmt="o", ms=6, color=INK, elinewidth=1.2,
+                   capsize=0, zorder=3)
     a.set_ylabel(r"H$\beta$ ($10^{-13}$ cgs)")
     fv = (f"F$_{{\\rm var}}$ = {100 * var['fvar']:.1f} ± {100 * var['fvar_err']:.1f} %"
           if np.isfinite(var.get("fvar", np.nan)) else "F$_{\\rm var}$ not detected")
@@ -238,12 +239,12 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
         a = ax["oiii"]
         hs, ls = [], []
         for key, mult, col, mk, lab in (("oiii5007_int", 1.0, GREEN, "o", "[O III] 5007"),
-                                        ("oiii4959_int", 2.98, "#CC79A7", "D", "[O III] 4959 × 2.98")):
+                                        ("oiii4959_int", 2.98, ORANGE, "D", "[O III] 4959 × 2.98")):
             if key not in night or night[key].notna().sum() == 0:
                 continue
             y, e = mult * night[key] / 1e-13, mult * night[f"{key}_err"] / 1e-13
-            h = a.errorbar(night.MJD, y, e, fmt=mk, ms=6, color=col, mec="white", mew=0.7, elinewidth=1.2,
-                           capsize=0, alpha=0.9)
+            h = a.errorbar(night.MJD, y, e, fmt=mk, ms=4.5, color=col, elinewidth=1.0, capsize=0,
+                           alpha=0.9)
             ok = np.isfinite(y)
             rms = 100 * np.nanstd(y[ok], ddof=1) / np.nanmean(y[ok]) if ok.sum() > 1 else np.nan
             hs.append(h)
@@ -252,8 +253,8 @@ def hbeta_lightcurve(night: pd.DataFrame, meta: dict, var: dict, target_name: st
         leg = a.legend(hs, ls, loc="best", fontsize=11, handletextpad=0.4, borderaxespad=0.4)
         leg.set_title("as measured, before the [O III] calibration", prop={"size": 10})
     a = ax["cont"]
-    h = a.errorbar(night.MJD, night.cont5100 / 1e-15, night.cont5100_err / 1e-15, fmt="s", ms=7, color=BLUE,
-                   mec="white", mew=0.8, elinewidth=1.4, capsize=0)
+    h = a.errorbar(night.MJD, night.cont5100 / 1e-15, night.cont5100_err / 1e-15, fmt="s", ms=5, color=BLUE,
+                   elinewidth=1.1, capsize=0)
     a.set_ylabel(r"$F_{5100}$ ($10^{-15}$ cgs)")
     label(a, h, "continuum 5100 Å", BLUE)
     ax[rows[-1]].set_xlabel("MJD")

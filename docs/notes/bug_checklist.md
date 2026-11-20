@@ -113,6 +113,84 @@ line in `future_improvements.md`.
   Fixed: one lookup `ava.lco.token`, templates point at `<install root>/.secrets/lco_token`, `check_install` and
   `make_crontab.py --check` test it as cron sees it.
 
+## 3e. From the Turgon backfill pilot (ESO 511-30, 20 Nov)
+
+Evidence and fixes: `fixer_bug_list_20261120.md` (repo root; item numbers in brackets). Turgon runs the weekend
+backfill with workarounds for B25–B30, so fixes must not change on-disk formats (`frame_qc`, `measurements.parquet`,
+`reference_stars.csv`, `pytics/`) or existing config keys, and must not change any QC threshold. When a fix is in
+`main`, say which workaround it retires.
+
+**High: wrong results or silently incomplete data**
+
+- [ ] **B25** [1]: the archive search reads only the first page of each window: `ava/lco/download.py::pages()` follows
+  `next`, which is an estimate for some filters (365-day windows found 4331 frames, 90-day windows 9151). Page by
+  `offset` + `ordering='id'` until a short page, as `lcodb.api.Client.frames()` does. Workaround: `--window-days` per
+  target, < 800 frames per window.
+- [ ] **B26** [2]: filler proposals are never searched (300 ESO 511-30 frames under `KEY2023B-001f`); only
+  `lco.proposals` is used. Default to the lcodb proposals of the target's LCO names ∪ `lco.proposals`. Workaround:
+  `backfill_helpers.py proposals T`.
+- [ ] **B27** [3]: a capped spectra download exits 0, its "missing" count is from before the download, and the
+  chained `spec_reduce` reduces nights whose standard or calibrations are not on disk
+  (`pipeline/tasks/spec_download.py`). Report missing after the run, fail when capped or incomplete, and skip and list
+  incomplete nights in `spec_reduce`. Workaround: repeat `-D` until `0 missing`.
+- [ ] **B28** [4]: the QC-0002 recipe (`reference_catalog.fn(T, force=True)`) raises `MissingContextError` outside a
+  flow, and `run_pipeline.py` cannot force a catalogue rebuild or recalibration. Add `--force-refcat` /
+  `--force-calibrate` through `ava_target_flow`, and correct the docs. Workaround: `backfill_helpers.py refcat|recal T`.
+
+**Medium: the backfill needs hand-set overrides**
+
+- [ ] **B29** [5]: no backfill mode. A full-dataset run needs `spectroscopy.download.select: oldest` and larger
+  `max_frames_per_run` (spectra, SExtractor) set by hand, plus B25–B26. Add `--backfill` / a `backfill:` block for
+  that run only.
+- [ ] **B30** [6]: `make_config.py init --force` must be given every override again. Add `set key=value` / `unset key`
+  (backup first, then `check`).
+- [ ] **B31** [7]: `tools/export_web_bundle.sh` hard-codes `$REPO/web/data` and ignores `web.data_dir` (production
+  layout `data/web`). Workaround: override `web.data_dir=web/data`.
+- [ ] **B32** [8]: `tools/upload_web_bundle.py` has no subset upload, and reads settings / `.netrc` only from `$HOME`
+  (CIFS home on Turgon, where `chmod` does nothing). Add `--only PREFIX`, `--settings` / `--netrc` (or env vars),
+  `--mark-sent`. Workaround: `HOME=…/.secrets/ftp_home`, `seed_staging_manifest.py`.
+- [ ] **B33** [9]: `tools/relocate_paths.py` for the VM transfer (needed Monday 23 Nov): rewrite `local_files.path`
+  and `spec_qc.path_1d/path_2d` (`/data2/jvhs1/AVA` → `/data/ava/AVA`), `--dry-run` default.
+- [ ] **B34** [10]: `config/lcodb_config.yaml` `standards.reference_dir` is a machine-specific `~/astro/floyds/…` path.
+  Derive it from `paths.floyds_pipeline`.
+
+**Low: reporting and usability**
+
+- [ ] **B35** [11]: `backfill_status.py` FLOYDS table counts science frames only (showed `to_download 0` with 263
+  standards/arcs/flats missing).
+- [ ] **B36** [12]: `backfill_status.py` photometry counts all filters (9339 vs 9151 in `photometry.filters`).
+- [ ] **B37** [13]: no progress output during spectra reduction; log one line per finished night (n of N).
+- [ ] **B38** [14]: `local_files` misses the files ported from the old pipeline (175 raw spectra). Register them, or
+  document that it covers AVA downloads only.
+- [ ] **B39** [15]: "To be processed" (`agn.ava = 0`) stays after a full backfill until `tools/set_archived.py T
+  --write`. Decide whether the backfill sets Archived itself.
+
+**Design decisions (next week, with the user)**
+
+- [ ] **B40** [16]: the QC gate before PyTICS (`photometry/store.py::load_pytics`, `qc_pass = 1`) drops 34.4 % of
+  ESO 511-30 frames. Diagnosis 20 Nov (session "Why PyTICS QC drops many ESO 511 frames"):
+  - `agn_flagged` is SExtractor FLAGS = 2 (deblended from the barred host), not saturation: no frame has FLAGS 4,
+    `agn_saturated` = 0, peak/SATURATE ≤ 0.15. Flagged and clean frames of the same night agree to 0.3–2 mmag.
+    The comparison stars use `bad_flags` 28 (4|8|16).
+  - z `zp_scatter`: the field's median is 0.123 against a 0.12 limit, in every camera and year; the per-frame ZP has
+    no colour term. PyTICS does not use that ZP.
+  - u `zp_offset`: the median is per family, so the per-camera u ZP spread (±0.6 mag, fa08 −2.36) is flagged; a
+    per-camera median cuts 350 flags to 69 (same as B04).
+
+  Proposal (no threshold value changes): the AGN flag mask = `bad_flags` (28); gate PyTICS on measurement flags only
+  (`seeing`, `few_matched`, `agn_missing`); `zp_dev` median per camera. Drops 34.4 % → 4.4 %.
+- [ ] **B41** [17]: distant standards: 12 of 180 ESO 511-30 science spectra matched to a standard more than 3 days
+  away (up to 714 h). Flag them in `spec_qc` and check them after the [O III] calibration.
+
+- [x] **B42** (user, 20 Nov; fixed 20 Nov: no white marker edge, markers ~30 % smaller (g 5, Hβ 6, [O III] 4.5, 5100 Å 5), [O III] 4959 orange `#E69F00` instead of pink, which deuteranopes could hardly tell from the green; checked on a synthetic 400-night series): Juan did not like the Hβ light-curve web plot
+  (`ava/spectroscopy/webplots.py::hbeta_lightcurve`): the points have a white edge (`mec="white"`) and are a bit too
+  big (`ms` 6–9 in the g-band, Hβ, line and 5100 Å panels). It looks fine with few points, but messy when they bunch
+  together (e.g. intensive campaigns). Remove the white edge and make the markers smaller; perhaps scale the marker
+  size with the number of points so sparse light curves keep their look. Check on a dense target (Mrk 817).
+
+Not code, from the same pilot: DR1 release files missing on Turgon (Mrk 817 merged LC and Hβ, NGC 4151 Hβ); no SSH
+route to the VM for `ava` / `jvhs1` (transfers by hand on Monday; a permanent route needs IT).
+
 ## 4. QC items already opened by the QC session
 
 - [ ] **QC-0001** (QC): sparse fields fail `min_matched: 30` (PG 2304+043: 0 % pass); fields with few GSPC u
