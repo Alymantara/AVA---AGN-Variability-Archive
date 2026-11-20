@@ -231,12 +231,59 @@ ESA_GAIA_TABLES = {
 }
 
 
+#: Seconds between the pages of a paged sync query (keep the ESA archive load low).
+ESA_PAGE_PAUSE_S = 1.0
+
+
 def _esa_job(adql: str):
-    """Run an ADQL query on the ESA Gaia Archive (asynchronous: no 2000-row cap); returns an astropy Table."""
+    """Run an ADQL query on the ESA Gaia Archive; returns an astropy Table.
+
+    Asynchronous first (no row cap).  If that fails — on 20 Nov 2026 every async job returned HTTP 500 while sync
+    jobs worked, and Turgon's backfill lost its reference catalogues — the query is rerun as sync jobs
+    (:func:`_esa_job_sync`)."""
     from astroquery.gaia import Gaia
 
     Gaia.ROW_LIMIT = -1
-    return Gaia.launch_job_async(adql, verbose=False).get_results()
+    try:
+        return Gaia.launch_job_async(adql, verbose=False).get_results()
+    except Exception as exc:  # noqa: BLE001 — try the sync endpoint once
+        try:
+            return _esa_job_sync(adql, Gaia)
+        except Exception as exc2:
+            raise RuntimeError(f"ESA async: {type(exc).__name__}: {exc}; sync: {type(exc2).__name__}: {exc2}") from exc2
+
+
+def _esa_job_sync(adql: str, gaia):
+    """``adql`` as sync jobs.  Sync results stop at 2000 rows, so the result is checked against ``COUNT(*)`` over
+    the same FROM/WHERE and, when short, fetched in pages ordered by ``gs.source_id`` (every query in
+    :data:`ESA_GAIA_TABLES` joins ``gaiadr3.gaia_source AS gs``).  A result that still disagrees with the count
+    raises: a truncated cone must never pass as complete."""
+    import re
+    import time
+
+    from astropy.table import vstack
+
+    m = re.search(r"\sFROM\s(.+)$", adql, flags=re.S | re.I)
+    n = int(gaia.launch_job("SELECT COUNT(*) AS n FROM " + m.group(1), verbose=False).get_results()[0][0])
+    t = gaia.launch_job(adql, verbose=False).get_results()
+    if len(t) == n:
+        return t
+    if "gaiadr3.gaia_source AS gs" not in adql or len(t) == 0:
+        raise RuntimeError(f"ESA sync result incomplete ({len(t)} of {n} rows) and cannot be paged")
+    pages, got, last = [], 0, -1
+    while got < n:
+        time.sleep(ESA_PAGE_PAUSE_S)
+        p = gaia.launch_job(f"{adql} AND gs.source_id > {last} ORDER BY gs.source_id", verbose=False).get_results()
+        if len(p) == 0:
+            break
+        pages.append(p)
+        got += len(p)
+        last = int(p[[c for c in p.colnames if c.lower() == "source_id"][0]][-1])
+    t = vstack(pages) if pages else t[:0]
+    sid = [c for c in t.colnames if c.lower() == "source_id"][0]
+    if len(t) != n or len(set(t[sid].tolist())) != n:
+        raise RuntimeError(f"ESA sync paging incomplete: {len(t)} rows of {n}")
+    return t
 
 
 def esa_gaia_query(coord, radius, catalog: str):

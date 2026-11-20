@@ -1135,3 +1135,37 @@ Changes:
     and z (3.3→13.8). The cause is s_cam: the old fit had too few cross-camera pairs and put it at 0. The
     new frames are no noisier than the old ones.
   - Figure: `docs/figures/qc_gate_20261120/sinistro_linearity_mrk817.png`.
+
+## ESA Gaia archive: sync fallback when async jobs fail (20 Nov 2026)
+
+- **What happened.** During Turgon's weekend backfill (20 Nov, ~15:00-16:40 CET) the reference step failed for every
+  new target: CDS VizieR answered "Page unavailable", every **async** TAP job on gea.esac.esa.int returned HTTP 500
+  (its availability page still said "available"), and vizier.cfa.harvard.edu returned no rows or a GSPC table
+  without `E(BP/RP)corr` (`KeyError`). **Sync** ESA jobs kept working, but stop at 2000 rows (NGC 2617: 3932 Gaia
+  sources in the cone; MCG 08-11-011: 2462 GSPC rows).
+- **Change** (`ava.photometry.reference._esa_job`, at Juan's request): async first as before; on any failure the
+  same ADQL runs as sync jobs (`_esa_job_sync`): a `COUNT(*)` over the same FROM/WHERE, then the query, then, if
+  short, pages of `... AND gs.source_id > last ORDER BY gs.source_id` with `ESA_PAGE_PAUSE_S` (1 s) between pages.
+  A result that still disagrees with the count raises, so a truncated cone never passes as complete. Extra load:
+  1 COUNT per table, plus 1 page per 2000 rows. Test: `tests/test_esa_sync_fallback.py` (offline, fake Gaia).
+- **Used for real first** in a scratch driver on the Mac: 13 catalogues for Turgon (NGC_2617 PG_1119+120
+  MCG_08-11-011 Mrk_110 PG_1302-102 PG_0844+349 PG_0923+201 Mrk_841 PG_0804+761 PG_1244+026 RXJ1755.0+6519
+  PG_2304+043 J22198+0935), shipped in the HEAD format (GSPC u only) as `refcats_20261120.tar.gz`, with
+  `HANDOVER.md` and `MANIFEST.csv`. Mrk 817 built this way matches the HEAD-built catalogue (same 266 stars and AGN,
+  magnitudes within 5e-5 mag, the old 6-figure rounding).
+- **Not changed:** the mirror order in `vizier_servers` (CDS, ESA, CfA). CfA's partial GSPC copy still fails with
+  a `KeyError` rather than a clean "rejected" reason; worth a guard in `build_gspc_catalog` some day.
+- **Also seen:** IRSA (E(B-V) for model u) failed from ~16:39 CET (XML parse errors, dropped connections).
+  `_gspc_model_u` then keeps GSPC u only and records the error in the meta, as designed.
+
+## B25: the archive search read only the first page of each window (20 Nov 2026)
+
+- **Bug.** `ava/lco/download.py::pages()` followed the archive's `next` link. For some filters `next` / `count` are
+  estimates, so a window could stop after its first page. On ESO 511-30 (Turgon pilot), 365-day windows found 4331
+  frames with exactly the minimum 34 listing requests; 90-day windows found 9151. The spectra request listing
+  (`spectroscopy/download.py::request_urls`) followed `next` too.
+- **Fix.** `listing_pages` pages by `offset` with `ordering=id` until a short page, as `lcodb.api.Client.frames` does,
+  and counts each request in `stats`. Both the photometry windows and the spectra request listings use it. A window
+  whose size is an exact multiple of the page size costs one extra (empty) request.
+- **Retires** the Turgon workaround of `--window-days` per target (< 800 frames per window).
+- Tests: `tests/test_download_parallel.py` (2,500 frames in one window with `next = None`: all listed, 3 requests).
