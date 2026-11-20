@@ -477,6 +477,7 @@ their image take that level from `photometry.calibration.camera_defaults`, which
 Existing frames need a recalibration (`-c`) to get `agn_peak`.
 
 QC gate before PyTICS (20 Nov 2026): three new keys.
+
 - `ensemble.pytics_ignore_qc_flags` (`no_zp`, `zp_scatter`, `zp_offset`): these flags no longer keep a frame out
   of PyTICS; they stay in `frame_qc` for the per-frame light curve.
 - `photometry.qc.agn_bad_flags` (28): `agn_flagged` only for AGN FLAGS 4 / 8 / 16, not 1 / 2 (deblended).
