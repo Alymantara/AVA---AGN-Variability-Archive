@@ -520,7 +520,7 @@ deletes. A file is deleted only when all its checks pass:
 |---|---|
 | Photometry image `raw_data/<target>/YYYYMMDD/<frame>.fits.fz` | its SExtractor catalogue exists; the frame has a `frame_qc` row at the current calibration version (calibrated; QC, AGN measurement and the image's header values stored); file older than `retention_days` |
 | FLOYDS night `raw_data/<target>/YYYYMMDD/` (spectra, arcs, flats together) | every science spectrum has its reduced `-1d` and a `spec_qc` row, **and** is in the final products (`hbeta_fits.parquet`: line fits, light curves); all files older than `retention_days` |
-| Standard-star night `raw_data/standards/YYYYMMDD/` | no target night that may need it is still on disk; every standard has a `spec_qc` row; older than `retention_days` |
+| Standard-star night `raw_data/standards/YYYYMMDD/`  | every science spectrum of an AVA target in the lcodb spectra DB that uses a standard, arc or flat filed in it has a `spec_qc` row (reduced, whether or not it is on disk: covers every target and the backfill), and no target night on disk has its date; the night is older than the standard-matching window (lcodb `standards.max_dt_days`, 60 d) + the download look-back, so no new night can pick it; every standard has a `spec_qc` row; older than `retention_days`; without the spectra DB nothing is freed |
 
 - **Frame metadata outlives the image, in the database.** Every header value calibration needs (exposure
   time, mid-exposure time, filter, night, airmass, header seeing, site, and since 16 Nov 2026 `SATURATE` and

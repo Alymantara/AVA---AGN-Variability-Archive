@@ -140,7 +140,7 @@ def test_standards_wait_for_target_nights(tmp_path):
     a = _night(std, "20260801", n_sci=1)
     b = _night(std, "20260802", n_sci=1)
     r = C.standards(std, waiting={"20260802"}, qc_basenames=set(a + b), cutoff=time.time() - 7 * C.DAY)
-    assert {p.parent.name for p in r.delete} == {"20260801"} and r.kept == {"a target night still needs it": 3}
+    assert {p.parent.name for p in r.delete} == {"20260801"} and r.kept == {"a science spectrum still needs it": 3}
     r = C.standards(std, waiting=set(), qc_basenames=set(a), cutoff=time.time() - 7 * C.DAY)
     assert r.kept == {"standard not reduced (no spec_qc row)": 3}
 
@@ -194,3 +194,65 @@ def test_header_cutoff(tmp_path):
                     [(1, "a", 0, 0, 1, "2018-01-01", "2018", "e1"), (2, "b", 0, 0, 1, "2026-11-01", "2026", "e2")])
     assert [r["id"] for r in headers.pending(con, [0])] == [2, 1]
     assert [r["id"] for r in headers.pending(con, [0], since="2021-09-01")] == [2]
+
+
+
+def _spectra_db(path, links, reduced=()):
+    """Minimal lcodb spectra DB: ``links`` = [(science basename, standard basename, standard day_obs, arc day_obs
+    of the standard)] in tables standing in for the views; ``reduced``: science basenames with a spec_qc row."""
+    with sqlite3.connect(path) as con:
+        con.executescript("""CREATE TABLE frames (id INTEGER PRIMARY KEY, basename TEXT, day_obs TEXT);
+                             CREATE TABLE spectrum_standards (sci_id INT, basename TEXT, ava_id INT, std_id INT);
+                             CREATE TABLE spectrum_calibs (spec_id INT, arc_id INT, flat_id INT);
+                             CREATE TABLE spec_qc (basename TEXT, role TEXT);""")
+        ids = {}
+        for i, (sci, std, std_day, arc_day) in enumerate(links):
+            if std not in ids:
+                sid, aid = 100 + i, 200 + i
+                ids[std] = sid
+                con.execute("INSERT INTO frames VALUES (?,?,?)", (sid, std, std_day))
+                con.execute("INSERT INTO frames VALUES (?,?,?)", (aid, std.replace("e00", "a00"), arc_day))
+                con.execute("INSERT INTO spectrum_calibs VALUES (?,?,NULL)", (sid, aid))
+            con.execute("INSERT INTO spectrum_standards VALUES (?,?,1,?)", (i, sci, ids[std]))
+        con.executemany("INSERT INTO spec_qc VALUES (?, 'science')", [(b,) for b in reduced])
+    return path
+
+
+def test_standard_nights_in_use(tmp_path):
+    links = [("sciA-e00", "stdA-e00", "2021-07-30", "2021-07-29"), ("sciB-e00", "stdB-e00", "2021-08-05", "2021-08-05"),
+             ("sciC-e00", "stdA-e00", "2021-07-30", "2021-07-29")]          # stdA serves two targets' spectra
+    db = _spectra_db(tmp_path / "s.sqlite", links, reduced=["sciA-e00", "sciB-e00"])
+    assert C.standard_nights_in_use(db) == {"20210730", "20210729"}         # sciC (not downloaded yet) needs stdA
+    db = _spectra_db(tmp_path / "t.sqlite", links, reduced=["sciA-e00", "sciB-e00", "sciC-e00"])
+    assert C.standard_nights_in_use(db) == set()
+    assert C.standard_nights_in_use(None) is None
+    assert C.standard_nights_in_use(tmp_path / "missing.sqlite") is None
+
+
+def test_cleanup_standards_backfill_and_window(tmp_path, monkeypatch):
+    """C04: a standard night stays while any science spectrum in the archive tables that uses it is unreduced (another
+    target, or a night the backfill has not downloaded yet) and while it is inside the matching window; nights
+    of other targets are not needed on disk.  Dry run: nothing is deleted."""
+    raw = tmp_path / "raw"
+    shared = _night(raw / "standards", "20210728", n_sci=1)          # used by sci1 (reduced) and sci2 (not yet)
+    done = _night(raw / "standards", "20210720", n_sci=1)            # only reduced spectra use it
+    recent_day = time.strftime("%Y%m%d", time.gmtime(time.time() - 20 * C.DAY))
+    recent = _night(raw / "standards", recent_day, n_sci=1)          # inside the 60-day window
+    _touch(raw / "Mrk_817" / "keep.txt")                             # a target folder (no nights on disk)
+    db = _spectra_db(tmp_path / "spectra.sqlite",
+                     [("sci1-e00", shared[0], "2021-07-28", "2021-07-28"), ("sci2-e00", shared[0], "2021-07-28", "2021-07-28"),
+                      ("sci3-e00", done[0], "2021-07-20", "2021-07-20")], reduced=["sci1-e00", "sci3-e00"])
+    with sqlite3.connect(db) as con:
+        con.executemany("INSERT INTO spec_qc VALUES (?, 'standard')", [(b,) for b in shared + done + recent])
+    cfg = SimpleNamespace(_raw={"cleanup": {"retention_days": 7}}, lcodb_config_path=None,
+                          phot_raw=lambda t: tmp_path / "phot" / t, spec_raw=lambda t: raw / t,
+                          spec_dir=lambda t: tmp_path / "spec" / t, sextractor_dir=lambda t: tmp_path / "sx" / t)
+    monkeypatch.setattr(C, "_lcodb", lambda cfg, kind: db if kind == "spectra" else None)
+    monkeypatch.setattr(C, "standards_window_days", lambda cfg: 60.0)
+    out = C.run(cfg, photometry=False, log=lambda *a: None)
+    kept = out["spectra"]["kept"]
+    assert out["mode"] == "dry_run" and out["spectra"]["files"] == 3          # only 20210720
+    assert kept["a science spectrum still needs it"] == 3 and kept["within the standard-matching window"] == 3
+    assert (raw / "standards/20210720").exists()                              # dry run: nothing deleted
+    monkeypatch.setattr(C, "_lcodb", lambda cfg, kind: None)                  # no DB: every standard kept
+    assert C.run(cfg, photometry=False, log=lambda *a: None)["spectra"]["files"] == 0

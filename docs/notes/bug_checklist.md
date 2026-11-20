@@ -129,7 +129,7 @@ line in `future_improvements.md`.
   Intended? `config/ava_config.yaml:578`.
 - [ ] **C02**: `merge` (`-m`/`-s`) raises `NotImplementedError`. Remove the flags or port the step?
 - [x] **C03** (fixed 19 Nov, 6baad1e/48be80c: `lcodb_config_path` honours `LCODB_CONFIG`, then `data/config/`, then the template): AVA ignored `LCODB_CONFIG` (`ava/config.py:248`).
-- [ ] **C04**: cleanup can delete a standard that an unreduced night elsewhere still needs (`archive/cleanup.py:291`).
+- [x] **C04** (fixed 20 Nov, rule agreed with the user: a raw standard night goes only when every AVA science spectrum in the lcodb spectra DB that uses its standard, arc or flat is reduced (`spec_qc`), covering all targets and the backfill, AND it is older than the matching window (lcodb `standards.max_dt_days` 60 d + look-back), so no new night can pick it; no spectra DB: nothing freed; a spectrum whose reduction fails keeps its standard): cleanup can delete a standard that an unreduced night elsewhere still needs (`archive/cleanup.py:291`).
   Fix together with B03.
 - [x] **C05** (fixed 20 Nov: `ava.lco.download.describe_error` removes URL query strings from every recorded download failure and log line, photometry and spectra): signed S3 URLs (valid 48 h) appeared in download error logs.
 - [x] **C06** (fixed 20 Nov: `Query.keep` checks the camera prefix for spectra too, from the lcodb `instruments.spectra` (en); the night-based spectra download reads the lcodb spectra DB, which holds FLOYDS only, so it was already safe): the spectra download filter had no instrument check (a SOAR spectrum with the same target name would be kept).

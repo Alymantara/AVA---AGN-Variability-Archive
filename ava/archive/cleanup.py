@@ -22,9 +22,17 @@ flats ``w00``), deleted as a whole when:
    line fits, light curves, mean/RMS);
 3. every file in the night is older than ``retention_days``.
 
-Flux-standard night ``<spec raw>/standards/YYYYMMDD/``: deleted when no target still has a raw folder for that
-night (the standard may be needed to reduce it), every standard spectrum has a ``spec_qc`` row, and every file
-is older than ``retention_days``.
+Flux-standard night ``<spec raw>/standards/YYYYMMDD/`` (one standard serves every target, and is filed under its
+OWN night, often not the science night), deleted when:
+
+1. no science spectrum of an AVA target in the lcodb spectra DB that uses a standard, arc or flat filed in it is
+   still without a ``spec_qc`` row (reduced or not, downloaded or not: this covers the backfill), and no target
+   night still on disk has its date;
+2. the night is older than the standard-matching window (lcodb ``standards.max_dt_days``, 60 d) plus the download
+   look-back, so no new science night can pick it;
+3. every standard spectrum in it has a ``spec_qc`` row and every file is older than ``retention_days``.
+
+Without the spectra DB no standard night is deleted.
 
 Catalogues, reduced spectra and all products are never touched.  Each deleted file is marked in the lcodb
 ``local_files`` table (``deleted_utc``; the row and its md5 stay).  ``retention_days`` must be longer than the
@@ -153,14 +161,19 @@ def spectra_target(raw_dir: Path, spec_dir: Path, qc_basenames: set[str], cutoff
     return r
 
 
-def standards(std_dir: Path, waiting: set[str], qc_basenames: set[str], cutoff: float) -> Report:
-    """Standard-star nights, once no target night still on disk (``waiting``: YYYYMMDD) may need them."""
+def standards(std_dir: Path, waiting: set[str], qc_basenames: set[str], cutoff: float,
+              newest_night: str | None = None) -> Report:
+    """Standard-star nights, once no science spectrum still needs them (``waiting``: YYYYMMDD; see
+    :func:`standard_nights_in_use`) and the night is no later than ``newest_night`` (YYYYMMDD: older than the
+    standard-matching window, so no new science night can pick it)."""
     r = Report()
     for night in sorted(p for p in Path(std_dir).glob("20??????") if p.is_dir()):
         files = [f for f in night.iterdir() if f.is_file()]
         sci = [f.name.split(".fits")[0] for f in files if "-e00.fits" in f.name]
         if night.name in waiting:
-            why = "a target night still needs it"
+            why = "a science spectrum still needs it"
+        elif newest_night is not None and night.name > newest_night:
+            why = "within the standard-matching window"
         elif not all(s in qc_basenames for s in sci):
             why = "standard not reduced (no spec_qc row)"
         elif not all(_old(f, cutoff) for f in files):
@@ -173,6 +186,41 @@ def standards(std_dir: Path, waiting: set[str], qc_basenames: set[str], cutoff: 
         r.delete += files
         r.bytes += sum(f.stat().st_size for f in files)
     return r
+
+
+def standard_nights_in_use(spectra_db: Path | None) -> set[str] | None:
+    """Nights (YYYYMMDD) of ``standards/`` that a science spectrum of an AVA target still needs: the night of the
+    standard chosen for it (view ``spectrum_standards``) or of that standard's arc / lamp flat
+    (``spectrum_calibs``), for every science spectrum in the lcodb spectra DB without a ``spec_qc`` row (not
+    reduced, on disk or not downloaded yet). Standards are filed under their OWN night and serve every target and
+    the backfill (C04). None when it cannot be told (no spectra DB or views): then no standard night is freed."""
+    if spectra_db is None or not Path(spectra_db).exists():
+        return None
+    try:
+        with closing(sqlite3.connect(f"file:{spectra_db}?mode=ro", uri=True)) as con:
+            has_qc = con.execute("SELECT 1 FROM sqlite_master WHERE name='spec_qc'").fetchone() is not None
+            done = ("AND NOT EXISTS (SELECT 1 FROM spec_qc q WHERE q.basename = s.basename AND q.role = 'science')"
+                    if has_qc else "")
+            rows = con.execute(
+                f"""WITH pending AS (SELECT DISTINCT s.std_id FROM spectrum_standards s
+                                     WHERE s.ava_id IS NOT NULL AND s.std_id IS NOT NULL {done})
+                    SELECT f.day_obs FROM pending p JOIN frames f ON f.id = p.std_id
+                    UNION
+                    SELECT f.day_obs FROM pending p JOIN spectrum_calibs c ON c.spec_id = p.std_id
+                    JOIN frames f ON f.id IN (c.arc_id, c.flat_id)""").fetchall()
+    except sqlite3.Error:
+        return None
+    return {str(d).replace("-", "") for (d,) in rows if d}
+
+
+def standards_window_days(cfg) -> float:
+    """How far back a new science spectrum may pick its standard (lcodb ``standards.max_dt_days``, 60)."""
+    try:
+        from ava.lcodb.config import load_config
+
+        return float((load_config(cfg.lcodb_config_path)["standards"] or {}).get("max_dt_days", 60))
+    except Exception:  # noqa: BLE001
+        return 60.0
 
 
 def spec_qc_basenames(spectra_db: Path | None, role: str) -> set[str]:
@@ -291,7 +339,20 @@ def run(cfg, *, live: bool = False, retention_days: float | None = None, targets
             going = {f.parent for f in rep.delete}
             waiting = {n.name for d in tdirs for n in d.glob("20??????")
                        if n.is_dir() and n not in going and any(n.iterdir())}
-            std = standards(root / "standards", waiting, spec_qc_basenames(spec_db, "standard"), cutoff)
+            # C04: a standard serves every target (and the backfill) and is filed under its own night: keep it
+            # while any science spectrum in the archive tables that uses it is not reduced, and while a new
+            # science night could still pick it (lcodb standards.max_dt_days + the download look-back)
+            in_use = standard_nights_in_use(spec_db)
+            if in_use is None:
+                waiting |= {n.name for n in (root / "standards").glob("20??????")}
+                log("spectra standards: no spectra DB, cannot tell which standards are still needed — all kept")
+            else:
+                waiting |= in_use
+            look_back = float((cfg._raw.get("spectroscopy", {}).get("download", {}) or {}).get("overlap_days", 2))
+            newest = datetime.fromtimestamp((time.time() if now is None else now)
+                                            - (standards_window_days(cfg) + look_back) * DAY, timezone.utc)
+            std = standards(root / "standards", waiting, spec_qc_basenames(spec_db, "standard"), cutoff,
+                            newest_night=newest.strftime("%Y%m%d"))
             log(f"spectra standards: delete {len(std.delete)} ({std.bytes / 1e6:.1f} MB); kept {dict(std.kept)}")
         rep.add(std)
         if live and rep.delete:
