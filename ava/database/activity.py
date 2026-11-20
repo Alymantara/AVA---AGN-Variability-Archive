@@ -11,8 +11,9 @@ ava.database.activity — the observing flag ``agn.ava`` from the LCO frame regi
 Only the observing state is automatic: a source with a science frame (photometry
 ``EXPOSE`` or spectroscopy ``SPECTRUM``) whose ``day_obs`` is within ``days`` of
 today becomes 2; a source at 2 whose last frame is older drops to 0 until it is
-archived. An archived source (1) that is observed again becomes 2. Sources with no
-linked frames are left alone.
+archived, and so does a source with no status yet (NULL) whose frames are all older
+(observed in the past, never processed). An archived source (1) that is observed again
+becomes 2. Sources with no linked frames are left alone.
 
 Run after every ingest of new frames: ``lcodb daily`` / ``lcodb link`` and the
 pipeline's daily publish step call :func:`update_from_lcodb`.
@@ -58,7 +59,7 @@ def new_flag(current, last: str | None, cutoff: str):
         return current
     if last >= cutoff:
         return OBSERVING
-    if current is not None and int(current) == OBSERVING:
+    if current is None or int(current) == OBSERVING:    # stopped observing, or data but no status yet
         return PENDING
     return current
 

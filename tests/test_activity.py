@@ -16,6 +16,8 @@ def test_new_flag_rules():
     assert new_flag(2, "2026-09-20", cut) == 0      # stopped: to be processed
     assert new_flag(1, "2025-01-01", cut) == 1      # archived stays archived
     assert new_flag(None, None, cut) is None        # no frames: untouched
+    assert new_flag(None, "2026-09-13", cut) == 0   # old data, no status yet: to be processed
+    assert new_flag(None, "2026-11-01", cut) == 2   # new data, no status yet: observing
 
 
 def _frames(path, rows):
@@ -36,14 +38,16 @@ def test_update_observing(tmp_path):
     db = tmp_path / "ava.db"
     with closing(sqlite3.connect(db)) as c:
         c.execute("CREATE TABLE agn (id INTEGER PRIMARY KEY, data_id TEXT, ava INTEGER)")
-        c.executemany("INSERT INTO agn VALUES (?,?,?)", [(1, "A", 1), (2, "B", 2), (3, "C", None), (4, "D", 2)])
+        c.executemany("INSERT INTO agn VALUES (?,?,?)", [(1, "A", 1), (2, "B", 2), (3, "C", None), (4, "D", 2),
+                                                        (5, "E", None)])
         c.commit()
-    last = {1: "2026-11-14", 2: "2026-09-01", 4: "2026-11-01"}
-    assert update_observing(db, last, today=TODAY, dry_run=True) == [("A", 1, 2, "2026-11-14"), ("B", 2, 0, "2026-09-01")]
+    last = {1: "2026-11-14", 2: "2026-09-01", 4: "2026-11-01", 5: "2026-09-13"}
+    assert update_observing(db, last, today=TODAY, dry_run=True) == [
+        ("A", 1, 2, "2026-11-14"), ("B", 2, 0, "2026-09-01"), ("E", None, 0, "2026-09-13")]
     update_observing(db, last, today=TODAY)
     assert update_observing(db, last, today=TODAY) == []                     # idempotent
     with closing(sqlite3.connect(db)) as c:
-        assert dict(c.execute("SELECT data_id, ava FROM agn")) == {"A": 2, "B": 0, "C": None, "D": 2}
+        assert dict(c.execute("SELECT data_id, ava FROM agn")) == {"A": 2, "B": 0, "C": None, "D": 2, "E": 0}
 
 
 # --- recent cadence (observing_recent) -------------------------------------------------------------------------
