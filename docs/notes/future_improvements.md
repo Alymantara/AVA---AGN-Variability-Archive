@@ -1262,3 +1262,16 @@ Changes:
 - **Fix** (the Turgon hot-fix, committed): skip empty / NaN / None / NaT values and catch `ValueError`; the plots then
   have no spectroscopy ticks, with the existing warning. Test: `tests/test_spec_epochs.py`.
 - **Retires** the uncommitted Turgon edit of `ava/pipeline/tasks/webplot.py`.
+
+## B53: calibrating a target with no reference catalogue (21 Nov 2026)
+
+- **Bug.** Only `-o` builds `reference_stars.csv`. A run with `-e -c` on a target without one (J21368-6438 on Turgon,
+  21 Nov) failed in the calibration step, and nothing said earlier that the catalogue was missing.
+- **Fix.**
+  - `ava_target_flow`: when it calibrates without `-o` and the catalogue is missing
+    (`calibrate.needs_reference_catalog`), it logs a warning and runs `reference_catalog` first, as `-o` would
+    (Gaia queries: the usual CDS → CfA → ESA fallback).
+  - `calibrate` itself, called directly, checks the catalogue before anything else and says "no reference
+    catalogue … run -o".
+  - `tools/backfill_status.py`: a `refcat` column and a "NO REFERENCE CATALOGUE" line listing those targets.
+- **Retires** the `backfill_helpers.py rounded` (v5) workaround on Turgon. Test: `tests/test_refcat_missing.py`.

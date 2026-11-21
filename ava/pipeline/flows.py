@@ -216,6 +216,14 @@ def ava_target_flow(
         )(target)
 
     if calibrate_data:
+        from ava.pipeline.tasks.calibrate import needs_reference_catalog, reference_path
+
+        if needs_reference_catalog(target, init, calibrate_data):       # B53: build it rather than fail
+            logger.warning("%s: no reference catalogue (%s); building it first, as -o would", target,
+                           reference_path(target))
+            results["reference_catalog"] = reference_catalog.with_options(
+                tags=_target_tags(target, STAGE_TAGS["init"] + ["catalogues"]),
+            )(target)
         results["calibrate"] = calibrate.with_options(
             tags=_target_tags(target, STAGE_TAGS["calibrate"]),
         )(target)

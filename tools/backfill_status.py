@@ -62,7 +62,8 @@ def photometry(db: Path, frame_db: Path, targets, imaging, filters):
         want = by[d]
         no_cat = [(b, c) for b, c in want if b not in cats]
         to_dl = [(b, c) for b, c in no_cat if b not in imgs]
-        out.append(dict(data_id=d, frames=len(want), catalogues=sum(b in cats for b, _ in want),
+        out.append(dict(data_id=d, refcat="yes" if (cfg.phot_dir(d) / "reference_stars.csv").exists() else "NO",
+                        frames=len(want), catalogues=sum(b in cats for b, _ in want),
                         to_extract_on_disk=len(no_cat) - len(to_dl), to_download=len(to_dl),
                         download_gb=sum(MB.get(c, 37.8) for _, c in to_dl) / 1e3,
                         calibrated=sum(b in done for b, _ in want),
@@ -140,6 +141,9 @@ def main():
               f"{int(p.to_extract_on_disk.sum())} on disk to extract; {n} to download ({gb / 1e3:.2f} TB, "
               f">= {n / rate / 86400:.1f} days at {rate:g} file/s); {int(p.to_calibrate.sum())} catalogued "
               f"but not calibrated")
+        no_ref = list(p.loc[p.refcat == "NO", "data_id"])
+        if no_ref:
+            print(f"NO REFERENCE CATALOGUE ({len(no_ref)}; -c builds it first, or run -o): {', '.join(no_ref)}")
     print("\nFLOYDS (science spectra)")
     if len(s):
         print(s.to_string(index=False))

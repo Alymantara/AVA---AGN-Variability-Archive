@@ -5,11 +5,11 @@
 
 | | Items | Share of all |
 |---|---:|---:|
-| High | 7 | 8 % |
+| High | 6 | 7 % |
 | Medium | 19 | 21 % |
 | Low | 19 | 21 % |
-| **Still to do** | **45** | **50 %** |
-| Done | 45 | 50 % |
+| **Still to do** | **44** | **49 %** |
+| Done | 46 | 51 % |
 | All items | 90 | |
 <!-- progress:end -->
 
@@ -57,9 +57,6 @@ line in `future_improvements.md`.
   - Fix: compare a 2014–2016 raw header with a 2020+ one (`OBSTYPE`, `CONFMODE`, `INSTRUME`, `OBJECT`/`SITEID`, file
     name, compression) and make the chain take them, or list them as unsupported in `spec_qc` and the summary.
   - Mrk 352, NPM1G+27.0587 and Arp 151 were marked Archived with no spectra before 21 Nov 00:42.
-- [ ] **B53** [26] *bug*: photometry fails when a target has no `reference_stars.csv` (J21368-6438); only `-o` builds
-  it. Fix: `calibrate` builds the catalogue when missing (logged), or fails up front with "no reference catalogue —
-  run -o"; `backfill_status` lists targets without one. Workaround: `backfill_helpers.py rounded` (v5).
 - [ ] **B54** [27] *bug*: the plot step crashes when no frame passes QC (PG 2304+043: NaN axis limits, exit 51). Skip
   the plot with a warning (or draw an empty "no frames pass QC" panel) and finish the run. Thresholds untouched.
 - [ ] **B26** [2] *bug*: filler proposals are never searched. 300 ESO 511-30 frames are under `KEY2023B-001f`, but only
@@ -230,6 +227,9 @@ Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and `docs/reports/ab
 ## Done
 
 **21 Nov 2026**
+- [x] **B53** [26] (B53 commit): a run that calibrates a target with no `reference_stars.csv` now builds it first
+  (logged); `calibrate` alone says "run -o"; `backfill_status` lists targets without one. Retires the
+  `backfill_helpers.py rounded` (v5) workaround.
 - [x] **B49** [20] (B49 commit): plots and PyTICS crashed on `Time("nan")` for targets never observed with FLOYDS
   (3C 445). The Turgon hot-fix is committed with a test; it retires the uncommitted Turgon `webplot.py` edit.
 - [x] **B52** [25] (AVA `d43b830`, banzai-floyds `137ffa6`): the spectra clean-up stripped `BINNED2D` from standards,

@@ -80,6 +80,17 @@ def raw_meta_provider(target: str):
     return meta
 
 
+def reference_path(target: str) -> Path:
+    """The target's reference catalogue, ``<phot>/<target>/reference_stars.csv`` (built by ``-o``)."""
+    return cfg.phot_dir(target) / "reference_stars.csv"
+
+
+def needs_reference_catalog(target: str, init: bool, calibrate_data: bool) -> bool:
+    """True when a run calibrates without ``-o`` and the target has no reference catalogue yet: the flow then builds
+    it first (B53) instead of failing in the calibration step."""
+    return bool(calibrate_data and not init and not reference_path(target).exists())
+
+
 @task(name="calibrate", tags=["calibration"])
 def calibrate(target: str, force: bool = False, max_frames: int | None = None) -> dict:
     """Calibrate ``target``'s catalogues (see module docstring)."""
@@ -87,10 +98,10 @@ def calibrate(target: str, force: bool = False, max_frames: int | None = None) -
     from ava.photometry.process import calibrate_target
     from ava.photometry.reference import read_reference
 
-    logger = get_run_logger()
-    ref_path = cfg.phot_dir(target) / "reference_stars.csv"
+    ref_path = reference_path(target)
     if not ref_path.exists():
-        raise FileNotFoundError(f"{ref_path} missing — run -o (initialise) first")
+        raise FileNotFoundError(f"{target}: no reference catalogue ({ref_path}) — run -o (initialise) first")
+    logger = get_run_logger()
     cc = cfg.photometry.calibration
     settings = ZPSettings(min_snr=float(cc.min_snr), max_peak_frac=float(cc.max_peak_frac),
                           edge_px=float(cfg.photometry.pix_edge), sigma_floor=float(cc.sigma_floor),
