@@ -239,7 +239,8 @@ def export_merged_csv(lc: pd.DataFrame, path: Path, target: str, error_model: st
 def _record_fvar(target: str, lc: pd.DataFrame, merged: pd.DataFrame | None, error_model: str, ec, logger) -> dict:
     """Per-band F_var of the merged light curve → ``photometry_variability`` + ``agn.frac_<band>``
     (ava.photometry.variability).  Settings: ``ensemble.fvar_error`` ("total" | "random"),
-    ``ensemble.fvar_min_epochs``.  A failure here is logged, never fatal to the ensemble step."""
+    ``ensemble.fvar_min_epochs``; also the mean of the last ``ensemble.recent_nights`` observed nights →
+    ``photometry_recent`` + ``agn.avg_<band>``.  A failure here is logged, never fatal to the ensemble step."""
     from ava.photometry import variability as PV
 
     try:
@@ -248,6 +249,7 @@ def _record_fvar(target: str, lc: pd.DataFrame, merged: pd.DataFrame | None, err
         error = str(ec.get("fvar_error", "total"))
         bv = PV.band_variability(merged, error=error, min_epochs=int(ec.get("fvar_min_epochs", 10)))
         out = PV.record_band_variability(cfg.db_path, target, bv, f"{error_model}/{error}")
+        PV.record_recent(cfg.db_path, target, PV.recent_means(merged, int(ec.get("recent_nights", 10))))
     except Exception as exc:  # noqa: BLE001
         logger.warning("%s: F_var not recorded (%s: %s)", target, type(exc).__name__, exc)
         return {}

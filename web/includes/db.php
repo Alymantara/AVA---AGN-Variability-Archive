@@ -272,6 +272,32 @@ function ava_band_variability(string $dataId): array
     return $out;
 }
 
+/** Mean AB mag over the last N observed nights of the merged light curve (ava.photometry.variability), by band. */
+function ava_recent_mags(string $dataId): array
+{
+    if (!ava_has_table('photometry_recent')) {
+        return [];
+    }
+    $st = ava_db()->prepare('SELECT * FROM photometry_recent WHERE data_id = ?');
+    $st->execute([$dataId]);
+    $out = [];
+    foreach ($st as $r) {
+        $out[$r['filter']] = $r;
+    }
+    return $out;
+}
+
+/** "28 Jul – 12 Oct 2026" from two MJDs (the year shown once when both share it). */
+function mjd_range(float $a, float $b): string
+{
+    $da = (new DateTimeImmutable('@' . (int) round(($a - 40587) * 86400)));
+    $db = (new DateTimeImmutable('@' . (int) round(($b - 40587) * 86400)));
+    $same = $da->format('Y') === $db->format('Y');
+    $l = $da->format($same ? 'j M' : 'j M Y');
+    $r = $db->format('j M Y');
+    return $da->format('Y-m-d') === $db->format('Y-m-d') ? $r : "$l – $r";
+}
+
 /** Derived properties (ava.database.derived → agn_derived): k_bol, L_bol, Eddington ratio, disc lags. */
 function ava_derived(string $dataId): ?array
 {

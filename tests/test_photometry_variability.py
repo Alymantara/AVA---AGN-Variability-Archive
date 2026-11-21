@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ava.photometry.variability import band_variability, legacy_frac, record_band_variability
+from ava.photometry.variability import (band_variability, legacy_frac, recent_means, record_band_variability,
+                                        record_recent)
 from ava.utils.variability import variability
 
 
@@ -72,3 +73,42 @@ def test_record_writes_table_and_legacy_columns(tmp_path):
     record_band_variability(db, "Mrk_817", bv, "pytics/total")
     with closing(sqlite3.connect(db)) as c:
         assert c.execute("SELECT COUNT(*) FROM photometry_variability").fetchone()[0] == 2
+
+
+def _mags(rows):
+    return pd.DataFrame(rows, columns=["filter", "MJD", "mag_AB"])
+
+
+def test_recent_means_last_observed_nights():
+    # g: 12 nights, two epochs on the last night; the mean uses the last 10 nights only, in flux
+    rows = [("g", 60000.0 + 3 * d, 15.0) for d in range(10)] + [("g", 60030.1, 14.0), ("g", 60030.2, 14.0),
+                                                                ("g", 60033.3, 16.0)]
+    rows += [("B", 60001.2, 15.5), ("B", 60001.3, np.nan)]          # one night, a NaN magnitude ignored
+    rec = recent_means(_mags(rows), nights=10).set_index("filter")
+    g = rec.loc["g"]
+    assert g.n_nights == 10 and g.n_epochs == 11                    # nights 60006 … 60033: drops 60000 and 60003
+    assert g.mjd_first == 60006.0 and g.mjd_last == 60033.3
+    flux = np.r_[np.full(8, 10 ** -6.0), 2 * [10 ** -5.6], 10 ** -6.4]
+    assert g.mag == pytest.approx(-2.5 * np.log10(flux.mean()))
+    assert rec.loc["B", "n_nights"] == 1 and rec.loc["B", "mag"] == pytest.approx(15.5)
+
+
+def test_record_recent_writes_table_and_avg_columns(tmp_path):
+    db = tmp_path / "ava.db"
+    with closing(sqlite3.connect(db)) as c:
+        c.execute("CREATE TABLE agn (id INTEGER PRIMARY KEY, data_id TEXT, avg_g, avg_u)")
+        c.execute("INSERT INTO agn (data_id, avg_g, avg_u) VALUES ('Mrk_817', 13.0, 17.0)")
+        c.commit()
+    rec = recent_means(_mags([("g", 60000.5, 14.2), ("Y", 60000.5, 15.0)]))
+    record_recent(db, "Mrk_817", rec)
+    record_recent(db, "Mrk_817", rec)                               # re-run replaces
+    with closing(sqlite3.connect(db)) as c:
+        assert c.execute("SELECT avg_g, avg_u FROM agn").fetchone() == (14.2, 17.0)   # u not measured: kept
+        assert c.execute("SELECT filter, n_nights FROM photometry_recent ORDER BY filter").fetchall() == [
+            ("Y", 1), ("g", 1)]
+
+
+def test_recent_means_from_flux_when_no_magnitudes():
+    rec = recent_means(pd.DataFrame({"filter": ["g", "g"], "MJD": [60000.1, 60001.1], "flux_mJy": [3.631, 3.631]}))
+    assert rec.loc[0, "mag"] == pytest.approx(15.0) and rec.loc[0, "n_nights"] == 2
+    assert recent_means(pd.DataFrame({"filter": ["g"], "MJD": [1.0]})).empty

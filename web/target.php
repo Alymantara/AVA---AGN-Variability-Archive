@@ -136,6 +136,8 @@ foreach (['spec', 'spec_avg', 'hbeta', 'hbeta_fit'] as $k) {
 }
 $lineVar = ava_line_variability((string) $t['data_id']);
 $bandVar = ava_band_variability((string) $t['data_id']);
+$recent = ava_recent_mags((string) $t['data_id']);
+$recentNights = $recent ? max(array_map(fn($r) => (int) $r['n_nights'], $recent)) : 0;
 $derived = ava_derived((string) $t['data_id']);
 $lit = ava_literature((string) $t['data_id']);
 // mass error only when the shown mass is the literature value it belongs to
@@ -471,7 +473,17 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
       </tr></thead>
       <tbody>
         <tr><th>#Epochs</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= fmt_int($lcoFrames($f)) ?></td><?php endforeach; ?></tr>
+        <?php if ($recent): $rc = array_intersect_key($recent, array_flip($breakdownCols)) ?: $recent; ?>
+        <tr><th>Mean mag (AB), last <?= $recentNights ?> nights
+            <span class="mjd fw-normal"><?= h(mjd_range(min(array_column($rc, 'mjd_first')), max(array_column($rc, 'mjd_last')))) ?></span></th>
+          <?php foreach ($breakdownCols as $f): $r = $recent[$f] ?? null; ?>
+          <td class="num"<?= $r ? ' title="' . h(mjd_range((float) $r['mjd_first'], (float) $r['mjd_last']) . ' · '
+              . (int) $r['n_nights'] . ' nights, ' . (int) $r['n_epochs'] . ' epochs') . '"' : '' ?>><?=
+            $r ? fmt_num($r['mag'], 2) : '—' ?></td>
+          <?php endforeach; ?></tr>
+        <?php else: ?>
         <tr><th>Mean mag (AB), last 10 d</th><?php foreach ($breakdownCols as $f): ?><td class="num"><?= is_pos($t["avg_$f"] ?? null) ? fmt_num($t["avg_$f"], 2) : '—' ?></td><?php endforeach; ?></tr>
+        <?php endif; ?>
         <?php if ($bandVar): ?>
         <tr><th>F<sub>var</sub> (merged)</th><?php foreach ($breakdownCols as $f): $r = $bandVar[$f] ?? null; ?>
           <td class="num"<?= $r ? ' title="' . (int) $r['n_epochs'] . ' epochs"' : '' ?>><?=

@@ -16,9 +16,9 @@ from ava.config import cfg
 
 #: agn columns the pipeline may write.
 #: ``ava`` only for its observing state (2), see :mod:`ava.database.activity`;
-#: ``frac_<band>`` from the merged light curves, see :mod:`ava.photometry.variability`.
+#: ``frac_<band>`` and ``avg_<band>`` from the merged light curves, see :mod:`ava.photometry.variability`.
 PIPELINE_COLUMNS = frozenset({"lco_active", "lt_active", "agn_gaia_dr3_id", "ava",
-                              *(f"frac_{b}" for b in ("u", "B", "g", "V", "r", "i", "z"))})
+                              *(f"{c}_{b}" for c in ("frac", "avg") for b in ("u", "B", "g", "V", "r", "i", "z"))})
 
 
 def set_agn_fields(data_id: str, path: Path | None = None, **fields) -> None:

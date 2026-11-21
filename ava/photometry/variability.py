@@ -9,6 +9,13 @@ written to the AVA database:
 * ``agn.frac_<band>`` — the legacy per-band column (u B g V r i z) in its original text
   format ("10.215%"), or "0.0" when there is no excess variance — what the website and
   older readers show as "Fractional variability".
+
+The same step writes the recent brightness (:func:`recent_means`):
+
+* ``photometry_recent`` — per target and band, the mean AB magnitude over the last ``nights`` *observed*
+  nights (distinct UTC dates with a good epoch; default 10, ``ensemble.recent_nights``), with the number of
+  epochs and the MJD range used. The mean is taken in flux and converted back to a magnitude;
+* ``agn.avg_<band>`` — the legacy column (u B g V r i z) the website called "Mean mag, last 10 d".
 """
 
 from __future__ import annotations
@@ -57,6 +64,57 @@ def band_variability(lc: pd.DataFrame, error: str = "total", min_epochs: int = 1
     return pd.DataFrame(rows)
 
 
+PHOT_RECENT_DDL = """
+CREATE TABLE IF NOT EXISTS photometry_recent (  -- merged LCO light curve: mean over the last N observed nights
+    data_id TEXT, filter TEXT,
+    mag REAL, n_epochs INTEGER, n_nights INTEGER, mjd_first REAL, mjd_last REAL, updated_utc TEXT,
+    PRIMARY KEY (data_id, filter)
+);
+"""
+
+
+def recent_means(lc: pd.DataFrame, nights: int = 10) -> pd.DataFrame:
+    """Per band: mean AB magnitude of the good epochs on the last ``nights`` distinct UTC dates (floor of MJD).
+    Uses ``mag_AB``, or ``flux_mJy`` (AB: 3631 Jy) when the table has no magnitudes."""
+    rows = []
+    if "mag_AB" not in lc:
+        if "flux_mJy" not in lc:
+            return pd.DataFrame(rows)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lc = lc.assign(mag_AB=-2.5 * np.log10(lc["flux_mJy"].to_numpy(float) / 3631e3))
+    for band, g in lc.groupby("filter", sort=True):
+        g = g[np.isfinite(g["mag_AB"].to_numpy(float))]
+        if g.empty:
+            continue
+        day = np.floor(g["MJD"].to_numpy(float))
+        keep = np.isin(day, np.unique(day)[-nights:])
+        sel = g[keep]
+        flux = 10 ** (-0.4 * sel["mag_AB"].to_numpy(float))
+        rows.append({"filter": band, "mag": float(-2.5 * np.log10(flux.mean())), "n_epochs": int(len(sel)),
+                     "n_nights": int(np.unique(day[keep]).size), "mjd_first": float(sel["MJD"].min()),
+                     "mjd_last": float(sel["MJD"].max())})
+    return pd.DataFrame(rows)
+
+
+def record_recent(db: Path, data_id: str, rec: pd.DataFrame) -> dict:
+    """Write ``photometry_recent`` rows and the legacy ``agn.avg_<band>`` columns (bands measured only)."""
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with closing(sqlite3.connect(db, timeout=60)) as con:
+        con.executescript(PHOT_RECENT_DDL)
+        con.execute("DELETE FROM photometry_recent WHERE data_id = ?", (data_id,))
+        for r in rec.itertuples(index=False):
+            con.execute("INSERT INTO photometry_recent VALUES (?,?,?,?,?,?,?,?)", (
+                data_id, r.filter, r.mag, r.n_epochs, r.n_nights, r.mjd_first, r.mjd_last, now))
+        cols = {r[1] for r in con.execute("PRAGMA table_info(agn)")}
+        sets = {f"avg_{b}": round(float(m), 4) for b, m in zip(rec.get("filter", []), rec.get("mag", []))
+                if b in LEGACY_FRAC_BANDS and f"avg_{b}" in cols}
+        if sets:
+            con.execute(f"UPDATE agn SET {', '.join(f'{c} = ?' for c in sets)} WHERE data_id = ?",
+                        (*sets.values(), data_id))
+        con.commit()
+    return dict(zip(rec.get("filter", []), rec.get("mag", [])))
+
+
 def legacy_frac(fvar) -> str:
     """agn.frac_<band> text format: percent with 3 decimals, "0.0" when undefined."""
     return f"{100 * float(fvar):.3f}%" if fvar is not None and np.isfinite(fvar) else "0.0"
@@ -87,10 +145,11 @@ def record_band_variability(db: Path, data_id: str, bv: pd.DataFrame, error_mode
 
 
 def update_from_merged(db: Path, phot_dir, error: str = "total", min_epochs: int = 10,
-                       error_model: str = "pytics", dry_run: bool = False) -> dict[str, dict]:
+                       error_model: str = "pytics", dry_run: bool = False,
+                       recent_nights: int = 10) -> dict[str, dict]:
     """F_var of every AGN in ``db`` that has a merged light curve
     (``phot_dir(data_id)/<data_id>_LCO_merged_lightcurve.csv``) → ``photometry_variability`` +
-    ``agn.frac_<band>``.  Keeps the main database in step with the merged light curves whichever
+    ``agn.frac_<band>``, and the recent means → ``photometry_recent`` + ``agn.avg_<band>``.  Keeps the main database in step with the merged light curves whichever
     database the ensemble step wrote to.  Returns ``{data_id: {band: fvar}}``."""
     with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=60)) as con:
         ids = [r[0] for r in con.execute("SELECT data_id FROM agn WHERE data_id IS NOT NULL")]
@@ -104,6 +163,9 @@ def update_from_merged(db: Path, phot_dir, error: str = "total", min_epochs: int
         if error == "random" and "flux_err_random_mJy" not in lc and qc.is_file():
             # the shareable CSV keeps only total errors (Nov 2026); the random part is in the QC file
             lc = lc.merge(pd.read_csv(qc, comment="#", usecols=["frame", "flux_err_random_mJy"]), on="frame", how="left")
+        rec = recent_means(lc, recent_nights)
+        if not dry_run and not rec.empty:
+            record_recent(db, t, rec)
         bv = band_variability(lc, error=error, min_epochs=min_epochs)
         if bv.empty:
             continue
@@ -113,7 +175,9 @@ def update_from_merged(db: Path, phot_dir, error: str = "total", min_epochs: int
 
 
 def update_from_config(cfg, dry_run: bool = False) -> dict[str, dict]:
-    """Pipeline entry point (publish step): settings ``ensemble.fvar_error``, ``ensemble.fvar_min_epochs``."""
+    """Pipeline entry point (publish step): settings ``ensemble.fvar_error``, ``ensemble.fvar_min_epochs``,
+    ``ensemble.recent_nights``."""
     ec = cfg._raw.get("ensemble", {}) or {}
     return update_from_merged(cfg.db_path, cfg.phot_dir, str(ec.get("fvar_error", "total")),
-                              int(ec.get("fvar_min_epochs", 10)), str(ec.get("error_model", "fitted")), dry_run)
+                              int(ec.get("fvar_min_epochs", 10)), str(ec.get("error_model", "fitted")), dry_run,
+                              int(ec.get("recent_nights", 10)))
