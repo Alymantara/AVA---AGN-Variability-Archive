@@ -28,6 +28,15 @@ line in `future_improvements.md`.
 
 ---
 
+## Monday 23 Nov agenda (VM move)
+
+- [ ] **banzai-floyds to `137ffa6`** (B52) on Turgon and the VM: `cd <banzai-floyds> && git fetch fork &&
+  git checkout 137ffa6`. On Turgon this replaces the hot-fixed `fringe_masters.py` (move the edited file aside or
+  restore it from `.bak_20261120_2205` first, so the checkout is clean). Also `git pull` AVA (the B52 commit) so
+  the clean-up stops slimming standards. Optionally restore the slimmed J1421+3855 standards (recipe in
+  `future_improvements.md`, B52).
+- [ ] **B33** `relocate_paths.py`, with the data move (see below).
+
 ## High
 
 - [ ] **B52** [25] *bug*, **breaks every later reduction**: `spec_reduce`'s clean-up (`drop_binned`) strips the
@@ -38,6 +47,9 @@ line in `future_improvements.md`.
     (b) commit the banzai-floyds hot-fix (skip unreadable standards, logged) on a branch with a test, and re-pin AVA
     (Turgon and VM); (c) a recipe to restore slimmed standards (re-reduce the night).
   - Hot-fix on Turgon: banzai-floyds `fringe_masters.py` (backup `.bak_20261120_2205`).
+  - **21 Nov:** (a) done: `clean_secondary` never rewrites a standard; test
+    `test_clean_secondary_leaves_standards_whole`. (b) the banzai-floyds fix (`_template_frames`) is written with a
+    test, waiting for the fork commit and new pin. (c) the restore recipe is in `future_improvements.md` (B52).
 - [ ] **B51** [24] *bug/decision*: `spec_reduce` outcome rules. One failed night stopped products for the whole target,
   and a run in which banzai processed no frame passed as a clean exit.
   - Turgon hot-fix (v3, 21 Nov 00:42): ≥ 1 science product → `PARTIAL`, products go on, missing nights appended to

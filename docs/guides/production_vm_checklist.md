@@ -125,10 +125,11 @@ are lost. Never paste a `<placeholder>` literally; replace it first.
   cd $AVA && git clone https://github.com/Alymantara/banzai-floyds.git
   ```
   ```bash
-  cd $AVA/banzai-floyds && git checkout 0271697 && git log --oneline -1
+  cd $AVA/banzai-floyds && git checkout 137ffa6 && git log --oneline -1
   ```
-  `0271697` is on branch `rm-improvements` (five more flux standards, fringe templates that survive repeat runs,
-  rejection of misidentified arc lines). **Never use `origin/main`:** it lacks `offline.py`, the shipped sky flats
+  `137ffa6` is on branch `rm-improvements` (21 Nov: an unreadable standard no longer stops the fringe templates,
+  AVA B52; earlier: five more flux standards, fringe templates that survive repeat runs, rejection of misidentified
+  arc lines). **Never use `origin/main`:** it lacks `offline.py`, the shipped sky flats
   and ~8,100 lines of the fork.
 - [ ] **D2. Environment + clean-shell wrapper:**
   ```bash

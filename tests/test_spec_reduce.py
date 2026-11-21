@@ -1,5 +1,6 @@
 """Offline helpers of ava.spectroscopy.reduce: chain-log parsing, product lookup, staging, QC table."""
 import sqlite3
+from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
@@ -82,3 +83,24 @@ def test_clean_secondary(tmp_path):
     assert not stage.exists() and out["files"] == 5 and out["bytes"] > 0
     again = R.clean_secondary(prods, [arc], [], keep_binned_examples=2, example_roots=[red])
     assert again["files"] == 0                                      # idempotent
+
+
+def test_clean_secondary_leaves_standards_whole(tmp_path):
+    """B52: a standard's -2d keeps every extension (BINNED2D above all), whatever the example count; science
+    products of the same run are still slimmed."""
+    red = tmp_path / "reduced"; red.mkdir()
+    proc = tmp_path / "processed"; proc.mkdir()
+    sci = []
+    for i in range(4):
+        f = red / f"s{i}-e91-2d.fits"; _two_d(f)
+        sci.append({"path_2d": str(f), "OBJECT": "Mrk 817", "role": "science"})
+    stds = []
+    for i in range(4):
+        f = proc / f"t{i}-e91-2d.fits"; _two_d(f, obj="Feige 34")
+        stds.append({"path_2d": str(f), "OBJECT": "Feige 34", "role": "standard"})
+    before = [(p["path_2d"], Path(p["path_2d"]).read_bytes()) for p in stds]
+    R.clean_secondary(sci + stds, [], [], keep_binned_examples=0, example_roots=[red, proc])
+    for path, data in before:
+        assert Path(path).read_bytes() == data                     # untouched, byte for byte
+        assert "BINNED2D" in {h.name for h in fits.open(path)}
+    assert all("BINNED2D" not in {h.name for h in fits.open(p["path_2d"])} for p in sci)

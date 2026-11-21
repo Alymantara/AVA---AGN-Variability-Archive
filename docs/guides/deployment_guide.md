@@ -128,10 +128,11 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
 
 - Fork: `https://github.com/Alymantara/banzai-floyds` (based on LCO's banzai-floyds; depends on
   `lco-banzai` 1.36.2 from GitHub, `torch`, `astroscrappy`, `scikit-image`, `scikit-learn`, `alembic`, …).
-  Deploy a **fixed commit** (currently `0271697` on `rm-improvements`, 19 Nov 2026: five more flux standards,
-  fringe templates that survive repeat runs, rejection of misidentified arc lines; was `3e8e796`). **Never
+  Deploy a **fixed commit** (currently `137ffa6` on `rm-improvements`, 21 Nov 2026: an unreadable standard is
+  skipped in the residual fringe templates instead of stopping the run (AVA B52); before that `0271697`, 19 Nov:
+  five more flux standards, fringe templates that survive repeat runs, rejection of misidentified arc lines). **Never
   `origin/main`:** it lacks `offline.py`, the shipped sky flats and ~8,100 lines of the fork. Clone, then
-  `git checkout 0271697`. The version is
+  `git checkout 137ffa6`. The version is
   recorded in every product. Install notes: the fork's `docs/INSTALL_RM.md`.
 - Python 3.12, own environment (e.g. `/opt/ava/env-banzai`). The fork has a `Dockerfile` that can be
   used instead.

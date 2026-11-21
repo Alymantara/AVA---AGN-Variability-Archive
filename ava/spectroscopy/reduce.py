@@ -236,10 +236,15 @@ def has_hdu(path: Path, name: str) -> bool:
 
 def clean_secondary(products: list[dict], calib_files: list[Path], staging: list[Path], *,
                     drop_binned: bool = True, keep_binned_examples: int = 2, example_roots=()) -> dict:
-    """Make validated products lean.  ``products``: dicts with path_2d, OBJECT (validated frames only).
-    Science/standard -2d: drop DIAGNOSTIC_HDUS, and BINNED2D unless fewer than ``keep_binned_examples``
+    """Make validated products lean.  ``products``: dicts with path_2d, OBJECT, role (validated frames only).
+    Science -2d: drop DIAGNOSTIC_HDUS, and BINNED2D unless fewer than ``keep_binned_examples``
     -2d files of that OBJECT under ``example_roots`` still have it.  Calibrations (arcs, lamp flats):
-    drop BINNED2D.  Staging folders: removed.  Returns {files, bytes}."""
+    drop BINNED2D.  Staging folders: removed.  Returns {files, bytes}.
+
+    Standards (``role == "standard"``) are never rewritten (B52): banzai-floyds rebuilds its residual fringe
+    templates from every processed standard on each run (``fringe_masters.make_residual_templates``), reading
+    BINNED2D (or a TRACE table, which this cleanup does not write) from the -2d, and ``keep_template_free`` copies
+    the -2d to ``-2d-notpl``.  A slimmed standard made every later chain run stop with ``KeyError: 'BINNED2D'``."""
     from astropy.io import fits
 
     freed, n = 0, 0
@@ -257,7 +262,7 @@ def clean_secondary(products: list[dict], calib_files: list[Path], staging: list
                     examples[obj] = examples.get(obj, 0) + 1
     for p in products:
         f = p.get("path_2d")
-        if not f or not Path(f).exists():
+        if not f or not Path(f).exists() or p.get("role") == "standard":
             continue
         drop = set(DIAGNOSTIC_HDUS)
         obj = str(p.get("OBJECT") or "").strip()

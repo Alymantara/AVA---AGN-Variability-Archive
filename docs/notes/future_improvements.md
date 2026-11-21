@@ -1208,3 +1208,25 @@ Changes:
   Gaussian, accepted only if the same-night pair scatter stays at 1–3 %. Check on turgon with full series and against
   PrepSpec's p(t). Details: `~/astro/AVA_QC/tests/QC-0009_*`.
 - Tests: `tests/test_spec_lines.py` (continuum invariance, grey factor, [O III] independent of the broad lines, blend off).
+
+## B52: the clean-up stripped BINNED2D from standards and broke later reductions (21 Nov 2026)
+
+- **Bug.** After a complete reduction, `spec_reduce`'s clean-up (`reduce.clean_secondary`) slimmed every validated
+  -2d, standards included, and dropped BINNED2D beyond `keep_binned_examples` per OBJECT. banzai-floyds rebuilds its
+  residual fringe templates on every chain run from all processed standards
+  (`fringe_masters.make_residual_templates` → `_standard_frame`), which needs BINNED2D or a TRACE table. AVA writes
+  neither, and `keep_template_free` then copied the slimmed -2d to `-2d-notpl`. From 20 Nov 15:49 (after J1421+3855's
+  2020-07-08 standards were slimmed) every run on Turgon stopped with `KeyError: 'BINNED2D'` before extracting any
+  science: 11 targets until the banzai-side hot-fix at 22:05.
+- **Fix (AVA).** `clean_secondary` never rewrites a product with `role == "standard"`; science products, arcs and
+  flats are slimmed as before. Test: `test_clean_secondary_leaves_standards_whole`.
+- **Fix (banzai-floyds).** `fringe_masters._template_frames` skips a standard that raises `KeyError` with a
+  `residual templates: <file> skipped (...)` line, as the Turgon hot-fix (`.bak_20261120_2205`) does. Test:
+  `test_unreadable_standard_is_skipped_not_fatal`. Needs a fork commit and a new pin (deployment guide §banzai-floyds,
+  `production_vm_checklist.md`).
+- **Slimmed standards already on Turgon.** With the banzai fix they are only skipped, so the templates use fewer
+  standards; nothing else breaks. To restore one: list them with
+  `python -c "from pathlib import Path; from astropy.io import fits; [print(f) for f in Path('<work>/processed').glob('**/*-2d*.fits*') if not {'BINNED2D','TRACE'} & {h.name for h in fits.open(f)}]"`,
+  delete that standard's `-1d`, `-2d`, `-1d-notpl` and `-2d-notpl`, and re-reduce a science night that uses it
+  (`run_pipeline.py -R --spec-nights <YYYYMMDD> <target>`; `chosen_standards` stages the standard again).
+- **Retires** the Turgon hot-fix in banzai-floyds once the new pin is deployed; the AVA side has no Turgon workaround.
