@@ -321,6 +321,9 @@ pre.ava-code { font-size: .82rem; padding: 1rem; background: var(--ava-surface);
 .ava-target { padding-block: 1.5rem 3rem; }
 .ava-target__head { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; justify-content: space-between;
   padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--ava-line); }
+.ava-target__head > div:first-child { min-width: 0; flex: 1 1 auto; }
+.ava-target__crumbs { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.ava-target__back-sm { font-size: .875rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
 .ava-target__head h1 { font-size: clamp(1.7rem, 3.5vw, 2.4rem); display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 .ava-links { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1.1rem; font-weight: 600; font-size: .92rem; }
 .ava-h { font-size: 1.05rem; font-weight: 600; color: var(--ava-strong); margin: 1.5rem 0 .5rem;
@@ -334,6 +337,14 @@ pre.ava-code { font-size: .82rem; padding: 1rem; background: var(--ava-surface);
 .ava-info .ref { text-align: right; font-size: .85rem; }
 .ava-info .mjd { display: block; font-size: .75rem; color: var(--ava-muted); }
 .ava-coords td { font-size: 1rem; color: var(--ava-strong); }
+.ava-coords td { white-space: nowrap; }
+.ava-coords .deg, .ava-coords.is-deg .hms { display: none; }
+.ava-coords.is-deg .deg { display: inline; }
+.ava-coords__units { width: 1%; text-align: right; vertical-align: middle; }
+.ava-coords thead th.ava-coords__units { text-transform: none; letter-spacing: 0; padding-top: .2rem; padding-bottom: .2rem; }
+.ava-coords__units .btn { --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;
+  --bs-btn-color: var(--ava-muted); --bs-btn-border-color: var(--ava-line); --bs-btn-hover-bg: var(--ava-surface-2); --bs-btn-hover-color: var(--ava-strong);
+  --bs-btn-active-bg: var(--ava-pill-bg); --bs-btn-active-color: var(--ava-strong); --bs-btn-active-border-color: var(--ava-sky); }
 .ava-breakdown th[style] { color: var(--ava-strong); }
 .ava-breakdown .fdot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--c); margin-right: .35rem; }
 .ava-cites { padding-left: 1.1rem; margin-bottom: .25rem; }

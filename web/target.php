@@ -210,10 +210,13 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
 <div class="container-xxl ava-target">
   <div class="ava-target__head">
     <div>
-      <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-1">
-        <li class="breadcrumb-item"><a href="targets.php">Targets</a></li>
-        <li class="breadcrumb-item active" aria-current="page">AVA #<?= (int) $t['id'] ?></li>
-      </ol></nav>
+      <div class="ava-target__crumbs">
+        <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-1">
+          <li class="breadcrumb-item"><a href="targets.php">Targets</a></li>
+          <li class="breadcrumb-item active" aria-current="page">AVA #<?= (int) $t['id'] ?></li>
+        </ol></nav>
+        <a class="ava-target__back-sm d-md-none" href="targets.php">← Back</a>
+      </div>
       <h1 class="mb-1"><?= h($t['name']) ?> <span class="ava-badge static ava-badge--<?= $st['key'] ?>"><?= $st['label'] ?></span></h1>
       <div class="ava-links mb-0">
         <a href="https://simbad.cds.unistra.fr/simbad/sim-id?Ident=<?= h(rawurlencode($simbadId)) ?>">SIMBAD</a>
@@ -248,17 +251,29 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
         <?php endif; ?>
       </div>
     </div>
-    <a class="btn btn-sm btn-ava btn-ava-outline" href="targets.php">← Back</a>
+    <a class="btn btn-sm btn-ava btn-ava-outline d-none d-md-inline-block" href="targets.php">← Back</a>
   </div>
 
   <div class="row g-4">
     <!-- ================= LEFT: information ================= -->
     <div class="col-xl-6">
-      <table class="table ava-info ava-coords">
-        <thead><tr><th>RA (h:m:s)</th><th>Dec (d:m:s)</th><th>RA (deg)</th><th>Dec (deg)</th></tr></thead>
+      <table class="table ava-info ava-coords" id="coords">
+        <thead><tr>
+          <th>RA <span class="hms">(h:m:s)</span><span class="deg">(deg)</span></th>
+          <th>Dec <span class="hms">(d:m:s)</span><span class="deg">(deg)</span></th>
+          <th class="ava-coords__units">
+            <div class="btn-group" role="group" aria-label="Coordinate units">
+              <input type="radio" class="btn-check" name="coord-units" id="cu-hms" value="hms" checked>
+              <label class="btn btn-sm" for="cu-hms">h:m:s</label>
+              <input type="radio" class="btn-check" name="coord-units" id="cu-deg" value="deg">
+              <label class="btn btn-sm" for="cu-deg">deg</label>
+            </div>
+          </th>
+        </tr></thead>
         <tbody><tr>
-          <td><?= h($t['ra']) ?></td><td><?= h($t['dec']) ?></td>
-          <td><?= fmt_num($t['ra_deg'], 5) ?></td><td><?= fmt_num($t['dec_deg'], 5) ?></td>
+          <td><span class="hms"><?= h($t['ra']) ?></span><span class="deg"><?= fmt_num($t['ra_deg'], 5) ?></span></td>
+          <td><span class="hms"><?= h($t['dec']) ?></span><span class="deg"><?= fmt_num($t['dec_deg'], 5) ?></span></td>
+          <td></td>
         </tr></tbody>
       </table>
 
@@ -505,4 +520,4 @@ function tabs(string $id, array $tabs, string $style = 'tabs'): void
   <?php endif; ?>
 </div>
 
-<?php ava_page_end(); ?>
+<?php ava_page_end(['assets/js/coords.js']); ?>
