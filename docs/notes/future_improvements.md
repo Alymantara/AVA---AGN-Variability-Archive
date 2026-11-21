@@ -1253,3 +1253,12 @@ Changes:
   (its standard is no longer needed); a target night with one is kept, because it has no -1d.
 - **Retires** the Turgon `spec_reduce.py` v3 hot-fix (`.bak_20261120_1910` is the original).
 - Tests: `tests/test_spec_outcome.py`.
+
+## B49: plots and PyTICS crashed for targets never observed with FLOYDS (21 Nov 2026)
+
+- **Bug.** `webplot.spectroscopy_epochs` falls back to `ava.db` `floyds_end` when the spectra DB has no spectra.
+  For a target never observed with FLOYDS it is NaN, which is truthy, and `Time("nan")` raises: the ensemble task
+  failed after the CSV export but before the plots (3C 445 on Turgon, 20 Nov, exit 51).
+- **Fix** (the Turgon hot-fix, committed): skip empty / NaN / None / NaT values and catch `ValueError`; the plots then
+  have no spectroscopy ticks, with the existing warning. Test: `tests/test_spec_epochs.py`.
+- **Retires** the uncommitted Turgon edit of `ava/pipeline/tasks/webplot.py`.

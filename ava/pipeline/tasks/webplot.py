@@ -71,8 +71,12 @@ def spectroscopy_epochs(target: str) -> tuple[list[float], float | None]:
         from ava.database import query
 
         end = (query.target(target) or {}).get("floyds_end")
-        if end:
-            last = float(Time(str(end)[:10]).mjd)
+        # B49: NaN (never observed with FLOYDS) is truthy and Time("nan") raises, which failed the ensemble task
+        if end is not None and str(end).strip().lower() not in ("", "nan", "none", "nat"):
+            try:
+                last = float(Time(str(end)[:10]).mjd)
+            except ValueError:
+                last = None
     return mjds, last
 
 

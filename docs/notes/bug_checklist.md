@@ -5,11 +5,11 @@
 
 | | Items | Share of all |
 |---|---:|---:|
-| High | 8 | 9 % |
+| High | 7 | 8 % |
 | Medium | 19 | 21 % |
 | Low | 19 | 21 % |
-| **Still to do** | **46** | **51 %** |
-| Done | 44 | 49 % |
+| **Still to do** | **45** | **50 %** |
+| Done | 45 | 50 % |
 | All items | 90 | |
 <!-- progress:end -->
 
@@ -57,9 +57,6 @@ line in `future_improvements.md`.
   - Fix: compare a 2014–2016 raw header with a 2020+ one (`OBSTYPE`, `CONFMODE`, `INSTRUME`, `OBJECT`/`SITEID`, file
     name, compression) and make the chain take them, or list them as unsupported in `spec_qc` and the summary.
   - Mrk 352, NPM1G+27.0587 and Arp 151 were marked Archived with no spectra before 21 Nov 00:42.
-- [ ] **B49** [20] *bug*: PyTICS fails for targets without FLOYDS spectra: `webplot.py::spectroscopy_epochs` calls
-  `Time("nan")` when `floyds_end` is NaN (3C 445, exit 51). Hot-fixed on Turgon (skip empty/NaN/None/NaT, catch
-  `ValueError`); commit it with a test.
 - [ ] **B53** [26] *bug*: photometry fails when a target has no `reference_stars.csv` (J21368-6438); only `-o` builds
   it. Fix: `calibrate` builds the catalogue when missing (logged), or fails up front with "no reference catalogue —
   run -o"; `backfill_status` lists targets without one. Workaround: `backfill_helpers.py rounded` (v5).
@@ -233,6 +230,8 @@ Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and `docs/reports/ab
 ## Done
 
 **21 Nov 2026**
+- [x] **B49** [20] (B49 commit): plots and PyTICS crashed on `Time("nan")` for targets never observed with FLOYDS
+  (3C 445). The Turgon hot-fix is committed with a test; it retires the uncommitted Turgon `webplot.py` edit.
 - [x] **B52** [25] (AVA `d43b830`, banzai-floyds `137ffa6`): the spectra clean-up stripped `BINNED2D` from standards,
   and every later banzai-floyds run stopped on the residual fringe templates. The clean-up no longer rewrites
   standards, and banzai-floyds skips an unreadable standard. Deploying `137ffa6` on Turgon and the VM is on the Monday
