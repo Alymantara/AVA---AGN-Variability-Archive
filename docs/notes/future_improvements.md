@@ -1275,3 +1275,13 @@ Changes:
     catalogue … run -o".
   - `tools/backfill_status.py`: a `refcat` column and a "NO REFERENCE CATALOGUE" line listing those targets.
 - **Retires** the `backfill_helpers.py rounded` (v5) workaround on Turgon. Test: `tests/test_refcat_missing.py`.
+
+## B54: the plot step crashed when no frame passes QC (21 Nov 2026)
+
+- **Bug.** PG 2304+043 on Turgon (21 Nov, phot exit 51): no frame passes QC, so `plot_lightcurves` got an empty light
+  curve and NaN axis limits, and the run failed. A band with all-NaN fluxes had the same problem in its y-limits, and
+  `plot_standards_rms` asked for a figure with no rows.
+- **Fix.** `plot_lightcurves` and `plot_standards_rms` skip the figure with a warning when nothing passes QC; an
+  all-NaN band keeps matplotlib's default limits; the `webplot` task logs "no frame passes QC (0 of N)" and the run
+  finishes. QC thresholds are unchanged: why nothing passes for PG 2304+043 is QC-0001 (sparse field, `min_matched`).
+- Tests: `test_no_frame_passes_qc_skips_plots`, `test_all_nan_band_still_plots` (`tests/test_webplots.py`).

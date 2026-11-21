@@ -101,6 +101,10 @@ def webplot(target: str) -> dict:
     fq = store.read_frame_qc(db, target)
     formats = list(pc.formats)
     spec, last_spec = spectroscopy_epochs(target)
+    n_pass = int((lc["qc_pass"] == 1).sum()) if "qc_pass" in lc else 0
+    if n_pass == 0:         # B54: the light-curve figures are skipped; the run goes on (thresholds unchanged)
+        logger.warning("%s: no frame passes QC (0 of %d); light-curve plots skipped, diagnostics still drawn",
+                       target, len(lc))
     base = out_dir / f"lco_latest_{target}"
     files = wp.plot_lightcurves(lc, fd, base, spec_mjd=spec, last_spec_mjd=last_spec, formats=formats)
     files += wp.plot_lightcurves(lc, fd, Path(f"{base}_last6"), spec_mjd=spec, last_spec_mjd=last_spec,

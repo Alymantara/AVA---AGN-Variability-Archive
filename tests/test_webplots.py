@@ -104,3 +104,32 @@ def test_ensemble_skips_target_without_photometry(tmp_path, monkeypatch):
     monkeypatch.setattr(task_mod, "get_run_logger", lambda: logging.getLogger("test"))
     out = task_mod.ensemble.fn("no_catalogues")
     assert out == {"target": "no_catalogues", "skipped": "no photometry"}
+
+
+def test_no_frame_passes_qc_skips_plots(tmp_path):
+    """B54 (PG 2304+043): with no QC-passing frame the light-curve and standards plots are skipped, not raised."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
+    lc = _lc().assign(qc_pass=0)
+    assert wp.plot_lightcurves(lc, fd, tmp_path / "lc") == []
+    assert wp.plot_lightcurves(lc, fd, tmp_path / "lc6", recent_days=60) == []
+    assert wp.plot_lightcurves(lc, fd, tmp_path / "lcs", last_season=True) == []
+    fq = pd.DataFrame(dict(frame=["a"], filter=["gp"], mjd_mid=[59000.0], zp=[23.0], qc_pass=[0], site=["coj"],
+                           fwhm_arcsec=[2.0], airmass=[1.2]))
+    meas = pd.DataFrame(dict(frame=["a"], star_id=[1], is_agn=[False], mag_inst=[-8.0]))
+    assert wp.plot_diagnostics(fq, fd, tmp_path / "d") == []
+    assert wp.plot_standards_rms(meas, fq, fd, tmp_path / "stan") == []
+
+
+def test_all_nan_band_still_plots(tmp_path):
+    """B54: a band whose fluxes are all NaN keeps default y-limits instead of raising on NaN limits."""
+    import matplotlib
+    matplotlib.use("Agg")
+
+    fd = wp.load_filter_dict(ROOT / "data/reference/filter_dict.txt")
+    lc = _lc()
+    lc.loc[lc["filter"] == "rp", "mag"] = np.nan
+    files = wp.plot_lightcurves(lc, fd, tmp_path / "lc")
+    assert files and all(Path(f).exists() for f in files)

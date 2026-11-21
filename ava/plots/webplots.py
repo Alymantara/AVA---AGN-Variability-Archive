@@ -179,6 +179,12 @@ def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec
 
     _style()
     lc = lc[lc["qc_pass"] == 1].sort_values("mjd_mid")
+    lc = lc[np.isfinite(lc["mjd_mid"].to_numpy(dtype=float))]
+    if lc.empty:            # B54: no frame passes QC → NaN axis limits; skip the figure instead of failing the run
+        import logging
+
+        logging.getLogger(__name__).warning("%s: no frame passes QC; light-curve plot skipped", Path(out_base).name)
+        return []
     rows = lco_filters(fd, lc["filter"].unique())
     n = max(len(rows), 1)
     xmin, xmax = lc["mjd_mid"].min(), lc["mjd_mid"].max()
@@ -197,6 +203,8 @@ def plot_lightcurves(lc: pd.DataFrame, fd: pd.DataFrame, out_base: Path, *, spec
         ax.yaxis.set_tick_params(labelsize=12)
         win = (g["mjd_mid"] >= x0).to_numpy()
         fy = f[win] if win.sum() > 0 else f
+        fy = np.asarray(fy, dtype=float)
+        fy = fy[np.isfinite(fy)]                 # an all-NaN band keeps matplotlib's default limits (B54)
         if len(fy):
             lo, hi = np.percentile(fy, 4), np.percentile(fy, 96)
             ax.set_ylim(lo - 0.5 * (hi - lo), hi + 0.5 * (hi - lo))
@@ -308,6 +316,11 @@ def plot_standards_rms(meas: pd.DataFrame, fq: pd.DataFrame, fd: pd.DataFrame, o
     m["mag"] = m["mag_inst"] + m["zp"]
     rows = lco_filters(fd, m["filter"].unique())
     n = len(rows)
+    if n == 0:              # B54: no QC-passing frame → a figure with no rows; skip it
+        import logging
+
+        logging.getLogger(__name__).warning("%s: no frame passes QC; standards RMS plot skipped", Path(out_base).name)
+        return []
     fig, axs = plt.subplots(nrows=int(np.ceil(n / 2)), ncols=2, figsize=(10, 2 * max(n, 2)), squeeze=False)
     for ax, r in zip(axs.reshape(-1), rows.itertuples()):
         g = m[m["filter"] == r.lco].sort_values("mjd_mid")
