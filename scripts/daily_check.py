@@ -232,6 +232,39 @@ def check_data(rep: Report, cfg, lcfg):
     (rep.ok if v else rep.warning)(f"data: newest successful download: {v or 'none yet'}", web=("Newest successful download", short_date(v) or "none yet"))
     v = newest(spec, "SELECT MAX(reduced_utc) FROM spec_qc")
     (rep.ok if v else rep.warning)(f"data: newest reduced spectrum: {v or 'none yet'}", web=("Newest reduced spectrum", short_date(v) or "none yet"))
+    check_spectra_flags(rep, spec)
+
+
+def check_spectra_flags(rep: Report, spec, now: datetime | None = None, days: int = 7) -> None:
+    """Spectra to re-run and inspect (B51 / B48): frames a reduction run left without a product (``spec_reprocess``,
+    open until a later run reduces them), and spectra flagged ``NOOBJECT`` (no object in the slit) in the last
+    ``days`` days."""
+    from ava.spectroscopy.reduce import NOOBJECT_FLAG, open_reprocess
+
+    if not spec or not Path(spec).exists():
+        return
+    left = open_reprocess(spec)
+    if left:
+        by = {}
+        for r in left:
+            by.setdefault(r["data_id"], set()).add(str(r["day_obs"]).replace("-", ""))
+        detail = "; ".join(f"{t} ({','.join(sorted(n))})" for t, n in sorted(by.items()))
+        rep.warning(f"spectra: {len(left)} frame(s) left unreduced, to re-run (-R --spec-nights): {detail}",
+                    web=("Spectra to reprocess", f"{len(left)} frame(s): {', '.join(sorted(by))}"))
+    else:
+        rep.ok("spectra: nothing left to reprocess", web=("Spectra to reprocess", "none"))
+    since = ((now or datetime.now(timezone.utc)) - timedelta(days=days)).isoformat(timespec="seconds")
+    try:
+        with closing(sqlite3.connect(f"file:{spec}?mode=ro", uri=True)) as con:
+            rows = con.execute("SELECT data_id, basename FROM spec_qc WHERE L1QFLAGS = ? AND reduced_utc >= ? "
+                               "ORDER BY data_id, basename", (NOOBJECT_FLAG, since)).fetchall()
+    except sqlite3.Error:
+        rows = []
+    if rows:
+        names = sorted({t for t, _ in rows})
+        rep.warning(f"spectra: {len(rows)} with no object in the slit ({NOOBJECT_FLAG}) in the last {days} days, to "
+                    f"inspect: " + ", ".join(b for _, b in rows),
+                    web=("Spectra with no object in the slit", f"{len(rows)} in {days} days: {', '.join(names)}"))
 
 
 def probe(rep: Report, cfg, log_dir: Path) -> None:

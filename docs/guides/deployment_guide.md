@@ -357,6 +357,10 @@ targets), 05:00 `cleanup` (**dry run** until `--cleanup-live`: read the first ni
 the command with `--cleanup-live`), every 6 h `lco_usage --live-snapshot`, and 07:00 `daily_check`.
 - `daily_check` exits non-zero when a job did not run in time or failed, or when the archive tables are older
   than 30 h, so cron mails its output to `MAILTO`.
+- `daily_check` also warns (without failing) about spectra to re-run and inspect: frames a reduction left without
+  a product (open rows of `spec_reprocess`; re-run `-R --spec-nights <nights> <target>`), and spectra with no
+  object in the slit (`spec_qc.L1QFLAGS = NOOBJECT`) in the last 7 days. A partly failed reduction still makes
+  products from the frames that reduced (B51).
 - **Run the machine in UTC** (`timedatectl`; `sudo timedatectl set-timezone UTC`): cron reads the times in the
   machine's zone and Debian's cron ignores `CRON_TZ`, so none is written; `make_crontab.py` warns otherwise.
 - **Mail needs a mail server.** `MAILTO` only works if the machine can send mail. `mail` alone is not enough; the
@@ -466,7 +470,7 @@ letters as `scripts/run_pipeline.py`):
 | PyTICS ensemble (incremental) | `-t` | merged light curve, per-band variability in `ava.db` |
 | web plots | `-p` | light-curve and diagnostic figures |
 | download spectra | `-D` | raw FLOYDS + standards |
-| reduce spectra | `-R` | banzai-floyds 1-d/2-d products, `spec_qc` |
+| reduce spectra | `-R` | banzai-floyds 1-d/2-d products, `spec_qc`; frames left without a product → `spec_reprocess` (spectra DB) and `<spec>/<target>/REPROCESS_NEEDED.txt` |
 | spectroscopy products | `-P` | Hβ / [O III] fits, line light curves, mean/RMS spectra, variability in `ava.db` |
 | publish | `-w` | derived properties, observing flag, website data copy, public data releases |
 

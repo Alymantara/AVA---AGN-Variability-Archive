@@ -133,6 +133,126 @@ def chosen_standards(spec_db: Path, ava_id: int, nights: list[str], spec_raw_roo
     return [q for q in paths if q.exists()], [q.name for q in paths if not q.exists()]
 
 
+#: ``spec_qc.L1QFLAGS`` of a raw spectrum in which banzai-floyds found no object to extract (B48): no -1d, not an error
+NOOBJECT_FLAG = "NOOBJECT"
+_NO_OBJECT = "No object was detected"
+_FRAME_NAME = re.compile(r"([a-z]{3}\d[a-z0-9]*-[a-z]{2}\d{2}-\d{8}-\d{4}-e(?:00|91))")
+
+#: raw spectra that a reduction run left without a usable product (B51); a later run that reduces them resolves them
+SPEC_REPROCESS_DDL = """
+CREATE TABLE IF NOT EXISTS spec_reprocess (  -- raw spectra left without a product by spec_reduce (B51)
+    basename TEXT PRIMARY KEY, data_id TEXT, day_obs TEXT, reason TEXT,
+    first_utc TEXT, last_utc TEXT, runs INTEGER, resolved_utc TEXT
+);
+"""
+
+
+def no_object_frames(log: Path, since: int = 0) -> set[str]:
+    """Raw (e00) basenames that banzai-floyds reported as "No object was detected" in the chain log, from line
+    ``since`` on.  Only those qualify for ``NOOBJECT``; a frame without a -1d for any other reason stays missing."""
+    out = set()
+    for line in log.read_text(errors="replace").splitlines()[since:]:
+        if _NO_OBJECT in line:
+            out |= {m.group(1).replace("-e91", "-e00") for m in _FRAME_NAME.finditer(line)}
+    return out
+
+
+def two_d_says_no_object(path_2d: Path | None) -> bool:
+    """True when a -2d exists and its header says no object was detected (``L1OBJDET`` false)."""
+    if path_2d is None or not Path(path_2d).exists():
+        return False
+    from astropy.io import fits
+
+    try:
+        with fits.open(path_2d) as h:
+            for x in h:
+                if "L1OBJDET" in x.header:
+                    return not bool(x.header["L1OBJDET"])
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
+def no_object_row(base: str, role: str, data_id: str, night: str, path_2d: Path | None, now: str,
+                  version: str, frame_id) -> dict:
+    """``spec_qc`` row of a NOOBJECT spectrum: no -1d, flagged, so it is not re-reduced every run."""
+    row = {c: None for c in QC_COLUMNS}
+    row.update(frame_id=frame_id, basename=base, data_id=data_id, role=role,
+               day_obs=f"{night[:4]}-{night[4:6]}-{night[6:]}", path_1d=None,
+               path_2d=str(path_2d) if path_2d else None, reduced_utc=now, pipeline="banzai-floyds",
+               pipeline_version=version, L1QFLAGS=NOOBJECT_FLAG, L1OBJDET=0, header_json="{}")
+    return row
+
+
+def no_object_basenames(db: Path, data_id: str | None = None) -> set[str]:
+    """Basenames flagged ``NOOBJECT`` in ``spec_qc`` (optionally of one target)."""
+    if not Path(db).exists():
+        return set()
+    with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True)) as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='spec_qc'").fetchone():
+            return set()
+        sql, args = "SELECT basename FROM spec_qc WHERE L1QFLAGS = ?", [NOOBJECT_FLAG]
+        if data_id is not None:
+            sql += " AND data_id = ?"
+            args.append(data_id)
+        return {b for (b,) in con.execute(sql, args)}
+
+
+def outcome(frames_ok: int, science_products: int, incomplete: bool, exit_code: int, log: Path) -> str:
+    """The rules for a reduction run (B51): ``"complete"``; ``"partial"`` when something is missing but at least one
+    science product was made (products go on, the rest is listed for reprocessing); otherwise it raises: no frame
+    processed at all (chain exit 0 with nothing done is not a success), or frames processed but no science product."""
+    if frames_ok == 0:
+        raise RuntimeError(f"reduction processed no frames (chain exit {exit_code}; see {log})")
+    if not incomplete:
+        return "complete"
+    if science_products == 0:
+        raise RuntimeError(f"reduction incomplete (exit {exit_code}); no science product (see {log})")
+    return "partial"
+
+
+def record_reprocess(db: Path, frames: list[dict], now: str) -> int:
+    """Upsert the frames left without a product (dicts: basename, data_id, day_obs, reason) into ``spec_reprocess``:
+    open again if resolved, ``runs`` counts the runs that left it unreduced."""
+    if not frames:
+        return 0
+    with closing(sqlite3.connect(db, timeout=60)) as con:
+        con.executescript(SPEC_REPROCESS_DDL)
+        for f in frames:
+            con.execute("INSERT INTO spec_reprocess (basename, data_id, day_obs, reason, first_utc, last_utc, runs) "
+                        "VALUES (?,?,?,?,?,?,1) ON CONFLICT(basename) DO UPDATE SET reason=excluded.reason, "
+                        "last_utc=excluded.last_utc, runs=runs+1, resolved_utc=NULL",
+                        (f["basename"], f["data_id"], f["day_obs"], f["reason"], now, now))
+        con.commit()
+    return len(frames)
+
+
+def resolve_reprocess(db: Path, basenames, now: str) -> int:
+    """Mark reprocess rows as resolved for frames that now have a product (or a NOOBJECT flag)."""
+    basenames = list(basenames)
+    if not basenames or not Path(db).exists():
+        return 0
+    with closing(sqlite3.connect(db, timeout=60)) as con:
+        con.executescript(SPEC_REPROCESS_DDL)
+        n = con.executemany("UPDATE spec_reprocess SET resolved_utc=? WHERE basename=? AND resolved_utc IS NULL",
+                            [(now, b) for b in basenames]).rowcount
+        con.commit()
+    return n
+
+
+def open_reprocess(db: Path) -> list[dict]:
+    """Unresolved ``spec_reprocess`` rows (for the daily report and status tools)."""
+    if not Path(db).exists():
+        return []
+    with closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True)) as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='spec_reprocess'").fetchone():
+            return []
+        cur = con.execute("SELECT basename, data_id, day_obs, reason, first_utc, last_utc, runs FROM spec_reprocess "
+                          "WHERE resolved_utc IS NULL ORDER BY data_id, day_obs")
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, r)) for r in cur]
+
+
 def parse_chain_log(log: Path, since: int = 0) -> dict:
     """{raw file name: 'ok' | 'ERROR ...'} from the chain's per-frame lines (last attempt wins)."""
     res = {}

@@ -38,11 +38,14 @@ def reduction_settings() -> dict:
                 cleanup=dict(r.get("cleanup") or {}))
 
 
-def pending_nights(target_raw: Path, reduced: Path) -> list[str]:
-    """Nights (YYYYMMDD) with at least one raw science frame (e00) without its reduced -1d in ``reduced``."""
-    out = []
+def pending_nights(target_raw: Path, reduced: Path, skip=()) -> list[str]:
+    """Nights (YYYYMMDD) with at least one raw science frame (e00) without its reduced -1d in ``reduced``.
+    ``skip``: raw basenames that have no -1d on purpose (``NOOBJECT`` in ``spec_qc``, B48)."""
+    out, skip = [], set(skip)
     for d in sorted(target_raw.glob("20??????")):
         for f in d.glob("*-e00.fits*"):
+            if f.name.split(".fits")[0] in skip:
+                continue
             stem = f.name.split(".fits")[0].replace("-e00", "-e91-1d")
             if not any((reduced / d.name).glob(f"{stem}.fits*")):
                 out.append(d.name)
@@ -65,7 +68,8 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
         raise ValueError(f"{target!r} is not a known data_id")
     target_raw, std_raw = cfg.spec_raw(target), cfg.spec_raw(target).parent / "standards"
     if not nights:   # incremental: only nights with raw science frames that have no reduced -1d yet
-        nights = pending_nights(target_raw, cfg.spec_dir(target) / "reduced")
+        nights = pending_nights(target_raw, cfg.spec_dir(target) / "reduced",
+                                skip=R.no_object_basenames(lcodb_path("spec"), target))
     nights = [n.replace("-", "") for n in nights]
     if not nights:
         logger.info("%s: nothing to reduce (every downloaded science frame in %s has a -1d)", target, target_raw)
@@ -90,6 +94,7 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
                                  "--processed-dir", str(processed), "--workers", str(s["workers"]),
                                  "--window-days", str(s["window_days"])], log)
     status = R.parse_chain_log(log, n0)
+    no_object = R.no_object_frames(log, n0)
     errors = {k: v for k, v in status.items() if v != "ok"}
     for k, v in list(errors.items())[:10]:
         logger.warning("  %s: %s", k, v)
@@ -102,17 +107,21 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
         is_std = dict(con.execute("SELECT basename, COALESCE(is_standard,0) FROM frames WHERE rlevel=0 AND basename "
                                   "IN (%s)" % ",".join("?" * len(staged)), [p.name.split(".fits")[0] for p in staged]))
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    rows, moved, missing = [], 0, []
+    rows, moved, missing, noobj_rows = [], 0, [], []
     for p in staged:
         if "-e00" not in p.name:
             continue
         base = p.name.split(".fits")[0]
         prod = R.products_of(processed, p.name)
-        if prod["1d"] is None:
-            missing.append(base)
-            continue
         role = "standard" if is_std.get(base) else "science"
         night = base.split("-")[2]
+        if prod["1d"] is None:
+            if base in no_object or R.two_d_says_no_object(prod["2d"]):     # B48: nothing to extract, not missing
+                noobj_rows.append(R.no_object_row(base, role, target if role == "science" else "standards", night,
+                                                  prod["2d"], now, version, ids.get(base)))
+            else:
+                missing.append(base)
+            continue
         if role == "science":           # science → the target's folder; standards stay with the calibrations
             dest = cfg.spec_dir(target) / "reduced" / night
             dest.mkdir(parents=True, exist_ok=True)
@@ -140,7 +149,10 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
         r["valid"] = why is None
     for k, v in invalid.items():
         logger.warning("  invalid product %s: %s", k, v)
-    n_qc = R.write_qc(spec_db, [r for r in rows if r["frame_id"] is not None])
+    n_qc = R.write_qc(spec_db, [r for r in rows + noobj_rows if r["frame_id"] is not None])
+    if noobj_rows:
+        logger.warning("%s: %d spectra with no object in the slit, flagged %s in spec_qc (not re-reduced; inspect): %s",
+                       target, len(noobj_rows), R.NOOBJECT_FLAG, [r["basename"] for r in noobj_rows])
 
     # cleanup of secondary products, only after a complete and validated run
     cl = s["cleanup"]
@@ -167,10 +179,36 @@ def spec_reduce(target: str, nights: list[str] | None = None) -> dict:
                 len(rows), moved, n_qc, flagged or "none")
     if missing:
         logger.warning("%s: no -1d for %s", target, missing)
+    frames_ok = sum(v == "ok" for v in status.values())
     out = {"target": target, "nights": nights, "pipeline_version": version, "exit_code": rc,
-           "frames_ok": sum(v == "ok" for v in status.values()), "frames_failed": len(errors),
-           "products": len(rows), "qc_rows": n_qc, "invalid": invalid, "cleaned": cleaned, "flagged": flagged, "missing": missing, "log": str(log)}
-    if rc or errors or missing or invalid:
-        raise RuntimeError(f"{target}: reduction incomplete (exit {rc}, {len(errors)} failed, "
-                           f"{len(missing)} without products, {len(invalid)} invalid; see {log})")
+           "frames_ok": frames_ok, "frames_failed": len(errors),
+           "products": len(rows), "qc_rows": n_qc, "invalid": invalid, "cleaned": cleaned, "flagged": flagged,
+           "missing": missing, "no_object": [r["basename"] for r in noobj_rows], "partial": False, "log": str(log)}
+    # B51: products go on from whatever reduced; what did not is listed for reprocessing (spec_reprocess, the daily
+    # report and <spec_dir>/REPROCESS_NEEDED.txt); a run with no frame processed, or no science product, fails
+    incomplete = bool(rc or errors or missing or invalid)
+    science = sum(1 for r in rows if r["role"] == "science" and r["valid"])
+    try:
+        # products found count as processed too (a re-run over frames banzai had already done logs none)
+        state = R.outcome(frames_ok or len(rows) + len(noobj_rows), science, incomplete, rc, log)
+    except RuntimeError as exc:
+        raise RuntimeError(f"{target}: {exc}") from None
+    done = [r["basename"] for r in rows if r["valid"]] + [r["basename"] for r in noobj_rows]
+    R.resolve_reprocess(spec_db, done, now)
+    if state == "partial":
+        left = [dict(basename=b, data_id=target if not is_std.get(b) else "standards",
+                     day_obs=f"{b.split('-')[2][:4]}-{b.split('-')[2][4:6]}-{b.split('-')[2][6:]}",
+                     reason="invalid: " + invalid[b] if b in invalid else "no product")
+                for b in missing + sorted(invalid)]
+        R.record_reprocess(spec_db, left, now)
+        bad_nights = sorted({f["day_obs"].replace("-", "") for f in left})
+        cfg.spec_dir(target).mkdir(parents=True, exist_ok=True)
+        with open(cfg.spec_dir(target) / "REPROCESS_NEEDED.txt", "a") as fh:
+            fh.write(f"{now}\t{target}\tnights {','.join(bad_nights) or '-'}\t{len(left)} frame(s)\t"
+                     f"exit {rc}, {len(errors)} failed\t{log}\n")
+        logger.warning("%s: PARTIAL: continuing with %d science products; %d frame(s) on night(s) %s left for "
+                       "reprocessing (spec_reprocess, REPROCESS_NEEDED.txt; re-run -R with --spec-nights)",
+                       target, science, len(left), bad_nights)
+        out["partial"] = True
+        out["reprocess_nights"] = bad_nights
     return out

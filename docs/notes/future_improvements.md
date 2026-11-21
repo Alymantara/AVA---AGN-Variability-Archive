@@ -1230,3 +1230,26 @@ Changes:
   delete that standard's `-1d`, `-2d`, `-1d-notpl` and `-2d-notpl`, and re-reduce a science night that uses it
   (`run_pipeline.py -R --spec-nights <YYYYMMDD> <target>`; `chosen_standards` stages the standard again).
 - **Retires** the Turgon hot-fix in banzai-floyds once the new pin is deployed; the AVA side has no Turgon workaround.
+
+## B48 / B51: no-object spectra and partial reductions (21 Nov 2026)
+
+- **B48.** banzai-floyds writes no -1d for an exposure with no object in the slit ("No object was detected in the
+  slit", `L1OBJDET = False`). `spec_reduce` counted those as missing products, so the target never reached `-P`
+  (ESO 511-30: 4 of 180). Now a frame named on a "No object was detected" line of the chain log (or whose -2d says
+  `L1OBJDET = False`) gets a `spec_qc` row with `L1QFLAGS = NOOBJECT` and no `path_1d`, is not counted as missing,
+  and is skipped by `pending_nights`, so it is not re-reduced every day. Only those frames qualify.
+- **B51 (agreed with Juan, 21 Nov: "yes, but flag them in the daily report so we can re-run and inspect").**
+  Outcome rules of a run (`reduce.outcome`), as the Turgon hot-fix v3:
+  - complete → as before (clean-up only after a complete run);
+  - incomplete with ≥ 1 valid science product → `PARTIAL`: products go on; the frames left without a product go to
+    the new table `spec_reprocess` of the spectra DB (basename, target, night, reason, first/last run, runs,
+    resolved) and a line to `<spec>/<target>/REPROCESS_NEEDED.txt` (kept from Turgon);
+  - frames processed but no science product → fails; no frame processed at all (and no product found) → fails
+    ("reduction processed no frames"), so a 2014–2016 night (B50) is no longer accepted as a clean exit.
+  - A later run that reduces a frame resolves its `spec_reprocess` row; a run that fails it again reopens it.
+- **Daily report.** `daily_check.py` warns (no failure) with the open `spec_reprocess` frames per target and night,
+  and the `NOOBJECT` spectra of the last 7 days.
+- `spec_qc` keeps its columns; `spec_reprocess` is a new table. The C04 clean-up treats a `NOOBJECT` row as reduced
+  (its standard is no longer needed); a target night with one is kept, because it has no -1d.
+- **Retires** the Turgon `spec_reduce.py` v3 hot-fix (`.bak_20261120_1910` is the original).
+- Tests: `tests/test_spec_outcome.py`.

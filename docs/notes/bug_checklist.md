@@ -1,8 +1,21 @@
 # AVA bug checklist
 
+<!-- progress:start -->
+**Progress** (updated 2026-11-21 by `python tools/bug_progress.py`)
+
+| | Items | Share of all |
+|---|---:|---:|
+| High | 8 | 9 % |
+| Medium | 19 | 21 % |
+| Low | 19 | 21 % |
+| **Still to do** | **46** | **51 %** |
+| Done | 44 | 49 % |
+| All items | 90 | |
+<!-- progress:end -->
+
 The single list of every known bug, open action and pending decision, sorted by priority (reorganised 20 Nov 2026).
 Work through **High** first. Tick an item by changing `[ ]` to `[x]`, adding the commit hash, and moving it to
-**Done** at the end.
+**Done** at the end, then run `python tools/bug_progress.py` to refresh the progress table above.
 
 - **High:** wrong results or silently incomplete data, or needed for a fixed date.
 - **Medium:** the backfill or production needs hand-set overrides; science accuracy at the 1–2 % level.
@@ -39,26 +52,6 @@ line in `future_improvements.md`.
 
 ## High
 
-- [ ] **B52** [25] *bug*, **breaks every later reduction**: `spec_reduce`'s clean-up (`drop_binned`) strips the
-  `BINNED2D` extension from standards' `-2d-notpl` files without adding a `TRACE` table. Each later banzai-floyds run
-  rebuilds the residual fringe templates from all processed standards, hits `KeyError: 'BINNED2D'` and stops before
-  extracting any science (20 Nov 15:49–21:55: 11 targets, Mrk 376 … RBS 1303).
-  - Fix: (a) AVA's clean-up must not slim standards (or must write a `TRACE` table as banzai's own slimming does);
-    (b) commit the banzai-floyds hot-fix (skip unreadable standards, logged) on a branch with a test, and re-pin AVA
-    (Turgon and VM); (c) a recipe to restore slimmed standards (re-reduce the night).
-  - Hot-fix on Turgon: banzai-floyds `fringe_masters.py` (backup `.bak_20261120_2205`).
-  - **21 Nov:** (a) done: `clean_secondary` never rewrites a standard; test
-    `test_clean_secondary_leaves_standards_whole`. (b) the banzai-floyds fix (`_template_frames`) is written with a
-    test, waiting for the fork commit and new pin. (c) the restore recipe is in `future_improvements.md` (B52).
-- [ ] **B51** [24] *bug/decision*: `spec_reduce` outcome rules. One failed night stopped products for the whole target,
-  and a run in which banzai processed no frame passed as a clean exit.
-  - Turgon hot-fix (v3, 21 Nov 00:42): ≥ 1 science product → `PARTIAL`, products go on, missing nights appended to
-    `<spec_dir>/REPROCESS_NEEDED.txt`; no science product → raise; no frame processed → raise.
-  - Fix: commit it with tests for the three outcomes; record the missing nights in `spec_qc` too; `-P` and the status
-    tools read the partial state. **Check with Juan before merging**: it changes the daily run as well.
-- [ ] **B48** [18] *bug*: exposures with no object in the slit (banzai-floyds: "No object was detected in the slit")
-  count as missing products, so `spec_reduce` raises `reduction incomplete` and `-P` never runs (ESO 511-30: 4 of
-  180). Fix: record them in `spec_qc` with a `NOOBJECT` flag and do not count them as incomplete.
 - [ ] **B50** [23] *bug*: 2014–2016 FLOYDS data give no products (Mrk 352, NPM1G+27.0587, Arp 151, RXJ2044.0+2833…):
   the chain reports `{'arcs': 0, 'flats': 0, 'standards': 0, 'science': 0}`. Data from 2018 on reduce.
   - Fix: compare a 2014–2016 raw header with a 2020+ one (`OBSTYPE`, `CONFMODE`, `INSTRUME`, `OBJECT`/`SITEID`, file
@@ -238,6 +231,17 @@ Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and `docs/reports/ab
 ---
 
 ## Done
+
+**21 Nov 2026**
+- [x] **B52** [25] (AVA `d43b830`, banzai-floyds `137ffa6`): the spectra clean-up stripped `BINNED2D` from standards,
+  and every later banzai-floyds run stopped on the residual fringe templates. The clean-up no longer rewrites
+  standards, and banzai-floyds skips an unreadable standard. Deploying `137ffa6` on Turgon and the VM is on the Monday
+  agenda; the restore recipe is in `future_improvements.md`.
+- [x] **B51** [24] (B48/B51 commit; rule agreed with Juan 21 Nov): a partly failed reduction still makes products; the
+  frames left without one go to the new `spec_reprocess` table and `REPROCESS_NEEDED.txt`; no frame processed, or no
+  science product, fails. Retires the Turgon `spec_reduce.py` v3 hot-fix.
+- [x] **B48** [18] (same commit): no-object exposures get `spec_qc.L1QFLAGS = NOOBJECT`, are not counted as missing
+  and are not re-reduced. Both are flagged in the daily report (`daily_check.py`) to re-run and inspect.
 
 **20 Nov 2026**
 - [x] **B25** [1] (B25 commit): the archive search read only the first page of each window, because it followed
