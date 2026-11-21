@@ -15,6 +15,10 @@ Each item says what it is: *bug*, *action* (something to run), or *decision* (Ju
 - QC items: [future_improvements.md](future_improvements.md).
 - B25–B41: the Turgon backfill pilot on ESO 511-30, with item numbers in brackets from
   `fixer_bug_list_20261120.md` (repo root). Turgon runs the weekend backfill with workarounds for B25–B30.
+- B48–B59: the weekend backfill run (20–21 Nov), item numbers in brackets from `fixer_bug_list_20261120_2.md`
+  (repo root; it supersedes the first list). Turgon carries uncommitted hot-fixes for B49, B51, B52 and the helper
+  workarounds (table under *Not code*). For those, start from the Turgon code given there, keep its behaviour and add
+  tests. `spec_qc` and the FLOYDS product names are also frozen formats.
   - Fixes must not change on-disk formats (`frame_qc`, `measurements.parquet`, `reference_stars.csv`, `pytics/`).
   - Fixes must not change existing config keys or any QC threshold.
   - When a fix is in `main`, say which workaround it retires.
@@ -26,6 +30,36 @@ line in `future_improvements.md`.
 
 ## High
 
+- [ ] **B52** [25] *bug*, **breaks every later reduction**: `spec_reduce`'s clean-up (`drop_binned`) strips the
+  `BINNED2D` extension from standards' `-2d-notpl` files without adding a `TRACE` table. Each later banzai-floyds run
+  rebuilds the residual fringe templates from all processed standards, hits `KeyError: 'BINNED2D'` and stops before
+  extracting any science (20 Nov 15:49–21:55: 11 targets, Mrk 376 … RBS 1303).
+  - Fix: (a) AVA's clean-up must not slim standards (or must write a `TRACE` table as banzai's own slimming does);
+    (b) commit the banzai-floyds hot-fix (skip unreadable standards, logged) on a branch with a test, and re-pin AVA
+    (Turgon and VM); (c) a recipe to restore slimmed standards (re-reduce the night).
+  - Hot-fix on Turgon: banzai-floyds `fringe_masters.py` (backup `.bak_20261120_2205`).
+- [ ] **B51** [24] *bug/decision*: `spec_reduce` outcome rules. One failed night stopped products for the whole target,
+  and a run in which banzai processed no frame passed as a clean exit.
+  - Turgon hot-fix (v3, 21 Nov 00:42): ≥ 1 science product → `PARTIAL`, products go on, missing nights appended to
+    `<spec_dir>/REPROCESS_NEEDED.txt`; no science product → raise; no frame processed → raise.
+  - Fix: commit it with tests for the three outcomes; record the missing nights in `spec_qc` too; `-P` and the status
+    tools read the partial state. **Check with Juan before merging**: it changes the daily run as well.
+- [ ] **B48** [18] *bug*: exposures with no object in the slit (banzai-floyds: "No object was detected in the slit")
+  count as missing products, so `spec_reduce` raises `reduction incomplete` and `-P` never runs (ESO 511-30: 4 of
+  180). Fix: record them in `spec_qc` with a `NOOBJECT` flag and do not count them as incomplete.
+- [ ] **B50** [23] *bug*: 2014–2016 FLOYDS data give no products (Mrk 352, NPM1G+27.0587, Arp 151, RXJ2044.0+2833…):
+  the chain reports `{'arcs': 0, 'flats': 0, 'standards': 0, 'science': 0}`. Data from 2018 on reduce.
+  - Fix: compare a 2014–2016 raw header with a 2020+ one (`OBSTYPE`, `CONFMODE`, `INSTRUME`, `OBJECT`/`SITEID`, file
+    name, compression) and make the chain take them, or list them as unsupported in `spec_qc` and the summary.
+  - Mrk 352, NPM1G+27.0587 and Arp 151 were marked Archived with no spectra before 21 Nov 00:42.
+- [ ] **B49** [20] *bug*: PyTICS fails for targets without FLOYDS spectra: `webplot.py::spectroscopy_epochs` calls
+  `Time("nan")` when `floyds_end` is NaN (3C 445, exit 51). Hot-fixed on Turgon (skip empty/NaN/None/NaT, catch
+  `ValueError`); commit it with a test.
+- [ ] **B53** [26] *bug*: photometry fails when a target has no `reference_stars.csv` (J21368-6438); only `-o` builds
+  it. Fix: `calibrate` builds the catalogue when missing (logged), or fails up front with "no reference catalogue —
+  run -o"; `backfill_status` lists targets without one. Workaround: `backfill_helpers.py rounded` (v5).
+- [ ] **B54** [27] *bug*: the plot step crashes when no frame passes QC (PG 2304+043: NaN axis limits, exit 51). Skip
+  the plot with a warning (or draw an empty "no frames pass QC" panel) and finish the run. Thresholds untouched.
 - [ ] **B26** [2] *bug*: filler proposals are never searched. 300 ESO 511-30 frames are under `KEY2023B-001f`, but only
   `lco.proposals` is used.
   - Fix: default to the lcodb proposals of the target's LCO names ∪ `lco.proposals`; `--proposal` still overrides.
@@ -40,10 +74,20 @@ line in `future_improvements.md`.
 - [ ] **B28** [4] *bug*: the QC-0002 recipe (`reference_catalog.fn(T, force=True)`) raises `MissingContextError` outside
   a flow, and `run_pipeline.py` cannot force a catalogue rebuild or recalibration.
   - Fix: `--force-refcat` / `--force-calibrate` through `ava_target_flow`, and correct the docs.
-  - Workaround: `backfill_helpers.py refcat|recal T`.
+  - Workaround: `backfill_helpers.py refcat|recal T` (wrap the tasks in a one-off `@flow`; `refcat` skips the rebuild
+    when the catalogue is already full precision and only clears the `.qc0002_pending` marker).
 - [ ] **B33** [9] *bug/tool*, **needed Monday 23 Nov** for the VM transfer: `tools/relocate_paths.py`.
   - Rewrite `local_files.path` (both lcodb DBs) and `spec_qc.path_1d/path_2d` (`/data2/jvhs1/AVA` → `/data/ava/AVA`).
   - `--dry-run` by default; report rows changed and files missing after the rewrite.
+  - **Scheduled: build and run on Monday 23 Nov, with the data move (Juan, 21 Nov).** Plan, as explained to Juan:
+    - `relocate_paths.py --from /data2/jvhs1/AVA --to /data/ava/AVA`, run on the VM after the copy, so the
+      missing-file check sees the new disk.
+    - Rewrite only a leading prefix; leave relative or already-moved rows alone.
+    - `--write` backs up each DB first.
+    - First list every stored path column: also `release_files.path` (`ava.db`), the `path` column of
+      `hbeta_fits.parquet`, and any path in `frame_qc` / `measurements.parquet`. Parquet caches are rewritten or
+      reported for a rebuild.
+    - Tests on synthetic SQLite / Parquet files.
 
 ## Medium
 
@@ -63,6 +107,16 @@ line in `future_improvements.md`.
   - Workaround: `HOME=…/.secrets/ftp_home`, `seed_staging_manifest.py`.
 - [ ] **B34** [10] *bug*: `config/lcodb_config.yaml` `standards.reference_dir` is a machine-specific `~/astro/floyds/…`
   path. Derive it from `paths.floyds_pipeline`.
+- [ ] **B56** [28] *bug*: no daily archive-request budget or HTTP 429 stop. Count requests per UTC day in one place,
+  a config key for the budget, stop cleanly (resumable) when reached, and on 429 stop for the day. The run that got
+  us blocked made ~42,000 requests (14–15 Nov). Workaround: `backfill_helpers.py requests` with
+  `data/backfill_budget.txt` (8000/day).
+- [ ] **B57** [29] *bug/tool*: a supported backfill runner to replace the git-ignored `data/backfill_weekend.sh`:
+  per-step timeout, target list re-read between targets, per-target summary, B51's acceptance rules (Archived only
+  with ≥ 1 science product), and no stale "Error" line in the prebuild log. Could share B29's flag.
+- [ ] **B55** [21] *bug*: `scripts/cleanup.py --retention-days 0` is refused during a backfill (must exceed the 2-day
+  download look-back). Let it delete photometry images whose catalogue and `frame_qc` row exist, regardless of age,
+  when the download skips catalogued frames (or add `--backfill`).
 - [ ] **O01** *action*: the weekly backup, job 5 "TO BUILD", the last open part of the cron set. The rest is done:
   `make_crontab.py` with `--test`, `--production`, `--install`, `--check` and `--run-now`, plus `cron_job.sh`
   (0337d2d, 3e6e2fb, b19df08, 48be80c).
@@ -115,6 +169,10 @@ line in `future_improvements.md`.
   or document that it covers AVA downloads only.
 - [ ] **B39** [15] *decision*: "To be processed" (`agn.ava = 0`) stays after a full backfill until
   `tools/set_archived.py T --write`. Should the backfill set Archived itself?
+- [ ] **B58** [19] *bug* (website): the host's page cache serves stale target pages on the staging site
+  (ESO 511-30 after the spectra upload). Send `Cache-Control: no-cache` (or a short max-age) from the PHP pages.
+- [ ] **B59** [30] *bug*: MCG+04-22-042 is listed with 2 FLOYDS nights but has no spectroscopy folder and the spec
+  track did nothing. Check `target_link` and the download, and make status and download agree.
 - [ ] **C02** *decision*: `merge` (`-m`/`-s`) raises `NotImplementedError`. Remove the flags, or port the step?
 
 **Longer-term studies (PyTICS error bars and calibration, pair test of 19 Nov)**
@@ -158,6 +216,12 @@ Evidence: `docs/reports/pytics_update/pair_test_all_agn.md` and `docs/reports/ab
 
 - DR1 release files are missing on Turgon: the Mrk 817 merged light curve and Hβ, and NGC 4151 Hβ.
 - There is no SSH route to the VM for `ava` / `jvhs1`. Transfers go by hand on Monday; a permanent route needs IT.
+- Gaia ESA Archive down from 25 Nov 12:00 CET (DR4 on 2 Dec). `gaia_utils` falls back CDS → CfA → ESA: decide the
+  production `vizier_servers` order. After DR4, `star_id` stays the DR3 `source_id`; keep querying DR3 until decided.
+- Uncommitted changes on Turgon (each with a backup next to it): `ava/pipeline/tasks/webplot.py` (B49);
+  `ava/pipeline/tasks/spec_reduce.py` v3 (B51, `.bak_20261120_1910`); banzai-floyds `fringe_masters.py` (B52,
+  `.bak_20261120_2205`); `data/backfill_helpers.py` (B28, B53, B56); `data/backfill_budget.txt` (B56, delete after the
+  backfill).
 
 ---
 
