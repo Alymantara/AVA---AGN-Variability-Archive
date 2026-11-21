@@ -105,3 +105,62 @@ def test_lightcurve_csv_keeps_mjd(tmp_path):
     back = pd.read_csv(path, comment="#")
     assert np.abs(back["MJD"].values - out["MJD"].values).max() <= 1e-5
     assert back["hbeta_flux"].values == pytest.approx(out["hbeta_flux"].values, rel=1e-5)
+
+
+# --- QC-0009: additive model, grey factors, and an [O III] calibrator independent of the broad lines -------------
+
+def synth_blend(hb=1.0, cont=1.0, slope=1.0, grey=1.0, seed=0):
+    """Asymmetric broad Hβ (main + red shoulder) + He I / Fe II blend under [O III], all scaling with ``hb``;
+    [O III] core (σ 6 Å) + a real blue wing (σ 8 Å, 25 %), constant.  Returns the spectrum and the true [O III]."""
+    w = np.arange(4650.0, 5150.0, 1.74)
+    H, o3c, o3w = 6e-13 * hb, 1.6e-13, 0.4e-13
+    f = (cont * 9.8e-15 - slope * 5.4e-16 * (w - 4930) / 100
+         + L.gauss(w, 0.78 * H, L.HB - 3, 30.0) + L.gauss(w, 0.22 * H, L.HB + 50, 40.0)
+         + L.gauss(w, 0.075 * H, 4923, 20.0) + L.gauss(w, 0.085 * H, 5017, 20.0)
+         + sum(L.gauss(w, F / r, lam + d, sg) for F, d, sg in ((o3c, -2.0, 6.0), (o3w, -4.0, 8.0))
+               for lam, r in ((L.O3B, 1.0), (L.O3A, L.O3_RATIO)))
+         + L.gauss(w, 2.5e-14, L.HB - 2, 6.0))
+    e = np.full_like(w, 1.2e-16)
+    rng = np.random.default_rng(seed)
+    return pd.DataFrame({"w": w, "f": grey * (f + rng.normal(0, e)), "e": grey * e}), grey * (o3c + o3w)
+
+
+def test_continuum_does_not_enter_line_fluxes():
+    """Lines are additive Gaussians from zero: a different linear continuum under the same lines (same noise)
+    changes no line flux."""
+    ref = L.fit_hbeta(synth_blend()[0])
+    for cont, slope in ((0.5, 1.0), (3.0, 1.0), (1.0, -2.0)):
+        r = L.fit_hbeta(synth_blend(cont=cont, slope=slope)[0])
+        for k in ("hb_broad", "oiii5007", "blend_flux"):
+            assert r[k] == pytest.approx(ref[k], rel=1e-4)
+
+
+def test_grey_factor_scales_everything():
+    rows = []
+    for i, k in enumerate((1.0, 0.4, 0.7, 1.2)):
+        r = L.fit_hbeta(synth_blend(grey=k)[0])
+        assert r["oiii5007"] / k == pytest.approx(L.fit_hbeta(synth_blend()[0])["oiii5007"], rel=1e-4)
+        rows.append({**{x: v for x, v in r.items() if x != "params"}, "MJD": 60000.0 + i})
+    t, _ = L.oiii_calibrate(pd.DataFrame(rows))
+    assert np.allclose(t.oiii_scale * np.array([1.0, 0.4, 0.7, 1.2]), t.oiii_scale.iloc[0] * 1.0, rtol=1e-4)
+
+
+def test_oiii_independent_of_broad_lines():
+    """The [O III] calibrator must not follow broad Hβ + the He I/Fe II blend (QC-0009: the old 37.5 Å 'wing'
+    took the blend, [O III] rose 25 % over Hβ ×0.5–1.6 and the calibrated Hβ was damped)."""
+    def spread(s):
+        o3 = [L.fit_hbeta(synth_blend(hb=h, seed=3)[0], s)["oiii5007"] for h in (0.5, 1.0, 1.6)]
+        return (max(o3) - min(o3)) / np.mean(o3)
+
+    assert spread(L.FitSettings()) < 0.20            # 14 % (one broad Gaussian cannot follow Hβ's red shoulder)
+    old = L.FitSettings(blend=False, oiii_wing_sigma_max=37.5, oiii_wing_max_shift=20.0)   # before QC-0009
+    assert spread(old) > 0.35                         # 47 %
+    r = L.fit_hbeta(synth_blend(seed=3)[0])
+    assert r["params"]["sw"] <= L.FitSettings().oiii_wing_sigma_max + 1e-9 and r["blend_flux"] > 0
+
+
+def test_blend_off_reproduces_old_model_parts():
+    s = L.FitSettings(blend=False)
+    r = L.fit_hbeta(synth(), s)
+    assert "Fe1" not in r["params"] and r["blend_flux"] == 0.0
+    assert np.all(L.model(r["params"], np.linspace(4800, 5000, 5), s, "blend") == 0)

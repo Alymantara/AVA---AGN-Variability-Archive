@@ -149,6 +149,10 @@ Daily volumes are small: ~200 photometry frames (~8 GB) and ~2 spectroscopy nigh
   folder lifts the restriction, with a warning.
 - **Arm for Hβ / 5100 Å.** `spectroscopy.products.hbeta_arm` (`auto`, `blue` or `red`). `auto` uses the red arm
   above `hbeta_red_arm_above_z` (0.09), one arm per target.
+- **Hβ fit model** (QC-0009, 21 Nov 2026). `spectroscopy.products.hbeta` has five new settings: `blend` (He I / Fe II
+  broad blend under [O III] fitted as its own component), `blend_sigma`, `blend_max_shift`, `oiii_wing_sigma_max`
+  (15 Å) and `oiii_wing_max_shift` (15 Å). The fit-cache key changed (`measures` 5), so the first products run
+  after the update refits every spectrum of every target once (about 0.1–0.3 s per spectrum).
 - **Repeat reductions** in the same work folder need the fork with `keep_template_free` (19 Nov 2026). It keeps
   `*-notpl` copies of the standards in the processed tree; do not delete them.
 

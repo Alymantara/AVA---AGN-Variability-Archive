@@ -57,7 +57,7 @@ def spec_products(target: str) -> dict:
                                     cache=cfg.spec_dir(target) / "hbeta_fits.parquet", arm=arm)
     logger.info("%s: Hβ fits: %d new, %d from the cache (%s)", target, meta.get("n_fitted", 0),
                 meta.get("n_cached", 0), cfg.spec_dir(target) / "hbeta_fits.parquet")
-    method = f"gauss{s.broad_components}b+oiii{'w' if s.oiii_wing else ''}"
+    method = f"gauss{s.broad_components}b+oiii{'w' if s.oiii_wing else ''}{'+blend' if s.blend else ''}"
     # 1. latest spectrum (two arms) and its Hβ fit (reference)
     latest = max(files, key=lambda f: P._header(f)["MJD-OBS"])
     hdr = P._header(latest)

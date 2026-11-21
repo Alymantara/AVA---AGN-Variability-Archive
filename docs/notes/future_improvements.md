@@ -1186,3 +1186,25 @@ Changes:
   whose size is an exact multiple of the page size costs one extra (empty) request.
 - **Retires** the Turgon workaround of `--window-days` per target (< 800 frames per window).
 - Tests: `tests/test_download_parallel.py` (2,500 frames in one window with `next = None`: all listed, 3 requests).
+
+## QC-0009: Hβ fit, [O III] wing and the He I / Fe II blend (21 Nov 2026)
+- **Question (Juan).** Do the Gaussians sit on top of the continuum instead of starting from zero? **No:** the model is
+  continuum + additive Gaussians, and the continuum never enters a line flux (synthetic test: line fluxes identical for
+  any linear continuum). The [O III] scale multiplies line and continuum alike, which is right for grey factors.
+- **Real defect.** The [O III] "blue wing" had a σ bound of 37.5 Å. It ran to that bound in 97/100 Fairall 9 and 6/6
+  Mrk 817 spectra, taking the He I 4922/5016 + Fe II 42 4924/5018 blend and the red wing of Hβ: ~46 % of the
+  calibration [O III] flux. It followed the broad lines, so the [O III] scale damped the calibrated Hβ (synthetic
+  series: 0.85 of the true change; Fairall 9 Hβ vs g band peak r 0.48).
+- **Fix.** `lines.FitSettings`: `blend` (two Gaussians at 4923.9 / 5018.4 Å, free fluxes, common σ 12–45 Å, shift
+  ≤ 10 Å; counted in neither [O III] nor Hβ, reported as `blend_flux`), wing σ ≤ 15 Å and shift ≤ 15 Å as settings.
+  Two-stage fit (no blend, then with it from those parameters): the one-stage start split core/wing less stably.
+  `integrated_hbeta` and `narrow_line_fluxes` also subtract the blend. `fit_key` measures 5 (everything refitted once).
+  Web plot: components labelled "above continuum", blend drawn.
+- **Result on the local series.** Fairall 9: χ²ν 2.67 → 1.48, wing at bound 97 → 18, calibrated-Hβ F_var 2.5 → 6.7 %,
+  same-night pair scatter 2.7 → 3.1 % (Hβ) and 4.0 → 4.4 % (5100 Å), Hβ vs g band peak r 0.48 → 0.81 (lag 22 d).
+  NGC 4151 (narrow wing already) barely changes.
+- **Still open.** One broad Gaussian cannot follow the red shoulder of Hβ (Mrk 817-type profiles): the wing still
+  reaches 15 Å when Hβ is bright. Next step if needed: a broadened Fe II template and/or a constrained second broad
+  Gaussian, accepted only if the same-night pair scatter stays at 1–3 %. Check on turgon with full series and against
+  PrepSpec's p(t). Details: `~/astro/AVA_QC/tests/QC-0009_*`.
+- Tests: `tests/test_spec_lines.py` (continuum invariance, grey factor, [O III] independent of the broad lines, blend off).

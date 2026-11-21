@@ -473,6 +473,11 @@ spectroscopy:
       narrow_sigma: [1.0, 15.0]    # narrow lines (instrument + [O III])
       max_shift: 20.0              # any line centre vs its rest wavelength
       oiii_wing: true              # blue-wing Gaussian in the [O III] doublet
+      oiii_wing_sigma_max: 15.0    # A; wider, the "wing" turns into a broad-line component (QC-0009)
+      oiii_wing_max_shift: 15.0    # A, wing centre vs [O III]
+      blend: true                  # He I 4922/5016 + Fe II 42 4924/5018 broad blend under [O III], its own component
+      blend_sigma: [12.0, 45.0]    # A
+      blend_max_shift: 10.0        # A
       loss: "soft_l1"              # robust least squares (scipy loss)
       loss_scale: 3.0              # residual (sigma) where the robust loss turns over
       max_nfev: 5000

@@ -59,7 +59,7 @@ def fit_key(s: L.FitSettings, z: float, arm: str = "blue") -> str:
     from dataclasses import asdict
 
     extra = {} if arm == "blue" else {"arm": arm}
-    return json.dumps({**asdict(s), "z": round(float(z), 7), "measures": 4, **extra}, sort_keys=True, default=list)   # 4: + the [O III] lines
+    return json.dumps({**asdict(s), "z": round(float(z), 7), "measures": 5, **extra}, sort_keys=True, default=list)   # 5: + He I/Fe II blend (QC-0009)
 
 
 def _file_stamp(f) -> tuple[int, int]:

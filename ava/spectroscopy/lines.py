@@ -5,11 +5,16 @@ Model (rest frame, blue arm = EXTRACTED order 2, ``fit_window`` default 4750–5
 
 * linear continuum about 4930 Å;
 * [O III] λλ4959, 5007: a tied doublet (4959 = 5007 / 2.98, same shift and width), each a core Gaussian plus an
-  optional blue-wing Gaussian (``oiii_wing``);
+  optional blue-wing Gaussian (``oiii_wing``, σ ≤ ``oiii_wing_sigma_max``, shift ≤ ``oiii_wing_max_shift``);
+* broad blend under [O III] (``blend``): He I λ4922/5016 + Fe II 42 λ4924/5018 as two Gaussians at 4923.9 and
+  5018.4 Å, free fluxes, common width and shift.  Counted in neither [O III] nor Hβ (QC-0009: without it the
+  [O III] wing ran to σ = 37.5 Å, took the blend and the red wing of Hβ — ~half the calibration flux — and the
+  [O III] scale then followed the broad lines and damped the calibrated Hβ);
 * narrow Hβ: shift and width of the [O III] core, flux free (≥ 0);
 * broad Hβ: ``broad_components`` Gaussians (default 1: on same-night exposure pairs a free 2-Gaussian broad
   model trades flux with the continuum, 8-19 % pair scatter, against 0.5-4 % for one), widths ``broad_sigma`` Å.
 
+Every line is an additive Gaussian from zero on the continuum (the continuum never enters a line flux).
 Robust least squares (soft-L1 loss: cosmic rays / residual spikes do not drive it), weights 1/σ.  Fluxes are
 analytic Gaussian integrals; errors from the Jacobian covariance scaled by the reduced χ².
 
@@ -30,6 +35,7 @@ import pandas as pd
 from scipy.optimize import least_squares
 
 HB, O3A, O3B = 4861.33, 4958.91, 5006.84
+FE1, FE2 = 4923.9, 5018.4          # Fe II 42 (He I 4921.9 / 5015.7 coincide at FLOYDS resolution)
 O3_RATIO = 2.98
 S2PI = np.sqrt(2 * np.pi)
 
@@ -44,6 +50,11 @@ class FitSettings:
     narrow_sigma: tuple = (1.0, 15.0)         # Å  (instrument + [O III])
     max_shift: float = 20.0                   # Å, any component vs its rest wavelength
     oiii_wing: bool = True
+    oiii_wing_sigma_max: float = 15.0         # Å; wider and the "wing" becomes a broad-line component (QC-0009)
+    oiii_wing_max_shift: float = 15.0         # Å, wing centre vs the [O III] rest wavelength
+    blend: bool = True                        # He I / Fe II 42 broad blend under [O III] (QC-0009)
+    blend_sigma: tuple = (12.0, 45.0)         # Å
+    blend_max_shift: float = 10.0             # Å
     loss: str = "soft_l1"
     loss_scale: float = 3.0                   # residual (in σ) where the robust loss turns over
     max_nfev: int = 5000
@@ -110,6 +121,8 @@ def _names(s: FitSettings):
         n += ["Fw", "dw", "sw"]
     for k in range(s.broad_components):
         n += [f"Fb{k}", f"db{k}", f"sb{k}"]
+    if s.blend:
+        n += ["Fe1", "Fe2", "de", "se"]
     return n
 
 
@@ -120,14 +133,27 @@ def model(p: dict, x, s: FitSettings, part: str | None = None):
         o3 = o3 + gauss(x, p["Fw"], O3B + p["dw"], p["sw"]) + gauss(x, p["Fw"] / O3_RATIO, O3A + p["dw"], p["sw"])
     hbn = gauss(x, p["Fnhb"], HB + p["dn"], p["sn"])
     hbb = sum(gauss(x, p[f"Fb{k}"], HB + p[f"db{k}"], p[f"sb{k}"]) for k in range(s.broad_components))
-    parts = {"cont": cont, "oiii": o3, "hb_narrow": hbn, "hb_broad": hbb}
-    return parts[part] if part else cont + o3 + hbn + hbb
+    bl = (gauss(x, p["Fe1"], FE1 + p["de"], p["se"]) + gauss(x, p["Fe2"], FE2 + p["de"], p["se"])
+          if s.blend and "Fe1" in p else 0.0 * x)
+    parts = {"cont": cont, "oiii": o3, "hb_narrow": hbn, "hb_broad": hbb, "blend": bl}
+    return parts[part] if part else cont + o3 + hbn + hbb + bl
 
 
-def fit_hbeta(sp: pd.DataFrame, s: FitSettings | None = None) -> dict:
+def fit_hbeta(sp: pd.DataFrame, s: FitSettings | None = None, start: dict | None = None) -> dict:
     """Fit one rest-frame spectrum. Returns fluxes (same units as the spectrum × Å), errors, parameters and
-    quality numbers; ``ok`` False with ``reason`` when the data cannot support the fit."""
+    quality numbers; ``ok`` False with ``reason`` when the data cannot support the fit.
+
+    With ``blend`` the fit runs in two stages: first without the blend, then with it, started from the first
+    fit's parameters (``start``).  A one-stage start splits [O III] core/wing less stably (QC-0009: Fairall 9
+    same-night 5100 Å pair scatter 6.4 % one-stage, 4.3 % two-stage)."""
     s = s or FitSettings()
+    if s.blend and start is None:
+        from dataclasses import replace
+
+        r0 = fit_hbeta(sp, replace(s, blend=False))
+        if not r0.get("params"):
+            return r0
+        return fit_hbeta(sp, s, start=r0["params"])
     x = sp[(sp.w > s.fit_window[0]) & (sp.w < s.fit_window[1])]
     span = s.fit_window[1] - s.fit_window[0]
     expected = span / max(np.median(np.diff(sp.w)), 1e-3) if len(sp) > 2 else 0
@@ -150,15 +176,22 @@ def fit_hbeta(sp: pd.DataFrame, s: FitSettings | None = None) -> dict:
     hi = {"c0": np.inf, "c1": np.inf, "dn": s.max_shift, "sn": s.narrow_sigma[1], "F5007": np.inf, "Fnhb": np.inf}
     if s.oiii_wing:
         p0.update(Fw=0.2 * fo3, dw=dpk - 3, sw=8.0)
-        lo.update(Fw=0, dw=-s.max_shift, sw=s.narrow_sigma[0])
-        hi.update(Fw=np.inf, dw=s.max_shift, sw=2.5 * s.narrow_sigma[1])
+        p0.update(sw=float(np.clip(8.0, s.narrow_sigma[0], s.oiii_wing_sigma_max)))
+        lo.update(Fw=0, dw=-s.oiii_wing_max_shift, sw=s.narrow_sigma[0])
+        hi.update(Fw=np.inf, dw=s.oiii_wing_max_shift, sw=s.oiii_wing_sigma_max)
     for k in range(s.broad_components):
         frac = (0.6, 0.4, 0.2)[k] if k < 3 else 0.1
         p0.update({f"Fb{k}": frac * fhb, f"db{k}": 0.0, f"sb{k}": float(np.clip((20, 45, 70)[min(k, 2)], *s.broad_sigma))})
         lo.update({f"Fb{k}": 0, f"db{k}": -2 * s.max_shift, f"sb{k}": s.broad_sigma[0]})
         hi.update({f"Fb{k}": np.inf, f"db{k}": 2 * s.max_shift, f"sb{k}": s.broad_sigma[1]})
+    if s.blend:
+        p0.update(Fe1=0.03 * fhb, Fe2=0.03 * fhb, de=0.0, se=float(np.clip(20.0, *s.blend_sigma)))
+        lo.update(Fe1=0, Fe2=0, de=-s.blend_max_shift, se=s.blend_sigma[0])
+        hi.update(Fe1=np.inf, Fe2=np.inf, de=s.blend_max_shift, se=s.blend_sigma[1])
+    if start:
+        p0.update({k: v for k, v in start.items() if k in p0})
     names = _names(s)
-    flux_like = {"c0", "c1", "F5007", "Fnhb", "Fw"} | {f"Fb{k}" for k in range(s.broad_components)}
+    flux_like = {"c0", "c1", "F5007", "Fnhb", "Fw", "Fe1", "Fe2"} | {f"Fb{k}" for k in range(s.broad_components)}
     norm = np.array([scale if n in flux_like else 1.0 for n in names])
     x0 = np.array([p0[n] for n in names]) / norm
     lb, ub = np.array([lo[n] for n in names]) / norm, np.array([hi[n] for n in names]) / norm
@@ -197,6 +230,8 @@ def fit_hbeta(sp: pd.DataFrame, s: FitSettings | None = None) -> dict:
            "oiii_sigma_A": p["sn"], "hb_fwhm_kms": float((above.max() - above.min()) / HB * 2.99792458e5),
            "cont5100": float(np.median(c5100.f)) if len(c5100) > 5 else np.nan,
            "cont5100_err": float(1.2533 * np.std(c5100.f) / np.sqrt(len(c5100))) if len(c5100) > 5 else np.nan,
+           "blend_flux": p["Fe1"] + p["Fe2"] if s.blend else 0.0,
+           "blend_flux_err": var_sum(["Fe1", "Fe2"]) if s.blend else 0.0,
            "chi2nu": chi2nu, "n_bins": len(w), "params": p}
     out["hb_snr"] = out["hb_broad"] / out["hb_broad_err"] if out["hb_broad_err"] > 0 else np.nan
     return out
@@ -252,7 +287,7 @@ def variability(f, e) -> dict:
 
 def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, window=None) -> float:
     """Cross-check of the broad Hβ flux: flux above the straight continuum through ``continuum_windows``,
-    minus the fitted narrow lines ([O III] wings, narrow Hβ), integrated over ``window`` (rest Å)."""
+    minus the fitted narrow lines ([O III] wings, narrow Hβ) and the He I/Fe II blend, integrated over ``window``."""
     s = s or FitSettings()
     window = window or s.integrated_window
     cw = np.zeros(len(sp), bool)
@@ -262,7 +297,7 @@ def integrated_hbeta(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None, 
         return np.nan
     c1, c0 = np.polyfit(sp.w[cw] - 4930.0, sp.f[cw], 1)
     x = sp[(sp.w > window[0]) & (sp.w < window[1])]
-    narrow = model(fit["params"], x.w.to_numpy(), s, "oiii") + model(fit["params"], x.w.to_numpy(), s, "hb_narrow")
+    narrow = sum(model(fit["params"], x.w.to_numpy(), s, k) for k in ("oiii", "hb_narrow", "blend"))
     return float(np.trapezoid(x.f - (c0 + c1 * (x.w - 4930.0)) - narrow, x.w))
 
 
@@ -286,7 +321,7 @@ def narrow_line_fluxes(sp: pd.DataFrame, fit: dict, s: FitSettings | None = None
         if len(x) < 10:
             continue
         w, e = x.w.to_numpy(), x.e.to_numpy()
-        r = x.f.to_numpy() - model(p, w, s, "cont") - model(p, w, s, "hb_broad")
+        r = x.f.to_numpy() - model(p, w, s, "cont") - model(p, w, s, "hb_broad") - model(p, w, s, "blend")
         prof = gauss(w, 1.0, c, p.get("sn", 4.0))
         if s.oiii_wing and fw > 0:
             prof = (prof + gauss(w, fw, lam + p.get("dw", 0.0), p.get("sw", 8.0))) / (1 + fw)

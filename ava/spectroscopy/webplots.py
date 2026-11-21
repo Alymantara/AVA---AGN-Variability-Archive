@@ -24,6 +24,7 @@ WIDTH = 9.0                      # inches; every spectroscopy web figure. The we
                                  # 9 in at 150 dpi keeps 14 pt text at ~15-16 px on screen (the page body size)
 BLUE, RED, GREEN, GREY = "#0072B2", "#D55E00", "#009E73", "0.45"
 ORANGE = "#E69F00"     # with GREEN: both [O III] lines; separable for colour-blind readers (B42)
+PINK = "#CC79A7"       # He I / Fe II blend under [O III] (QC-0009)
 INK, MUTED = "0.15", "0.45"
 LINES = {"[Ne V]": 3426.0, "[O II]": 3727.4, "Hδ": 4101.7, "Hγ": 4340.5, "He II": 4685.7, "Hβ": 4861.3,
          "[O III]": 5006.8, "He I": 5875.6, "[O I]": 6300.3, "Hα": 6562.8, "[S II]": 6724.0,
@@ -141,10 +142,16 @@ def latest_hbeta_fit(sp: pd.DataFrame, fit: dict, settings: L.FitSettings, hdr: 
         c = L.model(p, g, s, "cont")
         broad = L.model(p, g, s, "hb_broad")
         narrow = L.model(p, g, s, "oiii") + L.model(p, g, s, "hb_narrow")
-        a.fill_between(g, c / unit, (c + broad) / unit, color=BLUE, alpha=0.18, lw=0, label="broad Hβ", zorder=1)
+        # every line is an additive Gaussian from zero; here each is shaded on top of the fitted continuum (QC-0009)
+        a.fill_between(g, c / unit, (c + broad) / unit, color=BLUE, alpha=0.18, lw=0,
+                       label="broad Hβ (above continuum)", zorder=1)
         a.plot(g, (c + broad) / unit, color=BLUE, lw=2.0, zorder=4)
         a.fill_between(g, c / unit, (c + narrow) / unit, color=GREEN, alpha=0.25, lw=0,
-                       label="[O III] + narrow Hβ", zorder=1)
+                       label="[O III] + narrow Hβ (above continuum)", zorder=1)
+        blend = L.model(p, g, s, "blend")
+        if np.any(blend > 0):
+            a.plot(g, (c + blend) / unit, color=PINK, lw=1.8, ls="-.", label="He I / Fe II blend (above continuum)",
+                   zorder=4)
         a.plot(g, c / unit, color=GREY, lw=1.6, ls="--", label="continuum", zorder=4)
         a.plot(g, L.model(p, g, s) / unit, color=RED, lw=2.4, label="total model", zorder=5)
         mod = np.interp(x.w, g, L.model(p, g, s))
@@ -173,7 +180,8 @@ def latest_hbeta_fit(sp: pd.DataFrame, fit: dict, settings: L.FitSettings, hdr: 
     top.tick_params(direction="in", which="both")
     date = str(hdr.get("DATE-OBS", ""))[:10]
     top_ = _header(fig, f"{target_name} — Hβ fit, latest spectrum",
-                   f"{date} · MJD {hdr.get('MJD-OBS', 0):.2f} · reference fit; grey = continuum windows",
+                   f"{date} · MJD {hdr.get('MJD-OBS', 0):.2f} · lines shaded above the fitted continuum; "
+                   f"grey = continuum windows",
                    fig.get_figheight())
     fig.tight_layout(rect=(0, 0.015, 1, top_))
     fig.subplots_adjust(hspace=0.05)
